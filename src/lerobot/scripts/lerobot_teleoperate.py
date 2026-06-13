@@ -17,27 +17,28 @@ Simple script to control a robot from teleoperation.
 
 Requires: pip install 'lerobot[hardware]'
 
-Example:
+
+Example teleoperation with Meta Quest VR (telegrip) on SO-100:
 
 ```shell
 lerobot-teleoperate \
-    --robot.type=so101_follower \
-    --robot.port=/dev/tty.usbmodem58760431541 \
-    --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 1920, height: 1080, fps: 30}}" \
+    --robot.type=so100_follower \
+    --robot.port=/dev/tty.usbmodem58FD0170101 \
     --robot.id=black \
-    --teleop.type=so101_leader \
-    --teleop.port=/dev/tty.usbmodem58760431551 \
-    --teleop.id=blue \
+    --teleop.type=telegrip \
+    --teleop.urdf_path=.telegrip-ref/URDF/SO100/so100.urdf \
+    --teleop.controller_side=right \
     --display_data=true
 ```
+
 
 Example teleoperation with bimanual so100:
 
 ```shell
 lerobot-teleoperate \
   --robot.type=bi_so_follower \
-  --robot.left_arm_config.port=/dev/tty.usbmodem5A460822851 \
-  --robot.right_arm_config.port=/dev/tty.usbmodem5A460814411 \
+  --robot.left_arm_config.port=/dev/tty.usbmodem58FD0166521 \
+  --robot.right_arm_config.port=/dev/tty.usbmodem58FD0170101 \
   --robot.id=bimanual_follower \
   --robot.left_arm_config.cameras='{
     wrist: {"type": "opencv", "index_or_path": 1, "width": 640, "height": 480, "fps": 30},
@@ -45,8 +46,8 @@ lerobot-teleoperate \
     wrist: {"type": "opencv", "index_or_path": 2, "width": 640, "height": 480, "fps": 30},
   }' \
   --teleop.type=bi_so_leader \
-  --teleop.left_arm_config.port=/dev/tty.usbmodem5A460852721 \
-  --teleop.right_arm_config.port=/dev/tty.usbmodem5A460819811 \
+  --teleop.left_arm_config.port=/dev/tty.usbmodem58FD0166521 \
+  --teleop.right_arm_config.port=/dev/tty.usbmodem58FD0170101 \
   --teleop.id=bimanual_leader \
   --display_data=true
 ```
@@ -56,6 +57,7 @@ lerobot-teleoperate \
 import logging
 import time
 from dataclasses import asdict, dataclass
+from typing import Any
 from pprint import pformat
 
 from lerobot.cameras.opencv import OpenCVCameraConfig  # noqa: F401
@@ -68,9 +70,11 @@ from lerobot.processor import (
     RobotProcessorPipeline,
     make_default_processors,
 )
+from lerobot.teleoperators.telegrip import make_telegrip_processors
 from lerobot.robots import (  # noqa: F401
     Robot,
     RobotConfig,
+    so_follower,
     bi_openarm_follower,
     bi_rebot_b601_follower,
     bi_so_follower,
@@ -103,6 +107,7 @@ from lerobot.teleoperators import (  # noqa: F401
     rebot_102_leader,
     so_leader,
     unitree_g1,
+    telegrip,
 )
 from lerobot.utils.import_utils import register_third_party_plugins
 from lerobot.utils.robot_utils import precise_sleep
@@ -126,6 +131,56 @@ class TeleoperateConfig:
     display_port: int | None = None
     # Whether to  display compressed images in Rerun
     display_compressed_images: bool = False
+
+
+_BUS_MAX_RETRIES = 5
+_BUS_RETRY_DELAY_S = 0.01
+_BUS_SETTLE_AFTER_WRITE_S = 0.003
+_BUS_MAX_CONSECUTIVE_FAILURES = 30
+
+
+def _clear_robot_bus(robot: Robot) -> None:
+    if isinstance(robot, so_follower.SOFollower) and robot.is_connected:
+        try:
+            robot.bus.port_handler.clearPort()
+        except Exception:
+            pass
+
+
+def _retry_bus_op(
+    description: str,
+    op,
+    *,
+    robot: Robot | None = None,
+    max_retries: int = _BUS_MAX_RETRIES,
+):
+    last_error: Exception | None = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            return op()
+        except ConnectionError as error:
+            last_error = error
+            logging.warning(
+                "%s failed (%s/%s): %s",
+                description,
+                attempt,
+                max_retries,
+                error,
+            )
+            if robot is not None:
+                _clear_robot_bus(robot)
+            if attempt < max_retries:
+                time.sleep(_BUS_RETRY_DELAY_S * attempt)
+    assert last_error is not None
+    raise last_error
+
+
+def _motor_positions_from_observation(obs: dict[str, Any]) -> dict[str, float]:
+    return {
+        key.removesuffix(".pos"): float(value)
+        for key, value in obs.items()
+        if isinstance(key, str) and key.endswith(".pos")
+    }
 
 
 def teleop_loop(
@@ -158,14 +213,40 @@ def teleop_loop(
 
     display_len = max(len(key) for key in robot.action_features)
     start = time.perf_counter()
+    consecutive_bus_failures = 0
+    cached_obs: dict[str, Any] | None = None
+    use_cached_telegrip_obs = teleop.name == "telegrip" and not display_data
+    if use_cached_telegrip_obs:
+        cached_obs = _retry_bus_op(
+            "Initial robot observation read",
+            robot.get_observation,
+            robot=robot,
+        )
+
     while True:
         loop_start = time.perf_counter()
 
-        # Get robot observation
-        # Not really needed for now other than for visualization
-        # teleop_action_processor can take None as an observation
-        # given that it is the identity processor as default
-        obs = robot.get_observation()
+        if cached_obs is not None:
+            obs = cached_obs.copy()
+        else:
+            try:
+                obs = _retry_bus_op(
+                    "Robot observation read",
+                    robot.get_observation,
+                    robot=robot,
+                )
+                consecutive_bus_failures = 0
+            except ConnectionError:
+                consecutive_bus_failures += 1
+                logging.warning(
+                    "Skipping teleop frame after bus read failures (%s/%s).",
+                    consecutive_bus_failures,
+                    _BUS_MAX_CONSECUTIVE_FAILURES,
+                )
+                if consecutive_bus_failures >= _BUS_MAX_CONSECUTIVE_FAILURES:
+                    raise
+                time.sleep(0.05)
+                continue
 
         if robot.name == "unitree_g1":
             teleop.send_feedback(obs)
@@ -178,9 +259,48 @@ def teleop_loop(
 
         # Process action for robot through pipeline
         robot_action_to_send = robot_action_processor((teleop_action, obs))
+        if not robot_action_to_send:
+            dt_s = time.perf_counter() - loop_start
+            precise_sleep(max(1 / fps - dt_s, 0.0))
+            loop_s = time.perf_counter() - loop_start
+            print(f"Teleop loop time: {loop_s * 1e3:.2f}ms ({1 / loop_s:.0f} Hz)")
+            move_cursor_up(1)
+
+            if duration is not None and time.perf_counter() - start >= duration:
+                return
+            continue
 
         # Send processed action to robot (robot_action_processor.to_output should return RobotAction)
-        _ = robot.send_action(robot_action_to_send)
+        present_pos = _motor_positions_from_observation(obs)
+        try:
+            if isinstance(robot, so_follower.SOFollower):
+                _ = _retry_bus_op(
+                    "Robot action write",
+                    lambda: robot.send_action(robot_action_to_send, present_pos=present_pos),
+                    robot=robot,
+                )
+            else:
+                _ = _retry_bus_op(
+                    "Robot action write",
+                    lambda: robot.send_action(robot_action_to_send),
+                    robot=robot,
+                )
+        except ConnectionError:
+            consecutive_bus_failures += 1
+            logging.warning(
+                "Skipping teleop frame after bus write failures (%s/%s).",
+                consecutive_bus_failures,
+                _BUS_MAX_CONSECUTIVE_FAILURES,
+            )
+            if consecutive_bus_failures >= _BUS_MAX_CONSECUTIVE_FAILURES:
+                raise
+            time.sleep(0.05)
+            continue
+
+        consecutive_bus_failures = 0
+        if cached_obs is not None:
+            cached_obs.update(robot_action_to_send)
+        time.sleep(_BUS_SETTLE_AFTER_WRITE_S)
 
         if display_data:
             # Process robot observation through pipeline
@@ -223,7 +343,12 @@ def teleoperate(cfg: TeleoperateConfig):
 
     teleop = make_teleoperator_from_config(cfg.teleop)
     robot = make_robot_from_config(cfg.robot)
-    teleop_action_processor, robot_action_processor, robot_observation_processor = make_default_processors()
+    if cfg.teleop.type == "telegrip":
+        teleop_action_processor, robot_action_processor, robot_observation_processor = make_telegrip_processors(
+            robot, cfg.teleop
+        )
+    else:
+        teleop_action_processor, robot_action_processor, robot_observation_processor = make_default_processors()
 
     teleop.connect()
     robot.connect()

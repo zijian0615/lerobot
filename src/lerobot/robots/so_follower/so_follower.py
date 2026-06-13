@@ -33,6 +33,9 @@ from .config_so_follower import SOFollowerRobotConfig
 
 logger = logging.getLogger(__name__)
 
+# Extra retries help teleoperation loops survive transient Feetech bus drops under load.
+_BUS_SYNC_READ_RETRIES = 5
+
 
 class SOFollower(Robot):
     """
@@ -178,7 +181,7 @@ class SOFollower(Robot):
     def get_observation(self) -> RobotObservation:
         # Read arm position
         start = time.perf_counter()
-        obs_dict = self.bus.sync_read("Present_Position")
+        obs_dict = self.bus.sync_read("Present_Position", num_retry=_BUS_SYNC_READ_RETRIES)
         obs_dict = {f"{motor}.pos": val for motor, val in obs_dict.items()}
         dt_ms = (time.perf_counter() - start) * 1e3
         logger.debug(f"{self} read state: {dt_ms:.1f}ms")
@@ -193,12 +196,19 @@ class SOFollower(Robot):
         return obs_dict
 
     @check_if_not_connected
-    def send_action(self, action: RobotAction) -> RobotAction:
+    def send_action(
+        self, action: RobotAction, present_pos: dict[str, float] | None = None
+    ) -> RobotAction:
         """Command arm to move to a target joint configuration.
 
         The relative action magnitude may be clipped depending on the configuration parameter
         `max_relative_target`. In this case, the action sent differs from original action.
         Thus, this function always returns the action actually sent.
+
+        Args:
+            action: Target joint positions keyed as ``{motor}.pos``.
+            present_pos: Optional pre-read joint positions keyed by motor name. When provided,
+                avoids an extra bus read during safety clamping (useful in teleop loops).
 
         Raises:
             RobotDeviceNotConnectedError: if robot is not connected.
@@ -210,14 +220,14 @@ class SOFollower(Robot):
         goal_pos = {key.removesuffix(".pos"): val for key, val in action.items() if key.endswith(".pos")}
 
         # Cap goal position when too far away from present position.
-        # /!\ Slower fps expected due to reading from the follower.
         if self.config.max_relative_target is not None:
-            present_pos = self.bus.sync_read("Present_Position")
+            if present_pos is None:
+                present_pos = self.bus.sync_read("Present_Position", num_retry=_BUS_SYNC_READ_RETRIES)
             goal_present_pos = {key: (g_pos, present_pos[key]) for key, g_pos in goal_pos.items()}
             goal_pos = ensure_safe_goal_position(goal_present_pos, self.config.max_relative_target)
 
         # Send goal position to the arm
-        self.bus.sync_write("Goal_Position", goal_pos)
+        self.bus.sync_write("Goal_Position", goal_pos, num_retry=3)
         return {f"{motor}.pos": val for motor, val in goal_pos.items()}
 
     @check_if_not_connected
