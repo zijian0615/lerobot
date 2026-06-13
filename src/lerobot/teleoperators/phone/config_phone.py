@@ -31,6 +31,10 @@ class PhoneOS(Enum):
 @dataclass
 class PhoneConfig(TeleoperatorConfig):
     phone_os: PhoneOS = PhoneOS.IOS
+    # HEBI Mobile I/O module lookup (iOS). Must match Settings in the app.
+    hebi_family: str = "HEBI"
+    hebi_name: str = "mobileIO"
+    hebi_lookup_timeout_s: float = 20.0
     camera_offset = np.array(
         [0.0, -0.02, 0.04]
     )  # iPhone 14 Pro camera is 2cm off center and 4cm above center

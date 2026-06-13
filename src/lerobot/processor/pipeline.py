@@ -314,6 +314,10 @@ class DataProcessorPipeline[TInput, TOutput](HubMixin):
             # Execute post-hooks
             for hook in self.after_step_hooks:
                 hook(idx, transition)
+
+            action = transition.get(TransitionKey.ACTION)
+            if isinstance(action, dict) and not action:
+                break
         return transition
 
     def step_through(self, data: TInput) -> Iterable[EnvTransition]:

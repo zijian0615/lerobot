@@ -18,6 +18,22 @@
 # hebi: https://docs.hebi.us/tools.html#mobile-io
 # teleop: https://github.com/SpesRobotics/teleop
 
+
+'''
+lerobot-teleoperate \
+  --robot.type=xarm \
+  --robot.robot_ip=192.168.1.204 \
+  --robot.robot_mode=1 \
+  --robot.phone_ee_x_min_mm 100 \
+  --robot.phone_ee_y_min_mm -600 \
+  --robot.phone_ee_z_min_mm 30 \
+  --robot.phone_ee_x_max_mm 900 \
+  --robot.phone_ee_y_max_mm 300 \
+  --robot.phone_ee_z_max_mm 650 \
+  --robot.phone_max_ee_step_mm 40 \
+  --teleop.type=phone \
+  --teleop.phone_os=IOS
+'''
 import logging
 import threading
 import time
@@ -52,6 +68,11 @@ class BasePhone:
 
     def _reapply_position_calibration(self, pos: np.ndarray) -> None:
         self._calib_pos = pos.copy()
+
+    def _reapply_calibration(self, pos: np.ndarray, rot: Rotation) -> None:
+        """Re-latch position and orientation reference (e.g. on B1 / Move rising edge)."""
+        self._calib_pos = pos.copy()
+        self._calib_rot_inv = rot.inv()
 
     @property
     def is_calibrated(self) -> bool:
@@ -89,6 +110,7 @@ class IOSPhone(BasePhone, Teleoperator):
         super().__init__(config)
         self.config = config
         self._group = None
+        self._group_feedback = None
 
     @property
     def is_connected(self) -> bool:
@@ -96,14 +118,42 @@ class IOSPhone(BasePhone, Teleoperator):
 
     @check_if_already_connected
     def connect(self) -> None:
-        logger.info("Connecting to IPhone, make sure to open the HEBI Mobile I/O app.")
+        family = self.config.hebi_family
+        name = self.config.hebi_name
+        logger.info(
+            "Connecting to iPhone via HEBI Mobile I/O (family=%r, name=%r). "
+            "Open the app on your phone first.",
+            family,
+            name,
+        )
         lookup = hebi.Lookup()
-        time.sleep(2.0)
-        group = lookup.get_group_from_names(["HEBI"], ["mobileIO"])
+        deadline = time.time() + self.config.hebi_lookup_timeout_s
+        group = None
+        while time.time() < deadline:
+            time.sleep(1.0)
+            group = lookup.get_group_from_names([family], [name])
+            if group is not None:
+                break
         if group is None:
-            raise RuntimeError("Mobile I/O not found — check name/family settings in the app.")
+            discovered = [f"{entry.family}/{entry.name}" for entry in lookup.entrylist]
+            hint = (
+                f"HEBI module {family}/{name} not found within "
+                f"{self.config.hebi_lookup_timeout_s:.0f}s.\n"
+                "Checklist:\n"
+                "  1. iPhone and Mac on the same Wi‑Fi (no cellular-only / guest network isolation)\n"
+                "  2. HEBI Mobile I/O app is open and streaming (Settings → family/name match above)\n"
+                "  3. Disable VPN; allow local network access for the app on iOS\n"
+                "  4. macOS firewall allows incoming for Python/Terminal\n"
+            )
+            if discovered:
+                hint += f"Discovered HEBI modules on network: {', '.join(discovered)}\n"
+            else:
+                hint += "No HEBI modules discovered on the network.\n"
+            raise RuntimeError(hint)
         self._group = group
-        logger.info(f"{self} connected to HEBI group with {group.size} module(s).")
+        self._group_feedback = hebi.GroupFeedback(group.size)
+        group.feedback_frequency = 200.0
+        logger.info("%s connected to HEBI group with %d module(s).", self, group.size)
 
         self.calibrate()
 
@@ -162,7 +212,9 @@ class IOSPhone(BasePhone, Teleoperator):
             - The orientation as a `Rotation` object, or None if not available.
             - The raw HEBI feedback object for accessing other data like button presses.
         """
-        fbk = self._group.get_next_feedback()
+        fbk = self._group.get_next_feedback(reuse_fbk=self._group_feedback)
+        if fbk is None:
+            return False, None, None, None
         pose = fbk[0]
         ar_pos = getattr(pose, "ar_position", None)
         ar_quat = getattr(pose, "ar_orientation", None)
@@ -199,9 +251,9 @@ class IOSPhone(BasePhone, Teleoperator):
 
         enable = bool(raw_inputs.get("b1", 0))
 
-        # Rising edge then re-capture calibration immediately from current raw pose
+        # Rising edge: re-latch position + orientation so deltas start from zero.
         if enable and not self._enabled:
-            self._reapply_position_calibration(raw_position)
+            self._reapply_calibration(raw_position, raw_rotation)
 
         # Apply calibration
         pos_cal = self._calib_rot_inv.apply(raw_position - self._calib_pos)
@@ -219,6 +271,7 @@ class IOSPhone(BasePhone, Teleoperator):
     @check_if_not_connected
     def disconnect(self) -> None:
         self._group = None
+        self._group_feedback = None
 
 
 class AndroidPhone(BasePhone, Teleoperator):
@@ -344,9 +397,9 @@ class AndroidPhone(BasePhone, Teleoperator):
 
         enable = bool(raw_inputs.get("move", False))
 
-        # Rising edge then re-capture calibration immediately from current raw pose
+        # Rising edge: re-latch position + orientation so deltas start from zero.
         if enable and not self._enabled:
-            self._reapply_position_calibration(raw_pos)
+            self._reapply_calibration(raw_pos, raw_rot)
 
         # Apply calibration
         pos_cal = self._calib_rot_inv.apply(raw_pos - self._calib_pos)

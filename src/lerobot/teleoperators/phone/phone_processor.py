@@ -58,6 +58,9 @@ class MapPhoneActionToRobotAction(RobotActionProcessorStep):
             ValueError: If 'pos' or 'rot' keys are missing from the input action.
         """
         # Pop them from the action
+        if not action or "phone.enabled" not in action:
+            return {}
+
         enabled = bool(action.pop("phone.enabled"))
         pos = action.pop("phone.pos")
         rot = action.pop("phone.rot")

@@ -16,6 +16,7 @@ import numpy as np
 #       Neural Networks", CVPR 2019.
 
 _ROT6D_KEYS = ("r0", "r1", "r2", "r3", "r4", "r5")
+_POS_KEYS = ("j0", "j1", "j2")
 
 
 def _aa_to_rot6d(rx: float, ry: float, rz: float) -> Tuple[float, ...]:
@@ -130,10 +131,7 @@ class XArmRobot(Robot):
         self._mode = config.robot_mode
         self._gripper_type = GripperType(config.gripper_type)
         self._cmd_cnt = 0
-        # mode=1 伺服重稳定标志：置 True 时，下一次 send_action 会先以当前真实
-        # 位姿"原地踏步"若干帧，再恢复目标跟踪。用于 move_to_home 后或离合接合
-        # 时，避免伺服高增益控制器首帧猛追导致机械臂飘逸。
-        self._servo_restab = True
+        self._need_approach = False
 
         self._joint_speed = math.radians(config.robot_speed)
         self._joint_acc = math.radians(config.robot_acc)
@@ -149,6 +147,8 @@ class XArmRobot(Robot):
         self._latest_pose: Optional[np.ndarray] = None  # [x,y,z,rx,ry,rz] in radians
         self._latest_t: Optional[float] = None
         self._latest_gripper_norm: float = 0.0
+        # mode=1 EMA 状态：[j0, j1, j2, r0..r5]（6D 空间，转轴角之前）
+        self._ema_state: Optional[np.ndarray] = None
 
         # 相机异步缓存：后台线程持续采集，主循环只读最新帧
         self._cam_frames: dict = {}        # cam_name -> latest np.ndarray
@@ -330,10 +330,9 @@ class XArmRobot(Robot):
         self.real_arm.set_state(0)
         time.sleep(0.3)
 
-    def request_servo_restabilize(self) -> None:
-        """请求下一次 send_action 先做 mode=1 伺服重稳定（原地踏步），
-        用于离合接合等需要避免伺服首帧猛追的场景。"""
-        self._servo_restab = True
+    def request_approach_first_frame(self) -> None:
+        """请求下一次 send_action 先用 mode 0 低速移到首帧位姿（同 mode=6 首帧逻辑）。"""
+        self._need_approach = True
 
     def move_to_home(self, speed_deg_s: float = 30.0) -> None:
         """以低速平滑运动到 start_joints，用于 episode 间归位，避免下集开头跳变。
@@ -362,7 +361,7 @@ class XArmRobot(Robot):
         self.real_arm.set_mode(self._mode)
         self.real_arm.set_state(0)
         self._cmd_cnt = 0
-        self._servo_restab = True   # 让下次 send_action 重走 mode=1 首帧稳定逻辑
+        self._need_approach = True
         time.sleep(0.1)
         logger.info("XArmRobot: home reached.")
 
@@ -390,6 +389,7 @@ class XArmRobot(Robot):
 
         self.cameras = {}
         self._cam_frames = {}
+        self._ema_state = None
         self._connected = False
         logger.info("XArmRobot: disconnected.")
 
@@ -504,6 +504,93 @@ class XArmRobot(Robot):
             rz = float(action.get("j5", 0.0))
         return [x, y, z, rx, ry, rz]
 
+    def _action_to_cartesian_state(self, action: Dict) -> Optional[np.ndarray]:
+        """action → [j0,j1,j2,r0..r5]；无法解析时返回 None。"""
+        if not all(k in action for k in _POS_KEYS):
+            return None
+        pos = [float(action[k]) for k in _POS_KEYS]
+        if all(k in action for k in _ROT6D_KEYS):
+            rot = [float(action[k]) for k in _ROT6D_KEYS]
+        elif all(f"j{i}" in action for i in (3, 4, 5)):
+            rot = list(_aa_to_rot6d(float(action["j3"]), float(action["j4"]), float(action["j5"])))
+        else:
+            return None
+        return np.array(pos + rot, dtype=np.float64)
+
+    def _cartesian_state_to_action(self, state: np.ndarray, template: Dict) -> Dict:
+        out = dict(template)
+        for i, k in enumerate(_POS_KEYS):
+            out[k] = float(state[i])
+        for i, k in enumerate(_ROT6D_KEYS):
+            out[k] = float(state[3 + i])
+        for j in ("j3", "j4", "j5"):
+            out.pop(j, None)
+        return out
+
+    def _approach_first_frame_cartesian(self, pose: list) -> None:
+        """mode=1 首帧：切 mode 0 低速移到目标，再切回 mode 1（同 mode=6 思路）。"""
+        if not self.config.approach_first_frame:
+            return
+
+        _, cur_pose = self.real_arm.get_position_aa(is_radian=True)
+        if cur_pose is not None:
+            pos_err = float(np.linalg.norm(np.array(pose[:3]) - np.array(cur_pose[:3])))
+            if pos_err < self.config.approach_pos_threshold_mm:
+                logger.info(
+                    "XArmRobot: within %.1f mm of first frame, skip approach.",
+                    self.config.approach_pos_threshold_mm,
+                )
+                return
+
+        logger.info(
+            "XArmRobot: approaching first frame at %.0f mm/s …",
+            self.config.approach_speed,
+        )
+        if self.real_arm.mode != 0:
+            self.real_arm.set_mode(0)
+            self.real_arm.set_state(0)
+            time.sleep(0.1)
+        code = self.real_arm.set_position_aa(
+            pose,
+            is_radian=True,
+            speed=self.config.approach_speed,
+            mvacc=self.config.approach_acc,
+            wait=True,
+        )
+        if code != 0:
+            logger.warning("approach_first_frame: set_position_aa returned code=%d", code)
+        self.real_arm.set_mode(1)
+        self.real_arm.set_state(0)
+        time.sleep(0.1)
+
+    def _init_ema_from_pose_aa(self, pose) -> None:
+        """用当前真实位姿（轴角）初始化 EMA 状态。"""
+        rot6d = _aa_to_rot6d(float(pose[3]), float(pose[4]), float(pose[5]))
+        self._ema_state = np.array([pose[0], pose[1], pose[2], *rot6d], dtype=np.float64)
+
+    def _smooth_cartesian_action_ema(self, action: Dict) -> Dict:
+        """mode=1：在 _action_to_pose 之前对位置 + 6D 旋转做 EMA。"""
+        alpha = self.config.ema_alpha
+        if alpha <= 0.0:
+            return action
+        target = self._action_to_cartesian_state(action)
+        if target is None:
+            return action
+        if alpha >= 1.0:
+            self._ema_state = target.copy()
+            return action
+        if self._ema_state is None:
+            if self._connected and self.real_arm is not None:
+                code, cur_pose = self.real_arm.get_position_aa(is_radian=True)
+                if code == 0 and cur_pose is not None:
+                    self._init_ema_from_pose_aa(cur_pose[:6])
+                else:
+                    self._ema_state = target.copy()
+            else:
+                self._ema_state = target.copy()
+        self._ema_state = alpha * target + (1.0 - alpha) * self._ema_state
+        return self._cartesian_state_to_action(self._ema_state, action)
+
     def send_action(self, action: Dict) -> Dict:
         """
         发送控制指令。
@@ -590,27 +677,18 @@ class XArmRobot(Robot):
                 )
         else:
             # mode=1: Cartesian servo（笛卡尔伺服，每帧直接覆盖目标位置，无轨迹队列）
-            pose = self._action_to_pose(action)
-
-            if self.real_arm.mode != 1 or self._servo_restab:
-                # 切换到 Cartesian servo 模式（若已在 mode=1 则只做重稳定）
-                if self.real_arm.mode != 1:
-                    self.real_arm.set_mode(1)
-                    self.real_arm.set_state(0)
-                    time.sleep(0.1)
-                # 进入 servo / 重稳定时，先以当前真实位置"原地踏步"若干帧，
-                # 防止 servo 高增益控制器因首帧偏差产生剧烈抖动/飘逸。
-                _, cur_pose = self.real_arm.get_position_aa(is_radian=True)
-                if cur_pose is not None:
-                    for _ in range(5):
-                        self.real_arm.set_servo_cartesian_aa(
-                            cur_pose[:6],
-                            is_radian=True,
-                            speed=self.config.robot_speed,
-                            mvacc=self.config.robot_acc,
-                        )
-                        time.sleep(0.01)
-                self._servo_restab = False
+            if self._cmd_cnt == 0 or self._need_approach:
+                pose = self._action_to_pose(action)
+                self._approach_first_frame_cartesian(pose)
+                self._init_ema_from_pose_aa(pose)
+                self._need_approach = False
+            else:
+                action = self._smooth_cartesian_action_ema(action)
+                pose = self._action_to_pose(action)
+            if self.real_arm.mode != 1:
+                self.real_arm.set_mode(1)
+                self.real_arm.set_state(0)
+                time.sleep(0.1)
             self.real_arm.set_servo_cartesian_aa(
                 pose,
                 is_radian=True,

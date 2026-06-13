@@ -54,5 +54,28 @@ class XArmConfig(RobotConfig):
     # 首次录制建议保持 True 以确保起点一致。
     move_to_start_on_connect: bool = True
 
+    # ---- mode=1 笛卡尔伺服平滑 ----
+    # 对位置 j0..j2 与 6D 旋转 r0..r5 做 EMA（在转轴角之前），抑制高频抖动。
+    # 轴角 j3..j5 会先转为 6D 再滤波。0=关闭，1.0=无滤波。
+    ema_alpha: float = 0.3
+
+    # ---- mode=1 首帧 approach（同 mode=6 思路） ----
+    # 首帧切 mode 0，低速 set_position_aa(wait=True) 移到轨迹起点，再切 mode 1 伺服。
+    approach_first_frame: bool = True
+    approach_speed: float = 30.0       # mm/s
+    approach_acc: float = 200.0        # mm/s^2
+    approach_pos_threshold_mm: float = 5.0  # 距起点小于此值则跳过 approach
+
+    # ---- Phone 遥操（lerobot-teleoperate --teleop.type=phone） ----
+    # 末端绝对位置工作空间裁剪（xArm 基坐标系，mm）：超出后机械臂不再跟随该方向。
+    phone_ee_x_min_mm: float = 150.0
+    phone_ee_y_min_mm: float = -500.0
+    phone_ee_z_min_mm: float = 50.0
+    phone_ee_x_max_mm: float = 650.0
+    phone_ee_y_max_mm: float = 200.0
+    phone_ee_z_max_mm: float = 600.0
+    # 每帧末端最大位移（mm），防止 phone 丢帧或猛动造成突变。
+    phone_max_ee_step_mm: float = 20.0
+
     # ---- 可选相机 ----
     cameras: dict[str, CameraConfig] = field(default_factory=dict)

@@ -31,6 +31,19 @@ lerobot-teleoperate \
     --display_data=true
 ```
 
+Example teleoperation with phone on xArm (iOS HEBI or Android WebXR):
+
+```shell
+lerobot-teleoperate \
+    --robot.type=xarm \
+    --robot.robot_ip=192.168.1.127 \
+    --robot.robot_mode=1 \
+    --robot.gripper_type=1 \
+    --teleop.type=phone \
+    --teleop.phone_os=IOS \
+    --display_data=true
+```
+
 
 Example teleoperation with bimanual so100:
 
@@ -74,7 +87,6 @@ from lerobot.teleoperators.telegrip import make_telegrip_processors
 from lerobot.robots import (  # noqa: F401
     Robot,
     RobotConfig,
-    so_follower,
     bi_openarm_follower,
     bi_rebot_b601_follower,
     bi_so_follower,
@@ -88,7 +100,9 @@ from lerobot.robots import (  # noqa: F401
     rebot_b601_follower,
     so_follower,
     unitree_g1 as unitree_g1_robot,
+    xarm,
 )
+from lerobot.robots.xarm import make_phone_xarm_processors
 from lerobot.teleoperators import (  # noqa: F401
     Teleoperator,
     TeleoperatorConfig,
@@ -103,6 +117,7 @@ from lerobot.teleoperators import (  # noqa: F401
     omx_leader,
     openarm_leader,
     openarm_mini,
+    phone,
     reachy2_teleoperator,
     rebot_102_leader,
     so_leader,
@@ -345,6 +360,10 @@ def teleoperate(cfg: TeleoperateConfig):
     robot = make_robot_from_config(cfg.robot)
     if cfg.teleop.type == "telegrip":
         teleop_action_processor, robot_action_processor, robot_observation_processor = make_telegrip_processors(
+            robot, cfg.teleop
+        )
+    elif cfg.teleop.type == "phone" and cfg.robot.type == "xarm":
+        teleop_action_processor, robot_action_processor, robot_observation_processor = make_phone_xarm_processors(
             robot, cfg.teleop
         )
     else:
