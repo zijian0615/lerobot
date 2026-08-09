@@ -1,0 +1,30 @@
+{
+  "objects": [
+    {
+      "name": "black_panther_plush",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm"
+      ]
+    },
+    {
+      "name": "grey_plush_pair",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm"
+      ]
+    },
+    {
+      "name": "quest_headset",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm"
+      ]
+    },
+    {
+      "name": "pliers",
+      "blocked_by": null,
+      "in_workspace": []
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+[
+  {
+    "step": 1,
+    "arm": "xarm",
+    "primitive": "Grasp",
+    "args": {
+      "object": "grey_stuffed_animal"
+    },
+    "depends_on": []
+  },
+  {
+    "step": 2,
+    "arm": "xarm",
+    "primitive": "Place",
+    "args": {
+      "object": "grey_stuffed_animal",
+      "destination": "free_space"
+    },
+    "depends_on": [
+      1
+    ]
+  }
+]

@@ -1,0 +1,23 @@
+{
+  "objects": [
+    {
+      "name": "grey_stuffed_animal",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm"
+      ]
+    },
+    {
+      "name": "plastic_container",
+      "blocked_by": "grey_stuffed_animal",
+      "in_workspace": []
+    },
+    {
+      "name": "black_stuffed_animal",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm"
+      ]
+    }
+  ]
+}

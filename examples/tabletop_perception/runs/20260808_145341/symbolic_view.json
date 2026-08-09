@@ -1,0 +1,33 @@
+{
+  "objects": [
+    {
+      "name": "orange_box",
+      "blocked_by": null,
+      "in_workspace": []
+    },
+    {
+      "name": "black_stuffed_animal",
+      "blocked_by": null,
+      "in_workspace": []
+    },
+    {
+      "name": "grey_stuffed_animal",
+      "blocked_by": null,
+      "in_workspace": []
+    },
+    {
+      "name": "plastic_container",
+      "blocked_by": "grey_stuffed_animal",
+      "in_workspace": [
+        "xarm"
+      ]
+    },
+    {
+      "name": "vr_headset",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm"
+      ]
+    }
+  ]
+}

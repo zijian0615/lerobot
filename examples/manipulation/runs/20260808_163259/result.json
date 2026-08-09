@@ -1,0 +1,117 @@
+{
+  "status": "success",
+  "reason": "",
+  "plan": [
+    {
+      "step": 1,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "args": {
+        "object": "yellow_stuffed_animal"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm",
+      "primitive": "Place",
+      "args": {
+        "object": "yellow_stuffed_animal",
+        "destination": "free_space"
+      },
+      "depends_on": [
+        1
+      ]
+    }
+  ],
+  "bound": [
+    {
+      "step": 1,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.07679999999999998,
+          0.051428571428571435,
+          0.2,
+          1.5707963267948966
+        ],
+        "object": "yellow_stuffed_animal"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          -0.2713140139091681,
+          -0.172827429169821,
+          0.2,
+          1.5707963267948966
+        ],
+        "object": "yellow_stuffed_animal",
+        "destination": "free_space"
+      },
+      "depends_on": [
+        1
+      ]
+    }
+  ],
+  "results": [
+    {
+      "step": 1,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "yellow_stuffed_animal"
+      }
+    },
+    {
+      "step": 2,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          -0.2713140139091681,
+          -0.172827429169821,
+          0.2,
+          1.5707963267948966
+        ],
+        "object": "yellow_stuffed_animal",
+        "observed_xy": [
+          -0.2713140139091681,
+          -0.172827429169821
+        ],
+        "xy_error": 0.0
+      }
+    }
+  ],
+  "symbolic_view": {
+    "objects": [
+      {
+        "name": "yellow_stuffed_animal",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm"
+        ]
+      },
+      {
+        "name": "grey_stuffed_animal",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm"
+        ]
+      },
+      {
+        "name": "plastic_case",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm"
+        ]
+      }
+    ]
+  }
+}

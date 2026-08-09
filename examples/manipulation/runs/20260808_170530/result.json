@@ -1,0 +1,110 @@
+{
+  "status": "success",
+  "reason": "",
+  "plan": [
+    {
+      "step": 1,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "args": {
+        "object": "black_bear"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm",
+      "primitive": "Place",
+      "args": {
+        "object": "black_bear",
+        "destination": "clear_plastic_case"
+      },
+      "depends_on": [
+        1
+      ]
+    }
+  ],
+  "bound": [
+    {
+      "step": 1,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.1407166875428571,
+          -0.18811583337142856,
+          0.2,
+          -1.4565391200378173
+        ],
+        "object": "black_bear"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          -0.1063755936,
+          0.2010128624000001,
+          0.2,
+          -1.4565391200378173
+        ],
+        "object": "black_bear",
+        "destination": "clear_plastic_case"
+      },
+      "depends_on": [
+        1
+      ]
+    }
+  ],
+  "results": [
+    {
+      "step": 1,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "black_bear"
+      }
+    },
+    {
+      "step": 2,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          -0.1063755936,
+          0.2010128624000001,
+          0.2,
+          -1.4565391200378173
+        ],
+        "object": "black_bear",
+        "observed_xy": [
+          -0.1063755936,
+          0.2010128624000001
+        ],
+        "xy_error": 0.0
+      }
+    }
+  ],
+  "symbolic_view": {
+    "objects": [
+      {
+        "name": "black_bear",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm"
+        ]
+      },
+      {
+        "name": "clear_plastic_case",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm"
+        ]
+      }
+    ]
+  }
+}

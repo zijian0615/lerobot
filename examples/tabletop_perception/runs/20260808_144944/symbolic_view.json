@@ -1,0 +1,26 @@
+{
+  "objects": [
+    {
+      "name": "grey plush toy",
+      "blocked_by": null,
+      "in_workspace": []
+    },
+    {
+      "name": "black and yellow plush toy",
+      "blocked_by": null,
+      "in_workspace": []
+    },
+    {
+      "name": "orange box",
+      "blocked_by": null,
+      "in_workspace": []
+    },
+    {
+      "name": "VR headset",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,122 @@
+{
+  "status": "fail",
+  "reason": "replan_exec_failed:place_offset",
+  "plan": [
+    {
+      "step": 1,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "args": {
+        "object": "grey_stuffed_animal"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm",
+      "primitive": "Place",
+      "args": {
+        "object": "grey_stuffed_animal",
+        "destination": "free_space"
+      },
+      "depends_on": [
+        1
+      ]
+    }
+  ],
+  "bound": [
+    {
+      "step": 1,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.2304,
+          0.12891428571428573,
+          0.2,
+          0.0
+        ],
+        "object": "grey_stuffed_animal"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          0.02747238906238681,
+          -0.1669688722488101,
+          0.2,
+          0.0
+        ],
+        "object": "grey_stuffed_animal",
+        "destination": "free_space"
+      },
+      "depends_on": [
+        1
+      ]
+    }
+  ],
+  "results": [
+    {
+      "step": 1,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "grey_stuffed_animal"
+      }
+    },
+    {
+      "step": 2,
+      "status": "fail",
+      "reason": "place_offset",
+      "observed": {
+        "place_pose": [
+          0.02747238906238681,
+          -0.1669688722488101,
+          0.2,
+          0.0
+        ],
+        "object": "grey_stuffed_animal",
+        "observed_xy": [
+          -0.2304,
+          0.12891428571428573
+        ],
+        "xy_error": 0.3924856840789958
+      }
+    }
+  ],
+  "symbolic_view": {
+    "objects": [
+      {
+        "name": "grey_stuffed_animal",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm"
+        ]
+      },
+      {
+        "name": "black_stuffed_animal",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm"
+        ]
+      },
+      {
+        "name": "orange_box",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm"
+        ]
+      },
+      {
+        "name": "vr_headset",
+        "blocked_by": null,
+        "in_workspace": []
+      }
+    ]
+  }
+}

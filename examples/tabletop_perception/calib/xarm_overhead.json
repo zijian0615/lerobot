@@ -1,0 +1,266 @@
+{
+  "_comment": "Overhead /dev/video2. Dual xArm: Robot1 image bottom-LEFT true\u2248(-0.45,-0.35); Robot2 image bottom-RIGHT mirrored about image vertical through table_xy_affine \u2192 true\u2248(-0.55,+0.51). Do NOT use naive (+0.45,-0.35) \u2014 affine rotates axes ~90\u00b0.",
+  "camera": {
+    "index_or_path": "/dev/video2",
+    "width": 640,
+    "height": 480,
+    "fps": 30
+  },
+  "K": [
+    [
+      700.0,
+      0.0,
+      320.0
+    ],
+    [
+      0.0,
+      700.0,
+      240.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "T_cam_table": [
+    [
+      1.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "grasp_height_m": 0.2,
+  "grasp_height_offset_m": {
+    "_comment": "Added to grasp_height_m when object name contains the key (case-insensitive). Negative = lower gripper. No depth camera \u2192 tune per object class.",
+    "screw": -0.02,
+    "bear": -0.05
+  },
+  "place_height_offset_m": {
+    "_comment": "Added to Place z when destination name contains the key. Positive = higher (e.g. onto a tall container).",
+    "container": 0.04
+  },
+  "footprint_buffer_m": 0.02,
+  "table_polygon_xy": [
+    [
+      -0.45,
+      -0.35
+    ],
+    [
+      0.45,
+      -0.35
+    ],
+    [
+      0.45,
+      0.35
+    ],
+    [
+      -0.45,
+      0.35
+    ]
+  ],
+  "overlap_xy": {
+    "type": "intersection_of_workspaces",
+    "arms": [
+      "xarm",
+      "xarm2"
+    ],
+    "clip_to_table": true,
+    "_policy": "Mutex: only one arm may Grasp/Place inside overlap at a time. After such a step, that arm must retract to (workspace \\ overlap) before releasing the lock."
+  },
+  "arm_workspaces_xy": {
+    "xarm": {
+      "_role": "Robot1 parallel gripper @ 192.168.1.204",
+      "type": "semicircle",
+      "center": [
+        -0.45,
+        -0.35
+      ],
+      "radius": 0.75,
+      "opening": "+x+y",
+      "n_arc": 48
+    },
+    "xarm2": {
+      "_role": "Robot2 LeapHand @ 192.168.2.199. Image bottom-RIGHT = mirror of Robot1 about image vertical; after table_xy_affine (~90\u00b0), true-table base \u2248 (-0.55,+0.51) NOT (+0.45,-0.35).",
+      "type": "semicircle",
+      "center": [
+        -0.55,
+        0.51
+      ],
+      "radius": 0.75,
+      "opening": "+x-y",
+      "n_arc": 48
+    }
+  },
+  "robot": {
+    "_comment": "Legacy single-arm field (Robot1). Prefer robots{} for multi-arm.",
+    "robot_ip": "192.168.1.204",
+    "robot_dof": 6,
+    "gripper_type": 1,
+    "move_to_start_on_connect": false
+  },
+  "robots": {
+    "xarm": {
+      "robot_ip": "192.168.1.204",
+      "robot_dof": 6,
+      "gripper_type": 1,
+      "ee": "parallel_gripper",
+      "move_to_start_on_connect": false
+    },
+    "xarm2": {
+      "robot_ip": "192.168.2.199",
+      "robot_dof": 6,
+      "gripper_type": 0,
+      "ee": "leaphand",
+      "move_to_start_on_connect": false
+    }
+  },
+  "execution": {
+    "_comment": "Legacy Robot1-only block. Multi-arm runners should read execution_by_arm.",
+    "arm_name": "xarm",
+    "table_base_xy_m": [
+      -0.45,
+      -0.35
+    ],
+    "table_z_base_m": 0.0,
+    "_height_note": "Measured 2026-08-08: STOP at grasp \u2192 base z\u2248200 mm. tip_z_base = table_z_base_m + grasp_height_m.",
+    "flip_y": true,
+    "xy_offset_base_mm": [
+      0.0,
+      0.0
+    ],
+    "topdown_rpy_rad": [
+      3.1415926535,
+      0.0,
+      0.0
+    ],
+    "move_speed_mm_s": 80.0,
+    "move_acc_mm_s2": 500.0,
+    "solver_margin_m": 0.03,
+    "approach_offset_m": 0.08,
+    "lift_offset_m": 0.08
+  },
+  "execution_by_arm": {
+    "xarm": {
+      "table_base_xy_m": [
+        -0.45,
+        -0.35
+      ],
+      "table_z_base_m": 0.0,
+      "flip_x": false,
+      "flip_y": true,
+      "xy_offset_base_mm": [
+        0.0,
+        0.0
+      ],
+      "topdown_rpy_rad": [
+        3.1415926535,
+        0.0,
+        0.0
+      ],
+      "move_speed_mm_s": 80.0,
+      "move_acc_mm_s2": 500.0,
+      "solver_margin_m": 0.03,
+      "approach_offset_m": 0.08,
+      "lift_offset_m": 0.08
+    },
+    "xarm2": {
+      "_uncalibrated": true,
+      "_note": "Base\u2248(-0.548,+0.505) image BR. Same axis convention as xarm: +X\u2248image-up into table, +Y\u2248image-left (flip_y=true). flip_y=false made bear hover go image-right/out of FOV.",
+      "table_base_xy_m": [
+        -0.548,
+        0.505
+      ],
+      "table_z_base_m": 0.0,
+      "flip_x": false,
+      "flip_y": true,
+      "xy_offset_base_mm": [
+        0.0,
+        0.0
+      ],
+      "topdown_rpy_rad": [
+        3.1415926535,
+        0.0,
+        0.0
+      ],
+      "move_speed_mm_s": 80.0,
+      "move_acc_mm_s2": 500.0,
+      "solver_margin_m": 0.03,
+      "approach_offset_m": 0.08,
+      "lift_offset_m": 0.08,
+      "ee": "leaphand",
+      "table_xy_affine": {
+        "_comment": "true_table = A @ pred_table + b (metres). pred = global table_xy_affine(raw); per-arm residual.",
+        "A": [
+          [
+            1.006192,
+            0.097761
+          ],
+          [
+            0.112789,
+            0.9526
+          ]
+        ],
+        "b": [
+          -0.110192,
+          0.170909
+        ]
+      }
+    }
+  },
+  "leaphand": {
+    "_comment": "offset=(raw-2048)*(2π/4096) then set_allegro(+π, zeros=False). MEASURED_OPEN_RAW = mechanical open stop in Dynamixel counts. ↑ raw → deeper close; ↓ → weaker. python -m manipulation.leaphand --suggest-open-raw",
+    "port": "/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FTBEO3U2-if00-port0",
+    "baud": 4000000,
+    "curr_lim": 100,
+    "max_joint_rad": 1.2,
+    "use_measured_calibration": true,
+    "close_duration_s": 1.8,
+    "open_duration_s": 0.6,
+    "ramp_hz": 30,
+    "settle_s": 0.5,
+    "api_dir": "/home/sidcjetsonj1/LEAP_Hand_API/python",
+    "measured_open_raw": {
+      "_comment": "From --suggest-open-raw (open act leap≈4.57/4.96/5.79).",
+      "1": 2978,
+      "5": 3234,
+      "6": 3772
+    }
+  },
+  "table_xy_affine": {
+    "_comment": "true_table = A @ raw_to_table(uv) + b  (metres)",
+    "A": [
+      [
+        -0.146414,
+        1.215001
+      ],
+      [
+        1.275861,
+        0.092045
+      ]
+    ],
+    "b": [
+      -0.145722,
+      0.104489
+    ]
+  }
+}

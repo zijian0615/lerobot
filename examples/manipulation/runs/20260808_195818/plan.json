@@ -1,0 +1,23 @@
+[
+  {
+    "step": 1,
+    "arm": "xarm2",
+    "primitive": "Grasp",
+    "args": {
+      "object": "black_plush_bear"
+    },
+    "depends_on": []
+  },
+  {
+    "step": 2,
+    "arm": "xarm2",
+    "primitive": "Place",
+    "args": {
+      "object": "black_plush_bear",
+      "destination": "free_space"
+    },
+    "depends_on": [
+      1
+    ]
+  }
+]

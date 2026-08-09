@@ -1,0 +1,35 @@
+[
+  {
+    "step": 1,
+    "arm": "xarm",
+    "primitive": "Grasp",
+    "params": {
+      "pose": [
+        -0.09874285714285713,
+        -0.006857142857142895,
+        0.05,
+        1.5707963267948966
+      ],
+      "object": "grey_stuffed_animal"
+    },
+    "depends_on": []
+  },
+  {
+    "step": 2,
+    "arm": "xarm",
+    "primitive": "Place",
+    "params": {
+      "pose": [
+        -0.32697030465877147,
+        -0.2269703046587715,
+        0.05,
+        1.5707963267948966
+      ],
+      "object": "grey_stuffed_animal",
+      "destination": "free_space"
+    },
+    "depends_on": [
+      1
+    ]
+  }
+]

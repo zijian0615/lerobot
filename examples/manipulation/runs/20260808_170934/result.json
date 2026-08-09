@@ -1,0 +1,196 @@
+{
+  "status": "success",
+  "reason": "",
+  "plan": [
+    {
+      "step": 1,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "args": {
+        "object": "stuffed_animal"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm",
+      "primitive": "Place",
+      "args": {
+        "object": "stuffed_animal",
+        "destination": "free_space"
+      },
+      "depends_on": [
+        1
+      ]
+    },
+    {
+      "step": 3,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "args": {
+        "object": "clear_plastic_case"
+      },
+      "depends_on": [
+        2
+      ]
+    },
+    {
+      "step": 4,
+      "arm": "xarm",
+      "primitive": "Place",
+      "args": {
+        "object": "clear_plastic_case",
+        "destination": "free_space"
+      },
+      "depends_on": [
+        3
+      ]
+    }
+  ],
+  "bound": [
+    {
+      "step": 1,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.07334620800000001,
+          -0.01357549599999995,
+          0.2,
+          -1.4565391200378173
+        ],
+        "object": "stuffed_animal"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          0.11535074287755002,
+          -0.19040309993285368,
+          0.2,
+          -1.4565391200378173
+        ],
+        "object": "stuffed_animal",
+        "destination": "free_space"
+      },
+      "depends_on": [
+        1
+      ]
+    },
+    {
+      "step": 3,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.11381453371428571,
+          -0.06370696685714283,
+          0.2,
+          -1.4565391200378175
+        ],
+        "object": "clear_plastic_case"
+      },
+      "depends_on": [
+        2
+      ]
+    },
+    {
+      "step": 4,
+      "arm": "xarm",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          -0.2976775200537171,
+          0.19919093531437002,
+          0.2,
+          -1.4565391200378175
+        ],
+        "object": "clear_plastic_case",
+        "destination": "free_space"
+      },
+      "depends_on": [
+        3
+      ]
+    }
+  ],
+  "results": [
+    {
+      "step": 1,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "stuffed_animal"
+      }
+    },
+    {
+      "step": 2,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          0.11535074287755002,
+          -0.19040309993285368,
+          0.2,
+          -1.4565391200378173
+        ],
+        "object": "stuffed_animal",
+        "observed_xy": [
+          0.11535074287755002,
+          -0.19040309993285368
+        ],
+        "xy_error": 0.0
+      }
+    },
+    {
+      "step": 3,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "clear_plastic_case"
+      }
+    },
+    {
+      "step": 4,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          -0.2976775200537171,
+          0.19919093531437002,
+          0.2,
+          -1.4565391200378175
+        ],
+        "object": "clear_plastic_case",
+        "observed_xy": [
+          -0.2976775200537171,
+          0.19919093531437002
+        ],
+        "xy_error": 0.0
+      }
+    }
+  ],
+  "symbolic_view": {
+    "objects": [
+      {
+        "name": "stuffed_animal",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm"
+        ]
+      },
+      {
+        "name": "clear_plastic_case",
+        "blocked_by": "stuffed_animal",
+        "in_workspace": [
+          "xarm"
+        ]
+      }
+    ]
+  }
+}
