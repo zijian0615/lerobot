@@ -1,0 +1,399 @@
+{
+  "status": "success",
+  "reason": "",
+  "plan": [
+    {
+      "step": 1,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "args": {
+        "object": "grey_box_left"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm",
+      "primitive": "Place",
+      "args": {
+        "object": "grey_box_left",
+        "destination": "container"
+      },
+      "depends_on": [
+        1
+      ]
+    },
+    {
+      "step": 3,
+      "arm": "xarm2",
+      "primitive": "Grasp",
+      "args": {
+        "object": "white_box"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 4,
+      "arm": "xarm2",
+      "primitive": "Place",
+      "args": {
+        "object": "white_box",
+        "destination": "container"
+      },
+      "depends_on": [
+        3
+      ]
+    },
+    {
+      "step": 5,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "args": {
+        "object": "grey_box_bottom"
+      },
+      "depends_on": [
+        2
+      ]
+    },
+    {
+      "step": 6,
+      "arm": "xarm",
+      "primitive": "Place",
+      "args": {
+        "object": "grey_box_bottom",
+        "destination": "container"
+      },
+      "depends_on": [
+        5
+      ]
+    },
+    {
+      "step": 7,
+      "arm": "xarm2",
+      "primitive": "Grasp",
+      "args": {
+        "object": "grey_box_right"
+      },
+      "depends_on": [
+        4
+      ]
+    },
+    {
+      "step": 8,
+      "arm": "xarm2",
+      "primitive": "Place",
+      "args": {
+        "object": "grey_box_right",
+        "destination": "container"
+      },
+      "depends_on": [
+        7
+      ]
+    }
+  ],
+  "bound": [
+    {
+      "step": 1,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.23731355862857142,
+          -0.08600596891428572,
+          0.2,
+          0.07561270926443386
+        ],
+        "object": "grey_box_left"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          -0.061427368989734214,
+          0.02170345073015517,
+          0.24000000000000002,
+          0.07561270926443386
+        ],
+        "object": "grey_box_left",
+        "destination": "container"
+      },
+      "depends_on": [
+        1
+      ]
+    },
+    {
+      "step": 3,
+      "arm": "xarm2",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.10964313074285713,
+          0.13428501302857154,
+          0.19,
+          0.07561270926443452
+        ],
+        "object": "white_box"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 4,
+      "arm": "xarm2",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          -0.061439645748366606,
+          0.022924051164285742,
+          0.24000000000000002,
+          0.07561270926443452
+        ],
+        "object": "white_box",
+        "destination": "container"
+      },
+      "depends_on": [
+        3
+      ]
+    },
+    {
+      "step": 5,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.4001106454857143,
+          0.18287858445714283,
+          0.2,
+          0.07561270926443456
+        ],
+        "object": "grey_box_bottom"
+      },
+      "depends_on": [
+        2
+      ]
+    },
+    {
+      "step": 6,
+      "arm": "xarm",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          -0.06180013599999996,
+          0.02495176640000002,
+          0.24000000000000002,
+          0.07561270926443456
+        ],
+        "object": "grey_box_bottom",
+        "destination": "container"
+      },
+      "depends_on": [
+        5
+      ]
+    },
+    {
+      "step": 7,
+      "arm": "xarm2",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.2630173856,
+          0.07207018399999998,
+          0.19,
+          0.07561270926443445
+        ],
+        "object": "grey_box_right"
+      },
+      "depends_on": [
+        4
+      ]
+    },
+    {
+      "step": 8,
+      "arm": "xarm2",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          -0.061439645748366606,
+          0.022924051164285742,
+          0.24000000000000002,
+          0.07561270926443445
+        ],
+        "object": "grey_box_right",
+        "destination": "container"
+      },
+      "depends_on": [
+        7
+      ]
+    }
+  ],
+  "results": [
+    {
+      "step": 1,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "grey_box_left"
+      }
+    },
+    {
+      "step": 2,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          -0.061427368989734214,
+          0.02170345073015517,
+          0.24000000000000002,
+          0.07561270926443386
+        ],
+        "object": "grey_box_left",
+        "observed_xy": [
+          -0.061427368989734214,
+          0.02170345073015517
+        ],
+        "xy_error": 0.0
+      }
+    },
+    {
+      "step": 3,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "white_box"
+      }
+    },
+    {
+      "step": 4,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          -0.061439645748366606,
+          0.022924051164285742,
+          0.24000000000000002,
+          0.07561270926443452
+        ],
+        "object": "white_box",
+        "observed_xy": [
+          -0.061439645748366606,
+          0.022924051164285742
+        ],
+        "xy_error": 0.0
+      }
+    },
+    {
+      "step": 5,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "grey_box_bottom"
+      }
+    },
+    {
+      "step": 6,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          -0.06180013599999996,
+          0.02495176640000002,
+          0.24000000000000002,
+          0.07561270926443456
+        ],
+        "object": "grey_box_bottom",
+        "observed_xy": [
+          -0.06180013599999996,
+          0.02495176640000002
+        ],
+        "xy_error": 0.0
+      }
+    },
+    {
+      "step": 7,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "grey_box_right"
+      }
+    },
+    {
+      "step": 8,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          -0.061439645748366606,
+          0.022924051164285742,
+          0.24000000000000002,
+          0.07561270926443445
+        ],
+        "object": "grey_box_right",
+        "observed_xy": [
+          -0.061439645748366606,
+          0.022924051164285742
+        ],
+        "xy_error": 0.0
+      }
+    }
+  ],
+  "symbolic_view": {
+    "objects": [
+      {
+        "name": "container",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm2",
+          "xarm"
+        ],
+        "preferred_arm": "xarm2"
+      },
+      {
+        "name": "white_box",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm2",
+          "xarm"
+        ],
+        "preferred_arm": "xarm2"
+      },
+      {
+        "name": "grey_box_left",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm",
+          "xarm2"
+        ],
+        "preferred_arm": "xarm"
+      },
+      {
+        "name": "grey_box_right",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm2",
+          "xarm"
+        ],
+        "preferred_arm": "xarm2"
+      },
+      {
+        "name": "grey_box_bottom",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm2",
+          "xarm"
+        ],
+        "preferred_arm": "xarm2"
+      }
+    ]
+  },
+  "arms": [
+    "xarm",
+    "xarm2"
+  ]
+}

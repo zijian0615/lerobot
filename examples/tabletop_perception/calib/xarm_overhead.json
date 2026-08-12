@@ -51,12 +51,21 @@
   ],
   "grasp_height_m": 0.2,
   "grasp_height_offset_m": {
-    "_comment": "Added to grasp_height_m when object name contains the key (case-insensitive). Negative = lower gripper. No depth camera \u2192 tune per object class.",
+    "_comment": "Global (all EEs): added to grasp_height_m when object name contains the key. Negative = lower.",
     "screw": -0.02,
-    "bear": -0.05
+    "stand": -0.02
+  },
+  "grasp_height_offset_by_ee": {
+    "_comment": "Extra grasp z offsets applied only when that EE executes Grasp/Place (solver). parallel_gripper uses global only.",
+    "leaphand": {
+      "stand": -0.01,
+      "screw": -0.02,
+      "box": -0.01
+    }
   },
   "place_height_offset_m": {
-    "_comment": "Added to Place z when destination name contains the key. Positive = higher (e.g. onto a tall container).",
+    "_comment": "When Place destination is a named object matching the key: z = support.grasp_z + offset (stacks accumulate). stand=+0.02 per layer; container=+0.04 above support. Per-arm overrides: execution_by_arm.*.place_height_offset_m",
+    "stand": 0.02,
     "container": 0.04
   },
   "footprint_buffer_m": 0.02,
@@ -85,7 +94,7 @@
       "xarm2"
     ],
     "clip_to_table": true,
-    "_policy": "Mutex: only one arm may Grasp/Place inside overlap at a time. After such a step, that arm must retract to (workspace \\ overlap) before releasing the lock."
+    "_policy": "Mutex: only one arm may be inside overlap during a step. After Grasp, if a later Place of the same object by that arm exists, skip retract (stay at lift) and release the lock so Grasp\u2192Place is direct even with interleaved other-arm steps. After Place (or Grasp with no pending Place), retract to exclusive workspace then release."
   },
   "arm_workspaces_xy": {
     "xarm": {
@@ -181,7 +190,15 @@
       "move_acc_mm_s2": 500.0,
       "solver_margin_m": 0.03,
       "approach_offset_m": 0.08,
-      "lift_offset_m": 0.08
+      "lift_offset_m": 0.08,
+      "grasp_height_offset_m": {
+        "_comment": "arm1 parallel gripper: grasp screw 1cm lower than global.",
+        "screw": -0.01
+      },
+      "place_height_offset_m": {
+        "_comment": "arm1 parallel gripper: place onto stand +2cm higher than global (0.02\u21920.04).",
+        "stand": 0.04
+      }
     },
     "xarm2": {
       "_uncalibrated": true,
@@ -228,23 +245,61 @@
     }
   },
   "leaphand": {
-    "_comment": "offset=(raw-2048)*(2π/4096) then set_allegro(+π, zeros=False). MEASURED_OPEN_RAW = mechanical open stop in Dynamixel counts. ↑ raw → deeper close; ↓ → weaker. python -m manipulation.leaphand --suggest-open-raw",
+    "_comment": "LEAP MCP flat open = \u03c0 (higher=curl). MCP 1/5 forced to \u03c0 (no raw offset). Only joint 6 uses measured_open_raw. Open ramps present\u2192\u03c0 over open_duration_s.",
     "port": "/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FTBEO3U2-if00-port0",
     "baud": 4000000,
-    "curr_lim": 100,
+    "curr_lim": 350,
     "max_joint_rad": 1.2,
+    "thumb_side_scale": 0.0,
+    "thumb_forward_scale": 1.2,
+    "thumb_open_back_rad": -0.6,
     "use_measured_calibration": true,
     "close_duration_s": 1.8,
-    "open_duration_s": 0.6,
+    "open_duration_s": 2.5,
     "ramp_hz": 30,
     "settle_s": 0.5,
     "api_dir": "/home/sidcjetsonj1/LEAP_Hand_API/python",
     "measured_open_raw": {
-      "_comment": "From --suggest-open-raw (open act leap≈4.57/4.96/5.79).",
-      "1": 2978,
-      "5": 3234,
+      "_comment": "Do NOT set 1/5 here (code strips them \u2192 \u03c0). Joint 6 measured open only.",
       "6": 3772
-    }
+    },
+    "open_leap": [
+      2.74429,
+      -0.7133,
+      3.20755,
+      3.1508,
+      3.02961,
+      -0.67495,
+      6.2387,
+      3.29806,
+      3.12012,
+      4.18317,
+      2.89002,
+      3.40237,
+      4.68171,
+      3.07256,
+      2.31478,
+      3.16614
+    ],
+    "close_leap": [
+      3.02654,
+      0.01381,
+      3.37016,
+      3.14926,
+      3.05262,
+      0.13806,
+      6.20495,
+      3.17687,
+      2.93604,
+      4.88573,
+      3.04649,
+      3.40237,
+      4.85045,
+      3.09864,
+      3.64627,
+      2.76117
+    ],
+    "_comment_manual_poses": "open_leap/close_leap: taught 16-DOF LEAP poses. When both set, open()/close() use them directly (skip formula thumb scales)."
   },
   "table_xy_affine": {
     "_comment": "true_table = A @ raw_to_table(uv) + b  (metres)",

@@ -1,0 +1,230 @@
+{
+  "status": "fail",
+  "reason": "replan_exec_failed:exception:RuntimeError:set_position failed code=1 pose=[389.39629577142864, -591.5446534857142, 280.0, 3.1415926535, 0.0, 0.0]",
+  "plan": [
+    {
+      "step": 1,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "args": {
+        "object": "top_black_box"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm",
+      "primitive": "Place",
+      "args": {
+        "object": "top_black_box",
+        "destination": "container"
+      },
+      "depends_on": [
+        1
+      ]
+    },
+    {
+      "step": 3,
+      "arm": "xarm2",
+      "primitive": "Grasp",
+      "args": {
+        "object": "black_screw_on_table"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 4,
+      "arm": "xarm2",
+      "primitive": "Place",
+      "args": {
+        "object": "black_screw_on_table",
+        "destination": "container"
+      },
+      "depends_on": [
+        3
+      ]
+    },
+    {
+      "step": 5,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "args": {
+        "object": "bottom_black_box"
+      },
+      "depends_on": [
+        2
+      ]
+    },
+    {
+      "step": 6,
+      "arm": "xarm",
+      "primitive": "Place",
+      "args": {
+        "object": "bottom_black_box",
+        "destination": "container"
+      },
+      "depends_on": [
+        5
+      ]
+    }
+  ],
+  "bound": [
+    {
+      "step": 1,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.06060370422857139,
+          0.24154465348571422,
+          0.2,
+          0.0756127092644336
+        ],
+        "object": "top_black_box"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          -0.15933500422857141,
+          0.10228107508571434,
+          0.24000000000000002,
+          0.0756127092644336
+        ],
+        "object": "top_black_box",
+        "destination": "container"
+      },
+      "depends_on": [
+        1
+      ]
+    },
+    {
+      "step": 3,
+      "arm": "xarm2",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.2921690633142856,
+          -0.15723029645714287,
+          0.17,
+          0.07561270926443386
+        ],
+        "object": "black_screw_on_table"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 4,
+      "arm": "xarm2",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          -0.15933500422857141,
+          0.10228107508571434,
+          0.24000000000000002,
+          0.07561270926443386
+        ],
+        "object": "black_screw_on_table",
+        "destination": "container"
+      },
+      "depends_on": [
+        3
+      ]
+    },
+    {
+      "step": 5,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.31657444754285713,
+          0.1433179842285715,
+          0.2,
+          0.07561270926443386
+        ],
+        "object": "bottom_black_box"
+      },
+      "depends_on": [
+        2
+      ]
+    },
+    {
+      "step": 6,
+      "arm": "xarm",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          -0.15933500422857141,
+          0.10228107508571434,
+          0.24000000000000002,
+          0.07561270926443386
+        ],
+        "object": "bottom_black_box",
+        "destination": "container"
+      },
+      "depends_on": [
+        5
+      ]
+    }
+  ],
+  "results": [
+    {
+      "step": 1,
+      "status": "fail",
+      "reason": "exception:RuntimeError:set_position failed code=1 pose=[389.39629577142864, -591.5446534857142, 280.0, 3.1415926535, 0.0, 0.0]",
+      "observed": {}
+    }
+  ],
+  "symbolic_view": {
+    "objects": [
+      {
+        "name": "top_black_box",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm",
+          "xarm2"
+        ]
+      },
+      {
+        "name": "bottom_black_box",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm",
+          "xarm2"
+        ]
+      },
+      {
+        "name": "black_screw_on_table",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm",
+          "xarm2"
+        ]
+      },
+      {
+        "name": "black_screw_in_container",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm",
+          "xarm2"
+        ]
+      },
+      {
+        "name": "container",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm",
+          "xarm2"
+        ]
+      }
+    ]
+  },
+  "arms": [
+    "xarm",
+    "xarm2"
+  ]
+}

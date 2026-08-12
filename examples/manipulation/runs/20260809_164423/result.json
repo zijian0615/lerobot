@@ -1,0 +1,207 @@
+{
+  "status": "success",
+  "reason": "",
+  "plan": [
+    {
+      "step": 1,
+      "arm": "xarm2",
+      "primitive": "Grasp",
+      "args": {
+        "object": "black_bear_toy"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm2",
+      "primitive": "Place",
+      "args": {
+        "object": "black_bear_toy",
+        "destination": "free_space"
+      },
+      "depends_on": [
+        1
+      ]
+    },
+    {
+      "step": 3,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "args": {
+        "object": "black_screw"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 4,
+      "arm": "xarm",
+      "primitive": "Place",
+      "args": {
+        "object": "black_screw",
+        "destination": "container"
+      },
+      "depends_on": [
+        2,
+        3
+      ]
+    }
+  ],
+  "bound": [
+    {
+      "step": 1,
+      "arm": "xarm2",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.09158359634285712,
+          0.0721144482285714,
+          0.2,
+          0.07561270926443421
+        ],
+        "object": "black_bear_toy"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm2",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          -0.32890126079091225,
+          0.22409011320860986,
+          0.2,
+          0.07561270926443421
+        ],
+        "object": "black_bear_toy",
+        "destination": "free_space"
+      },
+      "depends_on": [
+        1
+      ]
+    },
+    {
+      "step": 3,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.12755210834285713,
+          -0.2588937245714285,
+          0.18000000000000002,
+          0.07561270926443324
+        ],
+        "object": "black_screw"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 4,
+      "arm": "xarm",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          -0.14814046697142863,
+          0.07430139611428568,
+          0.22000000000000003,
+          0.07561270926443324
+        ],
+        "object": "black_screw",
+        "destination": "container"
+      },
+      "depends_on": [
+        2,
+        3
+      ]
+    }
+  ],
+  "results": [
+    {
+      "step": 1,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "black_bear_toy"
+      }
+    },
+    {
+      "step": 2,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          -0.32890126079091225,
+          0.22409011320860986,
+          0.2,
+          0.07561270926443421
+        ],
+        "object": "black_bear_toy",
+        "observed_xy": [
+          -0.32890126079091225,
+          0.22409011320860986
+        ],
+        "xy_error": 0.0
+      }
+    },
+    {
+      "step": 3,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "black_screw"
+      }
+    },
+    {
+      "step": 4,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          -0.14814046697142863,
+          0.07430139611428568,
+          0.22000000000000003,
+          0.07561270926443324
+        ],
+        "object": "black_screw",
+        "observed_xy": [
+          -0.14814046697142863,
+          0.07430139611428568
+        ],
+        "xy_error": 0.0
+      }
+    }
+  ],
+  "symbolic_view": {
+    "objects": [
+      {
+        "name": "black_screw",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm"
+        ]
+      },
+      {
+        "name": "container",
+        "blocked_by": "black_bear_toy",
+        "in_workspace": [
+          "xarm",
+          "xarm2"
+        ]
+      },
+      {
+        "name": "black_bear_toy",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm",
+          "xarm2"
+        ]
+      }
+    ]
+  },
+  "arms": [
+    "xarm",
+    "xarm2"
+  ]
+}

@@ -1,0 +1,206 @@
+{
+  "status": "success",
+  "reason": "",
+  "plan": [
+    {
+      "step": 1,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "args": {
+        "object": "left_screw"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm2",
+      "primitive": "Grasp",
+      "args": {
+        "object": "right_screw"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 3,
+      "arm": "xarm",
+      "primitive": "Place",
+      "args": {
+        "object": "left_screw",
+        "destination": "container"
+      },
+      "depends_on": [
+        1
+      ]
+    },
+    {
+      "step": 4,
+      "arm": "xarm2",
+      "primitive": "Place",
+      "args": {
+        "object": "right_screw",
+        "destination": "container"
+      },
+      "depends_on": [
+        2
+      ]
+    }
+  ],
+  "bound": [
+    {
+      "step": 1,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.16643644114285716,
+          -0.06651680937142856,
+          0.18000000000000002,
+          -1.4565391200378177
+        ],
+        "object": "left_screw"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm2",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.002835039771428516,
+          0.21415169051428573,
+          0.17,
+          -1.4565391200378173
+        ],
+        "object": "right_screw"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 3,
+      "arm": "xarm",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          -0.15900034365714286,
+          0.09936482137142863,
+          0.24000000000000002,
+          -1.4565391200378177
+        ],
+        "object": "left_screw",
+        "destination": "container"
+      },
+      "depends_on": [
+        1
+      ]
+    },
+    {
+      "step": 4,
+      "arm": "xarm2",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          -0.15900034365714286,
+          0.09936482137142863,
+          0.24000000000000002,
+          -1.4565391200378173
+        ],
+        "object": "right_screw",
+        "destination": "container"
+      },
+      "depends_on": [
+        2
+      ]
+    }
+  ],
+  "results": [
+    {
+      "step": 1,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "left_screw"
+      }
+    },
+    {
+      "step": 2,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "right_screw"
+      }
+    },
+    {
+      "step": 3,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          -0.15900034365714286,
+          0.09936482137142863,
+          0.24000000000000002,
+          -1.4565391200378177
+        ],
+        "object": "left_screw",
+        "observed_xy": [
+          -0.15900034365714286,
+          0.09936482137142863
+        ],
+        "xy_error": 0.0
+      }
+    },
+    {
+      "step": 4,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          -0.15900034365714286,
+          0.09936482137142863,
+          0.24000000000000002,
+          -1.4565391200378173
+        ],
+        "object": "right_screw",
+        "observed_xy": [
+          -0.15900034365714286,
+          0.09936482137142863
+        ],
+        "xy_error": 0.0
+      }
+    }
+  ],
+  "symbolic_view": {
+    "objects": [
+      {
+        "name": "left_screw",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm",
+          "xarm2"
+        ]
+      },
+      {
+        "name": "right_screw",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm",
+          "xarm2"
+        ]
+      },
+      {
+        "name": "container",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm",
+          "xarm2"
+        ]
+      }
+    ]
+  },
+  "arms": [
+    "xarm",
+    "xarm2"
+  ]
+}

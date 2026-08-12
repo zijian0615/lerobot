@@ -1,0 +1,207 @@
+{
+  "status": "success",
+  "reason": "",
+  "plan": [
+    {
+      "step": 1,
+      "arm": "xarm2",
+      "primitive": "Grasp",
+      "args": {
+        "object": "black_panther_plush"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm2",
+      "primitive": "Place",
+      "args": {
+        "object": "black_panther_plush",
+        "destination": "free_space"
+      },
+      "depends_on": [
+        1
+      ]
+    },
+    {
+      "step": 3,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "args": {
+        "object": "black_screw"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 4,
+      "arm": "xarm",
+      "primitive": "Place",
+      "args": {
+        "object": "black_screw",
+        "destination": "container"
+      },
+      "depends_on": [
+        2,
+        3
+      ]
+    }
+  ],
+  "bound": [
+    {
+      "step": 1,
+      "arm": "xarm2",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.1418240107428571,
+          0.1071375858285714,
+          0.2,
+          0.07561270926443386
+        ],
+        "object": "black_panther_plush"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm2",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          -0.3338440664729159,
+          -0.08236383907561233,
+          0.2,
+          0.07561270926443386
+        ],
+        "object": "black_panther_plush",
+        "destination": "free_space"
+      },
+      "depends_on": [
+        1
+      ]
+    },
+    {
+      "step": 3,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.1610977986285714,
+          -0.14965399771428567,
+          0.18000000000000002,
+          0.07561270926443414
+        ],
+        "object": "black_screw"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 4,
+      "arm": "xarm",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          -0.16222104845714283,
+          0.10912229257142851,
+          0.22000000000000003,
+          0.07561270926443414
+        ],
+        "object": "black_screw",
+        "destination": "container"
+      },
+      "depends_on": [
+        2,
+        3
+      ]
+    }
+  ],
+  "results": [
+    {
+      "step": 1,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "black_panther_plush"
+      }
+    },
+    {
+      "step": 2,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          -0.3338440664729159,
+          -0.08236383907561233,
+          0.2,
+          0.07561270926443386
+        ],
+        "object": "black_panther_plush",
+        "observed_xy": [
+          -0.3338440664729159,
+          -0.08236383907561233
+        ],
+        "xy_error": 0.0
+      }
+    },
+    {
+      "step": 3,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "black_screw"
+      }
+    },
+    {
+      "step": 4,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          -0.16222104845714283,
+          0.10912229257142851,
+          0.22000000000000003,
+          0.07561270926443414
+        ],
+        "object": "black_screw",
+        "observed_xy": [
+          -0.16222104845714283,
+          0.10912229257142851
+        ],
+        "xy_error": 0.0
+      }
+    }
+  ],
+  "symbolic_view": {
+    "objects": [
+      {
+        "name": "black_screw",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm"
+        ]
+      },
+      {
+        "name": "container",
+        "blocked_by": "black_panther_plush",
+        "in_workspace": [
+          "xarm",
+          "xarm2"
+        ]
+      },
+      {
+        "name": "black_panther_plush",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm",
+          "xarm2"
+        ]
+      }
+    ]
+  },
+  "arms": [
+    "xarm",
+    "xarm2"
+  ]
+}

@@ -1,0 +1,1 @@
+put ALL boxes on the table onto the white lid/cover via handover: xarm grasps each box and Places to handover, then xarm2 Grasps from handover and Places onto white_lid (every box)

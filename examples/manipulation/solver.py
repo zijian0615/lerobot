@@ -51,6 +51,61 @@ class SolverConfig:
     polylabel_tolerance: float = 0.005
     # Destination name substring → Δz (m). Positive raises Place height.
     place_height_offsets_m: dict[str, float] = field(default_factory=dict)
+    # Per-arm overrides merged on top of place_height_offsets_m for that arm.
+    place_height_offsets_by_arm: dict[str, dict[str, float]] = field(default_factory=dict)
+    # Per-arm object-name substring → Δz (m), applied at bind time for that arm.
+    # Use for EE-specific tip offsets (e.g. LeapHand bear=-0.05; parallel gripper 0).
+    grasp_height_offsets_by_arm: dict[str, dict[str, float]] = field(default_factory=dict)
+
+
+def _resolve_object_height_offset_m(
+    object_name: str,
+    base_z_m: float,
+    offsets: Mapping[str, float] | None,
+) -> float:
+    """``z = base + first matching substring offset`` (same rule as perception)."""
+    z = float(base_z_m)
+    if not offsets:
+        return z
+    name = object_name.lower().replace(" ", "_")
+    for key, offset in offsets.items():
+        if str(key).startswith("_"):
+            continue
+        needle = str(key).lower().replace(" ", "_")
+        if needle and needle in name:
+            return z + float(offset)
+    return z
+
+
+def _arm_object_z_m(
+    *,
+    arm: str,
+    object_name: str,
+    base_z_m: float,
+    config: SolverConfig,
+) -> float:
+    return _resolve_object_height_offset_m(
+        object_name,
+        base_z_m,
+        config.grasp_height_offsets_by_arm.get(arm),
+    )
+
+
+def _match_name_offset_m(
+    name: str,
+    offsets: Mapping[str, float] | None,
+) -> float | None:
+    """First matching substring offset for ``name``, or None if no match."""
+    if not offsets:
+        return None
+    hay = name.lower().replace(" ", "_")
+    for key, offset in offsets.items():
+        if str(key).startswith("_"):
+            continue
+        needle = str(key).lower().replace(" ", "_")
+        if needle and needle in hay:
+            return float(offset)
+    return None
 
 
 def _resolve_place_height_m(
@@ -59,16 +114,39 @@ def _resolve_place_height_m(
     offsets: dict[str, float] | None,
 ) -> float:
     z = float(base_z_m)
-    if not offsets:
-        return z
-    dest = destination.lower().replace(" ", "_")
-    for key, offset in offsets.items():
-        if str(key).startswith("_"):
-            continue
-        needle = str(key).lower().replace(" ", "_")
-        if needle and needle in dest:
-            return z + float(offset)
+    matched = _match_name_offset_m(destination, offsets)
+    if matched is not None:
+        return z + matched
     return z
+
+
+def _resolve_place_z_m(
+    *,
+    arm: str,
+    obj: str,
+    dest: str,
+    state: Mapping[str, ObjectState],
+    config: SolverConfig,
+) -> float:
+    """
+    Place tip height.
+
+    - Onto a named scene object with a place_height_offset match:
+      ``support.grasp_z + offset`` (so stand stacks rise each layer;
+      per-arm overrides in ``place_height_offsets_by_arm`` win over global).
+    - Else: held-object grasp z (+ EE offsets) + optional symbolic dest offset.
+    """
+    base_z = float(state[obj].grasp_pose[2])
+    base_z = _arm_object_z_m(arm=arm, object_name=obj, base_z_m=base_z, config=config)
+    place_offs = dict(config.place_height_offsets_m)
+    place_offs.update(config.place_height_offsets_by_arm.get(arm) or {})
+    if dest in state:
+        layer = _match_name_offset_m(dest, place_offs)
+        if layer is not None:
+            support_z = float(state[dest].grasp_pose[2])
+            return support_z + layer
+        return base_z
+    return _resolve_place_height_m(dest, base_z, place_offs)
 
 
 @dataclass
@@ -277,7 +355,9 @@ def _compute_future(
     Grasp reserves the object's footprint. Place onto a **support object**
     (named object already in state, e.g. container) does **not** reserve the
     whole footprint — multiple items may share it. Place onto other named
-    regions still reserves the region. Place(..., free_space) reserves nothing.
+    regions still reserves the region. Place(..., free_space) and
+    Place(..., handover) reserve nothing: both are reusable zones (overlap
+    for sequential handoffs; free_space for parking).
     """
     sim = copy.deepcopy(state)
     reserved: list = []
@@ -296,8 +376,8 @@ def _compute_future(
             if dest == "free_space":
                 continue
             region = _region_polygon(dest, geometric_view, config, sim)
-            # Support object (container / tray): shareable — do not carve it out.
-            if dest not in sim:
+            # Support object / handover overlap: shareable — do not carve whole region.
+            if dest not in sim and dest != "handover":
                 reserved.append(region)
             if obj in sim and not region.is_empty:
                 new_xy = (float(region.centroid.x), float(region.centroid.y))
@@ -346,12 +426,34 @@ def solve(
             for k, v in dict(config.get("place_height_offsets_m") or {}).items()
             if not str(k).startswith("_")
         }
+        place_by_arm_raw = dict(config.get("place_height_offsets_by_arm") or {})
+        place_by_arm = {
+            str(arm): {
+                str(k): float(v)
+                for k, v in dict(offs or {}).items()
+                if not str(k).startswith("_")
+            }
+            for arm, offs in place_by_arm_raw.items()
+            if not str(arm).startswith("_")
+        }
+        by_arm_raw = dict(config.get("grasp_height_offsets_by_arm") or {})
+        by_arm = {
+            str(arm): {
+                str(k): float(v)
+                for k, v in dict(offs or {}).items()
+                if not str(k).startswith("_")
+            }
+            for arm, offs in by_arm_raw.items()
+            if not str(arm).startswith("_")
+        }
         config = SolverConfig(
             grasp_height=float(config["grasp_height"]),
             margin=float(config.get("margin", 0.03)),
             handover_radius=float(config.get("handover_radius", 0.08)),
             polylabel_tolerance=float(config.get("polylabel_tolerance", 0.005)),
             place_height_offsets_m=place_offs,
+            place_height_offsets_by_arm=place_by_arm,
+            grasp_height_offsets_by_arm=by_arm,
         )
 
     state = _init_state(geometric_view, config.grasp_height)
@@ -379,8 +481,9 @@ def solve(
             if obj not in state:
                 raise GraspUnreachable(sid, f"Unknown object {obj!r}")
             pose = state[obj].grasp_pose
-            # Keep per-object z from perception (height offsets); fall back to config.
+            # Perception z (global offsets) + per-arm EE offsets (e.g. LeapHand bear).
             z = float(pose[2]) if pose[2] is not None else float(config.grasp_height)
+            z = _arm_object_z_m(arm=arm, object_name=obj, base_z_m=z, config=config)
             pose = (pose[0], pose[1], z, pose[3])
             pt = Point(pose[0], pose[1])
             if not (ws.contains(pt) or ws.covers(pt) or ws.intersects(pt.buffer(1e-6))):
@@ -434,12 +537,23 @@ def solve(
                     f"No legal placement for {obj!r} at destination {dest!r}",
                 )
 
-            x, y = _farthest_from_boundary(legal, config.polylabel_tolerance)
+            # Handover: park as close as possible to the dual-arm overlap
+            # centroid. Obstacles may carve the center out of ``legal``; use the
+            # nearest legal point instead of representative_point (often an edge).
+            if dest == "handover":
+                from shapely.ops import nearest_points
+
+                seed = _as_polygon(region).centroid
+                if legal.contains(seed) or legal.covers(seed):
+                    x, y = float(seed.x), float(seed.y)
+                else:
+                    pt = nearest_points(legal, seed)[0]
+                    x, y = float(pt.x), float(pt.y)
+            else:
+                x, y = _farthest_from_boundary(legal, config.polylabel_tolerance)
             yaw = float(state[obj].yaw)
-            z = _resolve_place_height_m(
-                dest,
-                float(state[obj].grasp_pose[2]),
-                config.place_height_offsets_m,
+            z = _resolve_place_z_m(
+                arm=arm, obj=obj, dest=dest, state=state, config=config
             )
             pose = [x, y, z, yaw]
             params = {"pose": pose, "object": obj, "destination": dest}

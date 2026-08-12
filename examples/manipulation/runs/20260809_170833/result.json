@@ -1,0 +1,207 @@
+{
+  "status": "success",
+  "reason": "",
+  "plan": [
+    {
+      "step": 1,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "args": {
+        "object": "black_stand"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm2",
+      "primitive": "Grasp",
+      "args": {
+        "object": "right_white_stand"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 3,
+      "arm": "xarm",
+      "primitive": "Place",
+      "args": {
+        "object": "black_stand",
+        "destination": "middle_white_stand"
+      },
+      "depends_on": [
+        1
+      ]
+    },
+    {
+      "step": 4,
+      "arm": "xarm2",
+      "primitive": "Place",
+      "args": {
+        "object": "right_white_stand",
+        "destination": "black_stand"
+      },
+      "depends_on": [
+        2,
+        3
+      ]
+    }
+  ],
+  "bound": [
+    {
+      "step": 1,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.1365987497142857,
+          -0.2972316372571428,
+          0.18000000000000002,
+          0.07561270926443386
+        ],
+        "object": "black_stand"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm2",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.2328968050285714,
+          0.36615941188571427,
+          0.17,
+          0.07561270926443396
+        ],
+        "object": "right_white_stand"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 3,
+      "arm": "xarm",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          -0.16113515554285712,
+          0.10332134342857144,
+          0.22000000000000003,
+          0.07561270926443386
+        ],
+        "object": "black_stand",
+        "destination": "middle_white_stand"
+      },
+      "depends_on": [
+        1
+      ]
+    },
+    {
+      "step": 4,
+      "arm": "xarm2",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          -0.16228798057142851,
+          0.10970554331428567,
+          0.24000000000000002,
+          0.07561270926443396
+        ],
+        "object": "right_white_stand",
+        "destination": "black_stand"
+      },
+      "depends_on": [
+        2,
+        3
+      ]
+    }
+  ],
+  "results": [
+    {
+      "step": 1,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "black_stand"
+      }
+    },
+    {
+      "step": 2,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "right_white_stand"
+      }
+    },
+    {
+      "step": 3,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          -0.16113515554285712,
+          0.10332134342857144,
+          0.22000000000000003,
+          0.07561270926443386
+        ],
+        "object": "black_stand",
+        "observed_xy": [
+          -0.16113515554285712,
+          0.10332134342857144
+        ],
+        "xy_error": 0.0
+      }
+    },
+    {
+      "step": 4,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          -0.16228798057142851,
+          0.10970554331428567,
+          0.24000000000000002,
+          0.07561270926443396
+        ],
+        "object": "right_white_stand",
+        "observed_xy": [
+          -0.16228798057142851,
+          0.10970554331428567
+        ],
+        "xy_error": 0.0
+      }
+    }
+  ],
+  "symbolic_view": {
+    "objects": [
+      {
+        "name": "middle_white_stand",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm",
+          "xarm2"
+        ]
+      },
+      {
+        "name": "right_white_stand",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm",
+          "xarm2"
+        ]
+      },
+      {
+        "name": "black_stand",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm"
+        ]
+      }
+    ]
+  },
+  "arms": [
+    "xarm",
+    "xarm2"
+  ]
+}

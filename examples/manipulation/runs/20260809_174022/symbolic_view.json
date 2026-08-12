@@ -1,0 +1,42 @@
+{
+  "objects": [
+    {
+      "name": "top_screw",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm"
+      ]
+    },
+    {
+      "name": "bottom_left_screw",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm"
+      ]
+    },
+    {
+      "name": "top_cube_box",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm",
+        "xarm2"
+      ]
+    },
+    {
+      "name": "bottom_cube_box",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm",
+        "xarm2"
+      ]
+    },
+    {
+      "name": "container",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm",
+        "xarm2"
+      ]
+    }
+  ]
+}

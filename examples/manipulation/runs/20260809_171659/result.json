@@ -1,0 +1,205 @@
+{
+  "status": "success",
+  "reason": "",
+  "plan": [
+    {
+      "step": 1,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "args": {
+        "object": "top_left_screw"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm2",
+      "primitive": "Grasp",
+      "args": {
+        "object": "bottom_left_screw"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 3,
+      "arm": "xarm",
+      "primitive": "Place",
+      "args": {
+        "object": "top_left_screw",
+        "destination": "plastic_container"
+      },
+      "depends_on": [
+        1
+      ]
+    },
+    {
+      "step": 4,
+      "arm": "xarm2",
+      "primitive": "Place",
+      "args": {
+        "object": "bottom_left_screw",
+        "destination": "plastic_container"
+      },
+      "depends_on": [
+        2
+      ]
+    }
+  ],
+  "bound": [
+    {
+      "step": 1,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.08072845737142854,
+          -0.11767930788571429,
+          0.18000000000000002,
+          -1.4565391200378173
+        ],
+        "object": "top_left_screw"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm2",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.24530142262857146,
+          -0.03836875771428566,
+          0.18000000000000002,
+          -1.4565391200378166
+        ],
+        "object": "bottom_left_screw"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 3,
+      "arm": "xarm",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          -0.15893341154285714,
+          0.09878157062857146,
+          0.24000000000000002,
+          -1.4565391200378173
+        ],
+        "object": "top_left_screw",
+        "destination": "plastic_container"
+      },
+      "depends_on": [
+        1
+      ]
+    },
+    {
+      "step": 4,
+      "arm": "xarm2",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          -0.15893341154285714,
+          0.09878157062857146,
+          0.24000000000000002,
+          -1.4565391200378166
+        ],
+        "object": "bottom_left_screw",
+        "destination": "plastic_container"
+      },
+      "depends_on": [
+        2
+      ]
+    }
+  ],
+  "results": [
+    {
+      "step": 1,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "top_left_screw"
+      }
+    },
+    {
+      "step": 2,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "bottom_left_screw"
+      }
+    },
+    {
+      "step": 3,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          -0.15893341154285714,
+          0.09878157062857146,
+          0.24000000000000002,
+          -1.4565391200378173
+        ],
+        "object": "top_left_screw",
+        "observed_xy": [
+          -0.15893341154285714,
+          0.09878157062857146
+        ],
+        "xy_error": 0.0
+      }
+    },
+    {
+      "step": 4,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          -0.15893341154285714,
+          0.09878157062857146,
+          0.24000000000000002,
+          -1.4565391200378166
+        ],
+        "object": "bottom_left_screw",
+        "observed_xy": [
+          -0.15893341154285714,
+          0.09878157062857146
+        ],
+        "xy_error": 0.0
+      }
+    }
+  ],
+  "symbolic_view": {
+    "objects": [
+      {
+        "name": "plastic_container",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm",
+          "xarm2"
+        ]
+      },
+      {
+        "name": "top_left_screw",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm"
+        ]
+      },
+      {
+        "name": "bottom_left_screw",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm",
+          "xarm2"
+        ]
+      }
+    ]
+  },
+  "arms": [
+    "xarm",
+    "xarm2"
+  ]
+}

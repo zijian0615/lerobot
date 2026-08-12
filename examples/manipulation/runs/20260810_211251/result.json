@@ -1,0 +1,118 @@
+{
+  "status": "success",
+  "reason": "",
+  "plan": [
+    {
+      "step": 1,
+      "arm": "xarm2",
+      "primitive": "Grasp",
+      "args": {
+        "object": "milk_carton"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm2",
+      "primitive": "Place",
+      "args": {
+        "object": "milk_carton",
+        "destination": "plastic_container"
+      },
+      "depends_on": [
+        1
+      ]
+    }
+  ],
+  "bound": [
+    {
+      "step": 1,
+      "arm": "xarm2",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.1499298123428571,
+          0.1924184274285714,
+          0.2,
+          0.07561270926443431
+        ],
+        "object": "milk_carton"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm2",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          -0.12837767154285706,
+          0.004611688228571456,
+          0.24000000000000002,
+          0.07561270926443431
+        ],
+        "object": "milk_carton",
+        "destination": "plastic_container"
+      },
+      "depends_on": [
+        1
+      ]
+    }
+  ],
+  "results": [
+    {
+      "step": 1,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "milk_carton"
+      }
+    },
+    {
+      "step": 2,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          -0.12837767154285706,
+          0.004611688228571456,
+          0.24000000000000002,
+          0.07561270926443431
+        ],
+        "object": "milk_carton",
+        "observed_xy": [
+          -0.12837767154285706,
+          0.004611688228571456
+        ],
+        "xy_error": 0.0
+      }
+    }
+  ],
+  "symbolic_view": {
+    "objects": [
+      {
+        "name": "milk_carton",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm2",
+          "xarm"
+        ],
+        "preferred_arm": "xarm2"
+      },
+      {
+        "name": "plastic_container",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm2",
+          "xarm"
+        ],
+        "preferred_arm": "xarm2"
+      }
+    ]
+  },
+  "arms": [
+    "xarm",
+    "xarm2"
+  ]
+}

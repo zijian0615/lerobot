@@ -27,6 +27,11 @@ Execute motions (requires --execute)::
     python -m manipulation.run_xarm_live \\
         --instruction "move the grey stuffed animal to free space" \\
         --execute
+
+Dual-arm collaboration (plan with both arms, two executors)::
+
+    python -m manipulation.run_xarm_live --collab --execute --skip-place-verify \\
+        --instruction "put the black screw in the container"
 """
 
 from __future__ import annotations
@@ -93,6 +98,65 @@ def _arm_table_xy_affine_from_exe(
     if a.shape != (2, 2) or b.shape != (2,):
         raise ValueError("execution table_xy_affine needs A 2x2 and b length-2")
     return a, b
+
+
+def _resolve_arm_names(args: argparse.Namespace, calib: dict[str, Any]) -> list[str]:
+    """Single arm (default) or collaborative multi-arm list."""
+    if bool(getattr(args, "collab", False)):
+        return ["xarm", "xarm2"]
+    raw = getattr(args, "arms", None)
+    if raw:
+        names = [a.strip() for a in str(raw).split(",") if a.strip()]
+        if not names:
+            raise ValueError("--arms is empty")
+        return names
+    legacy = dict(calib.get("execution") or {})
+    return [str(args.arm or legacy.get("arm_name", "xarm"))]
+
+
+def _ee_name_for_arm(calib: dict[str, Any], arm_name: str, exe_cfg: dict[str, Any]) -> str:
+    return str(
+        exe_cfg.get("ee")
+        or dict(calib.get("robots") or {}).get(arm_name, {}).get("ee")
+        or "parallel_gripper"
+    )
+
+
+def _build_backend(
+    robot: Any,
+    *,
+    calib: dict[str, Any],
+    arm_name: str,
+) -> XArmMotionBackend:
+    exe_cfg = _execution_cfg_for_arm(calib, arm_name)
+    base_xy = tuple(float(v) for v in exe_cfg.get("table_base_xy_m", [-0.45, -0.35]))
+    table_z = float(exe_cfg.get("table_z_base_m", 0.0))
+    topdown = tuple(float(v) for v in exe_cfg.get("topdown_rpy_rad", [math.pi, 0.0, 0.0]))
+    flip_x = bool(exe_cfg.get("flip_x", False))
+    flip_y = bool(exe_cfg.get("flip_y", True))
+    xy_off = exe_cfg.get("xy_offset_base_mm", [0.0, 0.0])
+    arm_affine = _arm_table_xy_affine_from_exe(exe_cfg)
+    if arm_affine is not None:
+        logger.info("Using per-arm table_xy_affine for %s", arm_name)
+    logger.info(
+        "Backend arm=%s flip_x=%s flip_y=%s base_xy=%s",
+        arm_name,
+        flip_x,
+        flip_y,
+        base_xy,
+    )
+    return XArmMotionBackend(
+        robot,
+        base_xy_table=base_xy,  # type: ignore[arg-type]
+        table_z_base_m=table_z,
+        topdown_rpy=topdown,  # type: ignore[arg-type]
+        speed=float(exe_cfg.get("move_speed_mm_s", 80.0)),
+        acc=float(exe_cfg.get("move_acc_mm_s2", 500.0)),
+        flip_x=flip_x,
+        flip_y=flip_y,
+        xy_offset_base_mm=(float(xy_off[0]), float(xy_off[1])),
+        table_xy_affine=arm_affine,
+    )
 
 
 def _apply_arm_table_affine(
@@ -253,6 +317,17 @@ def build_argparser() -> argparse.ArgumentParser:
         default=None,
         help="Arm name in calib (default: execution.arm_name / xarm). e.g. xarm2",
     )
+    p.add_argument(
+        "--arms",
+        type=str,
+        default=None,
+        help="Comma-separated arms for multi-arm planning, e.g. xarm,xarm2",
+    )
+    p.add_argument(
+        "--collab",
+        action="store_true",
+        help="Shortcut: plan/execute with both xarm and xarm2",
+    )
     p.add_argument("--instruction", type=str, required=True)
     p.add_argument("--execute", action="store_true", help="Actually move the arm (default: dry-run)")
     p.add_argument("--no-robot", action="store_true", help="Skip robot connect (plan/solve only)")
@@ -266,15 +341,8 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     args = build_argparser().parse_args(argv)
     calib = _load_calib(args.calib)
-    legacy_exe = calib.get("execution", {})
-    arm_name = str(args.arm or legacy_exe.get("arm_name", "xarm"))
-    exe_cfg = _execution_cfg_for_arm(calib, arm_name)
-    base_xy = tuple(float(v) for v in exe_cfg.get("table_base_xy_m", [-0.45, -0.35]))
-    table_z = float(exe_cfg.get("table_z_base_m", 0.0))
-    topdown = tuple(float(v) for v in exe_cfg.get("topdown_rpy_rad", [math.pi, 0.0, 0.0]))
-    flip_x = bool(exe_cfg.get("flip_x", False))
-    flip_y = bool(exe_cfg.get("flip_y", True))
-    logger.info("Active arm=%s flip_x=%s flip_y=%s base_xy=%s", arm_name, flip_x, flip_y, base_xy)
+    arm_names = _resolve_arm_names(args, calib)
+    logger.info("Active arms=%s collab=%s", arm_names, bool(args.collab))
     grasp_height = float(calib["grasp_height_m"])
     grasp_height_offsets = {
         str(k): float(v)
@@ -286,6 +354,38 @@ def main(argv: list[str] | None = None) -> int:
         for k, v in dict(calib.get("place_height_offset_m") or {}).items()
         if not str(k).startswith("_")
     }
+    # EE-specific extras (e.g. leaphand bear=-0.05) → per-arm map for the solver.
+    ee_height_offs = {
+        str(ee).lower(): {
+            str(k): float(v)
+            for k, v in dict(offs or {}).items()
+            if not str(k).startswith("_")
+        }
+        for ee, offs in dict(calib.get("grasp_height_offset_by_ee") or {}).items()
+        if not str(ee).startswith("_")
+    }
+    grasp_height_offsets_by_arm: dict[str, dict[str, float]] = {}
+    place_height_offsets_by_arm: dict[str, dict[str, float]] = {}
+    for name in arm_names:
+        exe_i = _execution_cfg_for_arm(calib, name)
+        ee = _ee_name_for_arm(calib, name, exe_i).lower()
+        merged: dict[str, float] = {}
+        if ee in {"leaphand", "leap_hand", "leap"}:
+            merged.update(ee_height_offs.get("leaphand") or {})
+        elif ee in ee_height_offs:
+            merged.update(ee_height_offs[ee])
+        for k, v in dict(exe_i.get("grasp_height_offset_m") or {}).items():
+            if not str(k).startswith("_"):
+                merged[str(k)] = float(v)
+        if merged:
+            grasp_height_offsets_by_arm[name] = merged
+        place_merged = {
+            str(k): float(v)
+            for k, v in dict(exe_i.get("place_height_offset_m") or {}).items()
+            if not str(k).startswith("_")
+        }
+        if place_merged:
+            place_height_offsets_by_arm[name] = place_merged
 
     cam_cfg = calib["camera"]
     camera_path = args.camera or cam_cfg["index_or_path"]
@@ -296,28 +396,29 @@ def main(argv: list[str] | None = None) -> int:
         name: _workspace_from_spec(spec) for name, spec in calib["arm_workspaces_xy"].items()
     }
 
-    robot = None
-    leap: LeapHandEE | None = None
-    ee_name = str(
-        exe_cfg.get("ee")
-        or dict(calib.get("robots") or {}).get(arm_name, {}).get("ee")
-        or "parallel_gripper"
-    )
+    robots: dict[str, Any] = {}
+    leaps: dict[str, LeapHandEE] = {}
     if not args.no_robot:
-        logger.info("Connecting xArm arm=%s …", arm_name)
-        robot = _connect_xarm(calib, args.robot_ip, arm_name=arm_name)
-        logger.info("xArm connected (%s).", arm_name)
-        if ee_name.lower() in {"leaphand", "leap_hand", "leap"}:
-            logger.info("Connecting LeapHand EE …")
-            leap = LeapHandEE.from_calib(calib, arm_name)
-            leap.connect()
-            leap.open()
-            logger.info(
-                "LeapHand ready (port=%s curr_lim=%s max_joint_rad=%.2f)",
-                leap.port,
-                leap.curr_lim,
-                leap.max_joint_rad,
-            )
+        for i, name in enumerate(arm_names):
+            # --robot-ip only overrides the first arm (legacy single-arm CLI).
+            ip = args.robot_ip if (args.robot_ip and i == 0 and len(arm_names) == 1) else None
+            logger.info("Connecting xArm arm=%s …", name)
+            robots[name] = _connect_xarm(calib, ip, arm_name=name)
+            logger.info("xArm connected (%s).", name)
+            exe_cfg = _execution_cfg_for_arm(calib, name)
+            ee_name = _ee_name_for_arm(calib, name, exe_cfg)
+            if ee_name.lower() in {"leaphand", "leap_hand", "leap"}:
+                logger.info("Connecting LeapHand EE for %s …", name)
+                leap = LeapHandEE.from_calib(calib, name)
+                leap.connect()
+                leap.open()
+                leaps[name] = leap
+                logger.info(
+                    "LeapHand ready arm=%s port=%s curr_lim=%s",
+                    name,
+                    leap.port,
+                    leap.curr_lim,
+                )
     else:
         logger.info("Skipping robot (--no-robot).")
 
@@ -325,9 +426,16 @@ def main(argv: list[str] | None = None) -> int:
     if table_xy_affine is not None:
         logger.info("Using table_xy_affine correction from calib.")
     if grasp_height_offsets:
-        logger.info("Per-object grasp height offsets: %s", grasp_height_offsets)
+        logger.info("Per-object grasp height offsets (global): %s", grasp_height_offsets)
+    if grasp_height_offsets_by_arm:
+        logger.info(
+            "Per-arm grasp height offsets (EE-specific): %s",
+            grasp_height_offsets_by_arm,
+        )
     if place_height_offsets:
         logger.info("Per-destination place height offsets: %s", place_height_offsets)
+    if place_height_offsets_by_arm:
+        logger.info("Per-arm place height offsets: %s", place_height_offsets_by_arm)
     perception = Perception(
         footprint_buffer_m=float(calib.get("footprint_buffer_m", 0.02)),
         table_xy_affine=table_xy_affine,
@@ -439,10 +547,14 @@ def main(argv: list[str] | None = None) -> int:
         return plan
 
     try:
+        # Solver margin: use first arm's config (same default for both today).
+        primary_exe = _execution_cfg_for_arm(calib, arm_names[0])
+        solver_margin = float(primary_exe.get("solver_margin_m", 0.03))
+
         if not args.execute:
             # Dry-run: perceive → plan → solve only.
             symbolic, geometric = perceive_pair()
-            plan = plan_fn(symbolic, args.instruction, [arm_name])
+            plan = plan_fn(symbolic, args.instruction, arm_names)
             from manipulation.solver import solve
 
             bound = solve(
@@ -450,8 +562,10 @@ def main(argv: list[str] | None = None) -> int:
                 geometric,
                 SolverConfig(
                     grasp_height=grasp_height,
-                    margin=float(exe_cfg.get("solver_margin_m", 0.03)),
+                    margin=solver_margin,
                     place_height_offsets_m=place_height_offsets,
+                    place_height_offsets_by_arm=place_height_offsets_by_arm,
+                    grasp_height_offsets_by_arm=grasp_height_offsets_by_arm,
                 ),
                 lookahead=args.lookahead,
             )
@@ -460,28 +574,11 @@ def main(argv: list[str] | None = None) -> int:
             (out_dir / "bound.json").write_text(json.dumps(bound, indent=2))
             print(json.dumps({"plan": plan, "bound": bound}, indent=2))
             print(f"\nDry-run only. Outputs → {out_dir}")
-            print("Re-run with --execute to move the arm.")
+            print("Re-run with --execute to move the arm(s).")
             return 0
 
-        if robot is None:
+        if not robots:
             raise RuntimeError("--execute requires a connected robot (omit --no-robot)")
-
-        xy_off = exe_cfg.get("xy_offset_base_mm", [0.0, 0.0])
-        arm_affine = _arm_table_xy_affine_from_exe(exe_cfg)
-        if arm_affine is not None:
-            logger.info("Using per-arm table_xy_affine for %s", arm_name)
-        backend = XArmMotionBackend(
-            robot,
-            base_xy_table=base_xy,  # type: ignore[arg-type]
-            table_z_base_m=table_z,
-            topdown_rpy=topdown,  # type: ignore[arg-type]
-            speed=float(exe_cfg.get("move_speed_mm_s", 80.0)),
-            acc=float(exe_cfg.get("move_acc_mm_s2", 500.0)),
-            flip_x=flip_x,
-            flip_y=flip_y,
-            xy_offset_base_mm=(float(xy_off[0]), float(xy_off[1])),
-            table_xy_affine=arm_affine,
-        )
 
         # Last commanded Place pose — used when --skip-place-verify trusts the command.
         last_place_cmd: dict[str, Any] = {}
@@ -503,49 +600,60 @@ def main(argv: list[str] | None = None) -> int:
             _sym, geo = perceive_pair()
             return geo
 
-        _raw_execute = None
+        executors: dict[str, ArmExecutor] = {}
+        backends: dict[str, XArmMotionBackend] = {}
+        for name in arm_names:
+            robot = robots[name]
+            exe_cfg = _execution_cfg_for_arm(calib, name)
+            backend = _build_backend(robot, calib=calib, arm_name=name)
+            backends[name] = backend
+            leap = leaps.get(name)
+            if leap is not None:
+                gripper_fn = leap.gripper
+                width_fn = leap.read_gripper_width
+            else:
 
-        if leap is not None:
-            gripper_fn = leap.gripper
-            width_fn = leap.read_gripper_width
-        else:
-            gripper_fn = backend.gripper
+                def _make_width_fn(r: Any = robot) -> Any:
+                    def width_fn() -> float:
+                        g = float(r._latest_gripper_norm)
+                        if g >= 0.5:
+                            return 0.03
+                        return 0.08
 
-            def width_fn() -> float:
-                # Soften grasp_empty check: xArm gripper often reports binary.
-                g = float(robot._latest_gripper_norm)
-                if g >= 0.5:
-                    return 0.03
-                return 0.08
+                    return width_fn
 
-        executor = ArmExecutor(
-            arm_name,
-            move_to_pose=backend.move_to_pose,
-            gripper=gripper_fn,
-            read_gripper_width=width_fn,
-            perceive=perceive_for_place,
-            get_current_pose=backend.get_current_pose_table,
-            config=ExecutorConfig(
-                approach_offset=float(exe_cfg.get("approach_offset_m", 0.08)),
-                lift_offset=float(exe_cfg.get("lift_offset_m", 0.08)),
-                # After close, commanded norm=1 → width 0.01; allow near-closed as "holding"
-                # by treating any width strictly between open and closed — use a soft band.
-                gripper_open_width=0.085,
-                gripper_closed_width=0.005,
-                place_xy_tol=0.03,
-            ),
-        )
+                gripper_fn = backend.gripper
+                width_fn = _make_width_fn()
 
-        _raw_execute = executor.execute
+            executor = ArmExecutor(
+                name,
+                move_to_pose=backend.move_to_pose,
+                gripper=gripper_fn,
+                read_gripper_width=width_fn,
+                perceive=perceive_for_place,
+                get_current_pose=backend.get_current_pose_table,
+                config=ExecutorConfig(
+                    approach_offset=float(exe_cfg.get("approach_offset_m", 0.08)),
+                    lift_offset=float(exe_cfg.get("lift_offset_m", 0.08)),
+                    gripper_open_width=0.085,
+                    gripper_closed_width=0.005,
+                    place_xy_tol=0.03,
+                ),
+            )
+            raw_execute = executor.execute
 
-        def _execute_tracking(step: dict[str, Any]):
-            if str(step.get("primitive")) == "Place":
-                params = step.get("params") or {}
-                last_place_cmd["object"] = params.get("object")
-                last_place_cmd["pose"] = params.get("pose")
-            return _raw_execute(step)
+            def _make_tracking(raw=raw_execute):
+                def _execute_tracking(step: dict[str, Any]):
+                    if str(step.get("primitive")) == "Place":
+                        params = step.get("params") or {}
+                        last_place_cmd["object"] = params.get("object")
+                        last_place_cmd["pose"] = params.get("pose")
+                    return raw(step)
 
-        executor.execute = _execute_tracking  # type: ignore[method-assign]
+                return _execute_tracking
+
+            executor.execute = _make_tracking()  # type: ignore[method-assign]
+            executors[name] = executor
 
         # Overlap = ∩ workspaces (clipped to table). Mutex + retract after in-zone steps.
         ov_cfg = dict(calib.get("overlap_xy") or {})
@@ -554,30 +662,41 @@ def main(argv: list[str] | None = None) -> int:
             arms=ov_cfg.get("arms"),
             table_polygon=table_polygon if ov_cfg.get("clip_to_table", True) else None,
         )
-        retract_z = grasp_height + float(exe_cfg.get("lift_offset_m", 0.08)) + 0.05
-        ws_poly = arm_workspaces[arm_name]
-
         overlap_guard = OverlapGuard(
             ov_poly,
             retract={},
             enabled=bool(ov_cfg) and not ov_poly.is_empty,
         )
+        for name in arm_names:
+            exe_cfg = _execution_cfg_for_arm(calib, name)
+            retract_z = grasp_height + float(exe_cfg.get("lift_offset_m", 0.08)) + 0.05
+            ws_poly = arm_workspaces[name]
+            backend = backends[name]
 
-        def _retract_arm() -> None:
-            xy = exclusive_retract_xy(ws_poly, overlap_guard.overlap)
-            if xy is None:
-                logger.warning("retract skipped: no exclusive point for %s", arm_name)
-                return
-            logger.info(
-                "retract %s → exclusive xy=(%.3f, %.3f) z=%.3f",
-                arm_name,
-                xy[0],
-                xy[1],
-                retract_z,
-            )
-            backend.move_to_pose((xy[0], xy[1], retract_z, 0.0))
+            def _make_retract(
+                arm: str = name,
+                ws=ws_poly,
+                z: float = retract_z,
+                be=backend,
+            ):
+                def _retract_arm() -> None:
+                    xy = exclusive_retract_xy(ws, overlap_guard.overlap)
+                    if xy is None:
+                        logger.warning("retract skipped: no exclusive point for %s", arm)
+                        return
+                    logger.info(
+                        "retract %s → exclusive xy=(%.3f, %.3f) z=%.3f",
+                        arm,
+                        xy[0],
+                        xy[1],
+                        z,
+                    )
+                    be.move_to_pose((xy[0], xy[1], z, 0.0))
 
-        overlap_guard.retract[arm_name] = _retract_arm
+                return _retract_arm
+
+            overlap_guard.retract[name] = _make_retract()
+
         if overlap_guard.enabled:
             logger.info(
                 "Overlap mutex enabled area=%.3f m^2 centroid=(%.3f, %.3f)",
@@ -590,13 +709,15 @@ def main(argv: list[str] | None = None) -> int:
             args.instruction,
             perceive=perceive_pair,
             plan_fn=plan_fn,
-            executors={arm_name: executor},
+            executors=executors,
             solver_config=SolverConfig(
                 grasp_height=grasp_height,
-                margin=float(exe_cfg.get("solver_margin_m", 0.03)),
+                margin=solver_margin,
                 place_height_offsets_m=place_height_offsets,
+                place_height_offsets_by_arm=place_height_offsets_by_arm,
+                grasp_height_offsets_by_arm=grasp_height_offsets_by_arm,
             ),
-            arms=[arm_name],
+            arms=arm_names,
             lookahead=args.lookahead,
             overlap_guard=overlap_guard,
         )
@@ -608,22 +729,23 @@ def main(argv: list[str] | None = None) -> int:
             "bound": result.bound,
             "results": result.results,
             "symbolic_view": result.symbolic_view,
+            "arms": arm_names,
         }
         (out_dir / "result.json").write_text(json.dumps(payload, indent=2, default=str))
         print(json.dumps(payload, indent=2, default=str))
         print(f"\nOutputs → {out_dir}")
         return 0 if result.status == "success" else 1
     finally:
-        if leap is not None:
+        for name, leap in list(leaps.items()):
             try:
                 leap.disconnect()
             except Exception as exc:  # noqa: BLE001
-                logger.warning("LeapHand disconnect: %s", exc)
-        if robot is not None:
+                logger.warning("LeapHand disconnect %s: %s", name, exc)
+        for name, robot in list(robots.items()):
             try:
                 robot.disconnect()
             except Exception as exc:  # noqa: BLE001
-                logger.warning("robot disconnect: %s", exc)
+                logger.warning("robot disconnect %s: %s", name, exc)
 
 
 if __name__ == "__main__":

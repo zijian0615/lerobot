@@ -1,0 +1,102 @@
+{
+  "status": "fail",
+  "reason": "retry_failed:exception:RuntimeError:set_position failed code=-9 pose=[385.45596365, -607.6531892697503, 260.0, 3.1415926535, 0.0, 0.0]",
+  "plan": [
+    {
+      "step": 1,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "args": {
+        "object": "black_screw"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm",
+      "primitive": "Place",
+      "args": {
+        "object": "black_screw",
+        "destination": "box"
+      },
+      "depends_on": [
+        1
+      ]
+    }
+  ],
+  "bound": [
+    {
+      "step": 1,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.20121041645714277,
+          -0.2468242274285714,
+          0.18000000000000002,
+          -1.4565391200378177
+        ],
+        "object": "black_screw"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          -0.06454403635,
+          0.2576531892697503,
+          0.18000000000000002,
+          0.0756127092644341
+        ],
+        "object": "black_screw",
+        "destination": "box"
+      },
+      "depends_on": [
+        1
+      ]
+    }
+  ],
+  "results": [
+    {
+      "step": 1,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "black_screw"
+      }
+    },
+    {
+      "step": 2,
+      "status": "fail",
+      "reason": "exception:RuntimeError:set_position failed code=-9 pose=[385.45596365, -607.6531892697503, 260.0, 3.1415926535, 0.0, 0.0]",
+      "observed": {}
+    }
+  ],
+  "symbolic_view": {
+    "objects": [
+      {
+        "name": "black_screw",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm"
+        ]
+      },
+      {
+        "name": "box",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm",
+          "xarm2"
+        ]
+      }
+    ]
+  },
+  "arms": [
+    "xarm",
+    "xarm2"
+  ]
+}

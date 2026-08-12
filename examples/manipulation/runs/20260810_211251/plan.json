@@ -1,0 +1,23 @@
+[
+  {
+    "step": 1,
+    "arm": "xarm2",
+    "primitive": "Grasp",
+    "args": {
+      "object": "milk_carton"
+    },
+    "depends_on": []
+  },
+  {
+    "step": 2,
+    "arm": "xarm2",
+    "primitive": "Place",
+    "args": {
+      "object": "milk_carton",
+      "destination": "plastic_container"
+    },
+    "depends_on": [
+      1
+    ]
+  }
+]

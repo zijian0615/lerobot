@@ -1,0 +1,29 @@
+{
+  "objects": [
+    {
+      "name": "grey_duct_tape",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm",
+        "xarm2"
+      ],
+      "preferred_arm": "xarm"
+    },
+    {
+      "name": "clear_dispenser_tape",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm"
+      ],
+      "preferred_arm": "xarm"
+    },
+    {
+      "name": "small_green_tape_roll",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm"
+      ],
+      "preferred_arm": "xarm"
+    }
+  ]
+}

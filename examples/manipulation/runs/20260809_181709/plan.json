@@ -1,0 +1,190 @@
+[
+  {
+    "step": 1,
+    "arm": "xarm",
+    "primitive": "Grasp",
+    "args": {
+      "object": "top_left_box"
+    },
+    "depends_on": []
+  },
+  {
+    "step": 2,
+    "arm": "xarm",
+    "primitive": "Place",
+    "args": {
+      "object": "top_left_box",
+      "destination": "handover"
+    },
+    "depends_on": [
+      1
+    ]
+  },
+  {
+    "step": 3,
+    "arm": "xarm2",
+    "primitive": "Grasp",
+    "args": {
+      "object": "top_left_box"
+    },
+    "depends_on": [
+      2
+    ]
+  },
+  {
+    "step": 4,
+    "arm": "xarm2",
+    "primitive": "Place",
+    "args": {
+      "object": "top_left_box",
+      "destination": "white_lid"
+    },
+    "depends_on": [
+      3
+    ]
+  },
+  {
+    "step": 5,
+    "arm": "xarm",
+    "primitive": "Grasp",
+    "args": {
+      "object": "top_right_box"
+    },
+    "depends_on": [
+      2
+    ]
+  },
+  {
+    "step": 6,
+    "arm": "xarm",
+    "primitive": "Place",
+    "args": {
+      "object": "top_right_box",
+      "destination": "handover"
+    },
+    "depends_on": [
+      3,
+      5
+    ]
+  },
+  {
+    "step": 7,
+    "arm": "xarm2",
+    "primitive": "Grasp",
+    "args": {
+      "object": "top_right_box"
+    },
+    "depends_on": [
+      4,
+      6
+    ]
+  },
+  {
+    "step": 8,
+    "arm": "xarm2",
+    "primitive": "Place",
+    "args": {
+      "object": "top_right_box",
+      "destination": "white_lid"
+    },
+    "depends_on": [
+      7
+    ]
+  },
+  {
+    "step": 9,
+    "arm": "xarm",
+    "primitive": "Grasp",
+    "args": {
+      "object": "middle_left_box"
+    },
+    "depends_on": [
+      6
+    ]
+  },
+  {
+    "step": 10,
+    "arm": "xarm",
+    "primitive": "Place",
+    "args": {
+      "object": "middle_left_box",
+      "destination": "handover"
+    },
+    "depends_on": [
+      7,
+      9
+    ]
+  },
+  {
+    "step": 11,
+    "arm": "xarm2",
+    "primitive": "Grasp",
+    "args": {
+      "object": "middle_left_box"
+    },
+    "depends_on": [
+      8,
+      10
+    ]
+  },
+  {
+    "step": 12,
+    "arm": "xarm2",
+    "primitive": "Place",
+    "args": {
+      "object": "middle_left_box",
+      "destination": "white_lid"
+    },
+    "depends_on": [
+      11
+    ]
+  },
+  {
+    "step": 13,
+    "arm": "xarm",
+    "primitive": "Grasp",
+    "args": {
+      "object": "bottom_box"
+    },
+    "depends_on": [
+      10
+    ]
+  },
+  {
+    "step": 14,
+    "arm": "xarm",
+    "primitive": "Place",
+    "args": {
+      "object": "bottom_box",
+      "destination": "handover"
+    },
+    "depends_on": [
+      11,
+      13
+    ]
+  },
+  {
+    "step": 15,
+    "arm": "xarm2",
+    "primitive": "Grasp",
+    "args": {
+      "object": "bottom_box"
+    },
+    "depends_on": [
+      12,
+      14
+    ]
+  },
+  {
+    "step": 16,
+    "arm": "xarm2",
+    "primitive": "Place",
+    "args": {
+      "object": "bottom_box",
+      "destination": "white_lid"
+    },
+    "depends_on": [
+      15
+    ]
+  }
+]

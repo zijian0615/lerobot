@@ -1,0 +1,39 @@
+{
+  "objects": [
+    {
+      "name": "screwdriver",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm"
+      ]
+    },
+    {
+      "name": "green_tape",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm"
+      ]
+    },
+    {
+      "name": "plastic_container",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm"
+      ]
+    },
+    {
+      "name": "grey_plush_toy",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm"
+      ]
+    },
+    {
+      "name": "orange_box",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm"
+      ]
+    }
+  ]
+}

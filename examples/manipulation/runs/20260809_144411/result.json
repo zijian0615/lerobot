@@ -1,0 +1,104 @@
+{
+  "status": "success",
+  "reason": "",
+  "plan": [
+    {
+      "step": 1,
+      "arm": "xarm2",
+      "primitive": "Grasp",
+      "args": {
+        "object": "black_plush_bear"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm2",
+      "primitive": "Place",
+      "args": {
+        "object": "black_plush_bear",
+        "destination": "free_space"
+      },
+      "depends_on": [
+        1
+      ]
+    }
+  ],
+  "bound": [
+    {
+      "step": 1,
+      "arm": "xarm2",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.1575020521142857,
+          0.20714113074285712,
+          0.15000000000000002,
+          0.07561270926443436
+        ],
+        "object": "black_plush_bear"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm2",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          -0.3066586352218961,
+          -0.045292796460585455,
+          0.15000000000000002,
+          0.07561270926443436
+        ],
+        "object": "black_plush_bear",
+        "destination": "free_space"
+      },
+      "depends_on": [
+        1
+      ]
+    }
+  ],
+  "results": [
+    {
+      "step": 1,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "black_plush_bear"
+      }
+    },
+    {
+      "step": 2,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          -0.3066586352218961,
+          -0.045292796460585455,
+          0.15000000000000002,
+          0.07561270926443436
+        ],
+        "object": "black_plush_bear",
+        "observed_xy": [
+          -0.3066586352218961,
+          -0.045292796460585455
+        ],
+        "xy_error": 0.0
+      }
+    }
+  ],
+  "symbolic_view": {
+    "objects": [
+      {
+        "name": "black_plush_bear",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm",
+          "xarm2"
+        ]
+      }
+    ]
+  }
+}

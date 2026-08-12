@@ -53,6 +53,7 @@ class SymbolicObject(TypedDict):
     name: str
     blocked_by: str | None
     in_workspace: list[str]
+    preferred_arm: str | None
 
 
 class SymbolicView(TypedDict):
@@ -72,6 +73,72 @@ class GeometricView(TypedDict):
     free_space: Polygon
     table_polygon: Polygon
     workspaces: dict[str, Polygon]
+
+
+def resolve_preferred_arm(
+    xy: tuple[float, float],
+    candidates: list[str],
+    arm_workspaces: dict[str, Polygon],
+    table_polygon: Polygon | None = None,
+    *,
+    center_margin_m: float = 0.03,
+) -> str | None:
+    """
+    Among reachable arms, pick who should preferably Grasp this object.
+
+    1. If the object is clearly on one side of the table center (along the
+       axis joining the two farthest arm centroids), prefer that side's arm.
+    2. Otherwise (near center / ties): prefer the arm whose workspace
+       centroid is nearest to the object.
+    """
+    if not candidates:
+        return None
+    if len(candidates) == 1:
+        return candidates[0]
+
+    pt = np.asarray(xy, dtype=float)
+    cents = {
+        a: np.asarray(
+            [arm_workspaces[a].centroid.x, arm_workspaces[a].centroid.y],
+            dtype=float,
+        )
+        for a in candidates
+        if a in arm_workspaces
+    }
+    if len(cents) < len(candidates):
+        # Missing workspace poly — fall back to first reachable.
+        return candidates[0]
+    pool = list(candidates)
+
+    if table_polygon is not None and not table_polygon.is_empty and len(pool) >= 2:
+        tc = np.asarray(
+            [table_polygon.centroid.x, table_polygon.centroid.y], dtype=float
+        )
+        best_pair: tuple[str, str] | None = None
+        best_d = -1.0
+        for i, a0 in enumerate(pool):
+            for a1 in pool[i + 1 :]:
+                d = float(np.linalg.norm(cents[a0] - cents[a1]))
+                if d > best_d:
+                    best_d = d
+                    best_pair = (a0, a1)
+        if best_pair is not None and best_d > 1e-6:
+            a0, a1 = best_pair
+            axis = cents[a1] - cents[a0]
+            axis = axis / float(np.linalg.norm(axis))
+            o_side = float(np.dot(pt - tc, axis))
+            if abs(o_side) >= float(center_margin_m):
+                same = [
+                    a
+                    for a in pool
+                    if float(np.dot(cents[a] - tc, axis)) * o_side > 0
+                ]
+                if len(same) == 1:
+                    return same[0]
+                if len(same) > 1:
+                    pool = same
+
+    return min(pool, key=lambda a: float(np.sum((pt - cents[a]) ** 2)))
 
 
 class Perception:
@@ -188,11 +255,18 @@ class Perception:
                 for arm, poly in arm_workspaces.items()
                 if grasp_pt.within(poly)
             ]
+            preferred = resolve_preferred_arm(
+                geo["xy"], in_ws, arm_workspaces, table_polygon
+            )
+            # Put preferred arm first so planners that scan the list bias correctly.
+            if preferred is not None and preferred in in_ws:
+                in_ws = [preferred] + [a for a in in_ws if a != preferred]
             symbolic_objects.append(
                 {
                     "name": name,
                     "blocked_by": name_to_blocked.get(name),
                     "in_workspace": in_ws,
+                    "preferred_arm": preferred,
                 }
             )
 

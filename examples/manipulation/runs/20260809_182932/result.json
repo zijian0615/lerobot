@@ -1,0 +1,118 @@
+{
+  "status": "success",
+  "reason": "",
+  "plan": [
+    {
+      "step": 1,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "args": {
+        "object": "tape"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm",
+      "primitive": "Place",
+      "args": {
+        "object": "tape",
+        "destination": "box"
+      },
+      "depends_on": [
+        1
+      ]
+    }
+  ],
+  "bound": [
+    {
+      "step": 1,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.24112356845714283,
+          -0.13336031062857137,
+          0.2,
+          0.07561270926443434
+        ],
+        "object": "tape"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          -0.20611883862857142,
+          0.052259480685714274,
+          0.2,
+          0.07561270926443434
+        ],
+        "object": "tape",
+        "destination": "box"
+      },
+      "depends_on": [
+        1
+      ]
+    }
+  ],
+  "results": [
+    {
+      "step": 1,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "tape"
+      }
+    },
+    {
+      "step": 2,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          -0.20611883862857142,
+          0.052259480685714274,
+          0.2,
+          0.07561270926443434
+        ],
+        "object": "tape",
+        "observed_xy": [
+          -0.20611883862857142,
+          0.052259480685714274
+        ],
+        "xy_error": 0.0
+      }
+    }
+  ],
+  "symbolic_view": {
+    "objects": [
+      {
+        "name": "tape",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm",
+          "xarm2"
+        ],
+        "preferred_arm": "xarm"
+      },
+      {
+        "name": "box",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm2",
+          "xarm"
+        ],
+        "preferred_arm": "xarm2"
+      }
+    ]
+  },
+  "arms": [
+    "xarm",
+    "xarm2"
+  ]
+}

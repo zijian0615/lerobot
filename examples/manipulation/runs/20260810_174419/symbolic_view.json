@@ -1,0 +1,83 @@
+{
+  "objects": [
+    {
+      "name": "blackboard_eraser",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm2",
+        "xarm"
+      ],
+      "preferred_arm": "xarm2"
+    },
+    {
+      "name": "tape_dispenser",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm"
+      ],
+      "preferred_arm": "xarm"
+    },
+    {
+      "name": "tape_roll",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm"
+      ],
+      "preferred_arm": "xarm"
+    },
+    {
+      "name": "remote_control",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm",
+        "xarm2"
+      ],
+      "preferred_arm": "xarm"
+    },
+    {
+      "name": "purple_box",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm2",
+        "xarm"
+      ],
+      "preferred_arm": "xarm2"
+    },
+    {
+      "name": "small_tape_roll",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm2",
+        "xarm"
+      ],
+      "preferred_arm": "xarm2"
+    },
+    {
+      "name": "plastic_container",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm2",
+        "xarm"
+      ],
+      "preferred_arm": "xarm2"
+    },
+    {
+      "name": "small_black_box",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm2",
+        "xarm"
+      ],
+      "preferred_arm": "xarm2"
+    },
+    {
+      "name": "gps_computer_box",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm2",
+        "xarm"
+      ],
+      "preferred_arm": "xarm2"
+    }
+  ]
+}

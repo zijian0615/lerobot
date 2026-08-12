@@ -1,0 +1,135 @@
+{
+  "status": "success",
+  "reason": "",
+  "plan": [
+    {
+      "step": 1,
+      "arm": "xarm2",
+      "primitive": "Grasp",
+      "args": {
+        "object": "all_black_box"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm2",
+      "primitive": "Place",
+      "args": {
+        "object": "all_black_box",
+        "destination": "container"
+      },
+      "depends_on": [
+        1
+      ]
+    }
+  ],
+  "bound": [
+    {
+      "step": 1,
+      "arm": "xarm2",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.032238519314285674,
+          0.02366134194285717,
+          0.19,
+          0.07561270926443422
+        ],
+        "object": "all_black_box"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm2",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          -0.17851417988571427,
+          0.03140619885714287,
+          0.24000000000000002,
+          0.07561270926443422
+        ],
+        "object": "all_black_box",
+        "destination": "container"
+      },
+      "depends_on": [
+        1
+      ]
+    }
+  ],
+  "results": [
+    {
+      "step": 1,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "all_black_box"
+      }
+    },
+    {
+      "step": 2,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          -0.17851417988571427,
+          0.03140619885714287,
+          0.24000000000000002,
+          0.07561270926443422
+        ],
+        "object": "all_black_box",
+        "observed_xy": [
+          -0.17851417988571427,
+          0.03140619885714287
+        ],
+        "xy_error": 0.0
+      }
+    }
+  ],
+  "symbolic_view": {
+    "objects": [
+      {
+        "name": "all_black_box",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm2",
+          "xarm"
+        ],
+        "preferred_arm": "xarm2"
+      },
+      {
+        "name": "black_and_white_box_left",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm"
+        ],
+        "preferred_arm": "xarm"
+      },
+      {
+        "name": "black_and_white_box_right",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm2",
+          "xarm"
+        ],
+        "preferred_arm": "xarm2"
+      },
+      {
+        "name": "container",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm2",
+          "xarm"
+        ],
+        "preferred_arm": "xarm2"
+      }
+    ]
+  },
+  "arms": [
+    "xarm",
+    "xarm2"
+  ]
+}

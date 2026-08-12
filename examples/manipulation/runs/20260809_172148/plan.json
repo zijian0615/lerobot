@@ -1,0 +1,44 @@
+[
+  {
+    "step": 1,
+    "arm": "xarm",
+    "primitive": "Grasp",
+    "args": {
+      "object": "left_screw"
+    },
+    "depends_on": []
+  },
+  {
+    "step": 2,
+    "arm": "xarm2",
+    "primitive": "Grasp",
+    "args": {
+      "object": "right_screw"
+    },
+    "depends_on": []
+  },
+  {
+    "step": 3,
+    "arm": "xarm",
+    "primitive": "Place",
+    "args": {
+      "object": "left_screw",
+      "destination": "container"
+    },
+    "depends_on": [
+      1
+    ]
+  },
+  {
+    "step": 4,
+    "arm": "xarm2",
+    "primitive": "Place",
+    "args": {
+      "object": "right_screw",
+      "destination": "container"
+    },
+    "depends_on": [
+      2
+    ]
+  }
+]

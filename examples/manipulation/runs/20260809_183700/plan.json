@@ -1,0 +1,23 @@
+[
+  {
+    "step": 1,
+    "arm": "xarm",
+    "primitive": "Grasp",
+    "args": {
+      "object": "electrical_industrial_tape"
+    },
+    "depends_on": []
+  },
+  {
+    "step": 2,
+    "arm": "xarm",
+    "primitive": "Place",
+    "args": {
+      "object": "electrical_industrial_tape",
+      "destination": "box"
+    },
+    "depends_on": [
+      1
+    ]
+  }
+]

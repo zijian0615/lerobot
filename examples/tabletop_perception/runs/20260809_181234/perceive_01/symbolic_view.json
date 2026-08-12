@@ -1,0 +1,37 @@
+{
+  "objects": [
+    {
+      "name": "leftmost_box",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm"
+      ],
+      "preferred_arm": "xarm"
+    },
+    {
+      "name": "middle_box",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm"
+      ],
+      "preferred_arm": "xarm"
+    },
+    {
+      "name": "rightmost_box",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm"
+      ],
+      "preferred_arm": "xarm"
+    },
+    {
+      "name": "white_lid",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm2",
+        "xarm"
+      ],
+      "preferred_arm": "xarm2"
+    }
+  ]
+}

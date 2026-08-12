@@ -1,0 +1,205 @@
+{
+  "status": "success",
+  "reason": "",
+  "plan": [
+    {
+      "step": 1,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "args": {
+        "object": "plush_toy"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm",
+      "primitive": "Place",
+      "args": {
+        "object": "plush_toy",
+        "destination": "free_space"
+      },
+      "depends_on": [
+        1
+      ]
+    },
+    {
+      "step": 3,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "args": {
+        "object": "black_screw"
+      },
+      "depends_on": [
+        2
+      ]
+    },
+    {
+      "step": 4,
+      "arm": "xarm",
+      "primitive": "Place",
+      "args": {
+        "object": "black_screw",
+        "destination": "container"
+      },
+      "depends_on": [
+        3
+      ]
+    }
+  ],
+  "bound": [
+    {
+      "step": 1,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.14141028159999997,
+          0.0083309456,
+          0.2,
+          0.07561270926443386
+        ],
+        "object": "plush_toy"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          0.10656290749603371,
+          -0.18161526455133734,
+          0.2,
+          0.07561270926443386
+        ],
+        "object": "plush_toy",
+        "destination": "free_space"
+      },
+      "depends_on": [
+        1
+      ]
+    },
+    {
+      "step": 3,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.15464425257142866,
+          -0.2644760758857142,
+          0.18000000000000002,
+          0.07561270926443438
+        ],
+        "object": "black_screw"
+      },
+      "depends_on": [
+        2
+      ]
+    },
+    {
+      "step": 4,
+      "arm": "xarm",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          -0.1598643929142857,
+          0.059293513142857114,
+          0.22000000000000003,
+          0.07561270926443438
+        ],
+        "object": "black_screw",
+        "destination": "container"
+      },
+      "depends_on": [
+        3
+      ]
+    }
+  ],
+  "results": [
+    {
+      "step": 1,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "plush_toy"
+      }
+    },
+    {
+      "step": 2,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          0.10656290749603371,
+          -0.18161526455133734,
+          0.2,
+          0.07561270926443386
+        ],
+        "object": "plush_toy",
+        "observed_xy": [
+          0.10656290749603371,
+          -0.18161526455133734
+        ],
+        "xy_error": 0.0
+      }
+    },
+    {
+      "step": 3,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "black_screw"
+      }
+    },
+    {
+      "step": 4,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          -0.1598643929142857,
+          0.059293513142857114,
+          0.22000000000000003,
+          0.07561270926443438
+        ],
+        "object": "black_screw",
+        "observed_xy": [
+          -0.1598643929142857,
+          0.059293513142857114
+        ],
+        "xy_error": 0.0
+      }
+    }
+  ],
+  "symbolic_view": {
+    "objects": [
+      {
+        "name": "black_screw",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm"
+        ]
+      },
+      {
+        "name": "container",
+        "blocked_by": "plush_toy",
+        "in_workspace": [
+          "xarm",
+          "xarm2"
+        ]
+      },
+      {
+        "name": "plush_toy",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm",
+          "xarm2"
+        ]
+      }
+    ]
+  }
+}

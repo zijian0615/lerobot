@@ -1,0 +1,20 @@
+[
+  {
+    "step": 1,
+    "arm": "xarm",
+    "primitive": "Grasp",
+    "args": {
+      "object": "grey_duct_tape"
+    },
+    "depends_on": []
+  },
+  {
+    "step": 2,
+    "arm": "xarm",
+    "primitive": "LiftUp",
+    "args": {},
+    "depends_on": [
+      1
+    ]
+  }
+]

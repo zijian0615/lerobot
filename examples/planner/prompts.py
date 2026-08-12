@@ -66,6 +66,18 @@ RULES
    them may run in parallel; leave depends_on empty only for steps that
    can start immediately.
 5. Use only arm names from AVAILABLE ARMS.
+6. Arm assignment preference (nearest / table-side):
+   - When an object has preferred_arm set, assign Grasp of that object to
+     preferred_arm whenever that arm is in in_workspace, unless doing so
+     would force an unnecessary handover or leave the instruction
+     incomplete.
+   - When several objects must be moved and multiple arms are free, give
+     each arm objects whose preferred_arm matches it (objects nearer that
+     arm / on its side of the table). Do not send an arm across the table
+     to grab something another arm prefers if both can work in parallel.
+7. When the instruction says ALL of a class (e.g. all screws), include a
+   Grasp+Place for every matching object still on the table (not already
+   inside the destination).
 
 {feedback_block}
 

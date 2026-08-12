@@ -1,0 +1,21 @@
+{
+  "objects": [
+    {
+      "name": "electrical_industrial_tape",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm"
+      ],
+      "preferred_arm": "xarm"
+    },
+    {
+      "name": "plastic_container_box",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm",
+        "xarm2"
+      ],
+      "preferred_arm": "xarm"
+    }
+  ]
+}

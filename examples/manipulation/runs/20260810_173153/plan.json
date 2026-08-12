@@ -1,0 +1,20 @@
+[
+  {
+    "step": 1,
+    "arm": "xarm2",
+    "primitive": "Grasp",
+    "args": {
+      "object": "blackboard_eraser"
+    },
+    "depends_on": []
+  },
+  {
+    "step": 2,
+    "arm": "xarm2",
+    "primitive": "LiftUp",
+    "args": {},
+    "depends_on": [
+      1
+    ]
+  }
+]

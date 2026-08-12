@@ -1,0 +1,26 @@
+{
+  "objects": [
+    {
+      "name": "middle_white_stand",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm",
+        "xarm2"
+      ]
+    },
+    {
+      "name": "right_white_stand",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm2"
+      ]
+    },
+    {
+      "name": "left_black_stand",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm"
+      ]
+    }
+  ]
+}

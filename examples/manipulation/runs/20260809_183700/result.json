@@ -1,0 +1,118 @@
+{
+  "status": "success",
+  "reason": "",
+  "plan": [
+    {
+      "step": 1,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "args": {
+        "object": "electrical_industrial_tape"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm",
+      "primitive": "Place",
+      "args": {
+        "object": "electrical_industrial_tape",
+        "destination": "box"
+      },
+      "depends_on": [
+        1
+      ]
+    }
+  ],
+  "bound": [
+    {
+      "step": 1,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.23332758994285716,
+          -0.12806313897142851,
+          0.2,
+          -1.4565391200378175
+        ],
+        "object": "electrical_industrial_tape"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          -0.05253165097142858,
+          0.01741742171428571,
+          0.2,
+          -1.4565391200378175
+        ],
+        "object": "electrical_industrial_tape",
+        "destination": "box"
+      },
+      "depends_on": [
+        1
+      ]
+    }
+  ],
+  "results": [
+    {
+      "step": 1,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "electrical_industrial_tape"
+      }
+    },
+    {
+      "step": 2,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          -0.05253165097142858,
+          0.01741742171428571,
+          0.2,
+          -1.4565391200378175
+        ],
+        "object": "electrical_industrial_tape",
+        "observed_xy": [
+          -0.05253165097142858,
+          0.01741742171428571
+        ],
+        "xy_error": 0.0
+      }
+    }
+  ],
+  "symbolic_view": {
+    "objects": [
+      {
+        "name": "electrical_industrial_tape",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm",
+          "xarm2"
+        ],
+        "preferred_arm": "xarm"
+      },
+      {
+        "name": "box",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm",
+          "xarm2"
+        ],
+        "preferred_arm": "xarm"
+      }
+    ]
+  },
+  "arms": [
+    "xarm",
+    "xarm2"
+  ]
+}

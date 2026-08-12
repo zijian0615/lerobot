@@ -1,0 +1,1 @@
+stack the stands on the table in white-black-white order onto the middle stand (base is the middle stand, then white, then black, then white on top)

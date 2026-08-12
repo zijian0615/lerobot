@@ -1,0 +1,67 @@
+[
+  {
+    "step": 1,
+    "arm": "xarm",
+    "primitive": "Grasp",
+    "args": {
+      "object": "left_box"
+    },
+    "depends_on": []
+  },
+  {
+    "step": 2,
+    "arm": "xarm2",
+    "primitive": "Grasp",
+    "args": {
+      "object": "right_box"
+    },
+    "depends_on": []
+  },
+  {
+    "step": 3,
+    "arm": "xarm",
+    "primitive": "Place",
+    "args": {
+      "object": "left_box",
+      "destination": "container"
+    },
+    "depends_on": [
+      1
+    ]
+  },
+  {
+    "step": 4,
+    "arm": "xarm2",
+    "primitive": "Place",
+    "args": {
+      "object": "right_box",
+      "destination": "container"
+    },
+    "depends_on": [
+      2
+    ]
+  },
+  {
+    "step": 5,
+    "arm": "xarm2",
+    "primitive": "Grasp",
+    "args": {
+      "object": "bottom_box"
+    },
+    "depends_on": [
+      4
+    ]
+  },
+  {
+    "step": 6,
+    "arm": "xarm2",
+    "primitive": "Place",
+    "args": {
+      "object": "bottom_box",
+      "destination": "container"
+    },
+    "depends_on": [
+      5
+    ]
+  }
+]

@@ -1,0 +1,1 @@
+xarm picks up the black screw and places it at handover in the middle, then xarm2 grasps the screw from handover and places it into the box

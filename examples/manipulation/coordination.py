@@ -102,8 +102,14 @@ def exclusive_retract_xy(
 class OverlapGuard:
     """
     Policy:
-      1. Poses inside overlap require the mutex (no two arms at once).
-      2. After a step that held the mutex, retract then release.
+      1. Poses inside overlap require the mutex (no two arms in-zone at once
+         during a step).
+      2. After Place (or any step that should clear the zone): retract to
+         exclusive workspace, then release.
+      3. After Grasp when a later Place of the same object by this arm exists:
+         release the mutex **without** retracting (arm stays at lift) so
+         Grasp→Place is direct even if other arms' steps are interleaved.
+         Plans are assumed sequential (no true parallel overlap use).
     """
 
     def __init__(
@@ -120,32 +126,52 @@ class OverlapGuard:
         self.enabled = enabled
         self._holder: str | None = None
 
+    @property
+    def holder(self) -> str | None:
+        return self._holder
+
     def update_overlap(self, overlap: Polygon) -> None:
         self.overlap = overlap if overlap is not None else Polygon()
 
+    def in_overlap(self, xy: tuple[float, float] | None) -> bool:
+        if xy is None:
+            return False
+        return xy_in_overlap(xy, self.overlap, margin_m=self.margin_m)
+
     def acquire(self, arm: str, xy: tuple[float, float] | None) -> bool:
         """
-        Returns True if this step entered the overlap (caller must release_after).
-        Raises OverlapBusy if another arm holds the zone.
+        Returns True if this step is inside the overlap (caller must
+        ``release_after``).
         """
-        if not self.enabled or xy is None:
+        if not self.enabled:
             return False
-        if not xy_in_overlap(xy, self.overlap, margin_m=self.margin_m):
+        if not self.in_overlap(xy):
             return False
         if self._holder is not None and self._holder != arm:
             raise OverlapBusy(self._holder, arm)
+        if self._holder != arm:
+            logger.info("overlap acquire arm=%s xy=(%.3f, %.3f)", arm, xy[0], xy[1])
         self._holder = arm
-        logger.info("overlap acquire arm=%s xy=(%.3f, %.3f)", arm, xy[0], xy[1])
         return True
 
-    def release_after(self, arm: str) -> None:
+    def release_after(self, arm: str, *, retract: bool = True) -> None:
+        """
+        Finish an overlap step and always clear the mutex.
+
+        ``retract=True``: move to exclusive workspace first.
+        ``retract=False``: stay put (e.g. post-Grasp lift) then free the lock
+        so another arm's sequential step can run before this arm's Place.
+        """
         if self._holder != arm:
             return
-        fn = self.retract.get(arm)
         try:
-            if fn is not None:
-                logger.info("overlap retract arm=%s", arm)
-                fn()
+            if retract:
+                fn = self.retract.get(arm)
+                if fn is not None:
+                    logger.info("overlap retract arm=%s", arm)
+                    fn()
+                logger.info("overlap release arm=%s", arm)
+            else:
+                logger.info("overlap release arm=%s (skip retract)", arm)
         finally:
-            logger.info("overlap release arm=%s", arm)
             self._holder = None

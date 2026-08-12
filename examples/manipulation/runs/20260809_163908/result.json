@@ -1,0 +1,200 @@
+{
+  "status": "success",
+  "reason": "",
+  "plan": [
+    {
+      "step": 1,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "args": {
+        "object": "black_bear"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm",
+      "primitive": "Place",
+      "args": {
+        "object": "black_bear",
+        "destination": "handover"
+      },
+      "depends_on": [
+        1
+      ]
+    },
+    {
+      "step": 3,
+      "arm": "xarm2",
+      "primitive": "Grasp",
+      "args": {
+        "object": "black_bear"
+      },
+      "depends_on": [
+        2
+      ]
+    },
+    {
+      "step": 4,
+      "arm": "xarm2",
+      "primitive": "Place",
+      "args": {
+        "object": "black_bear",
+        "destination": "container"
+      },
+      "depends_on": [
+        3
+      ]
+    }
+  ],
+  "bound": [
+    {
+      "step": 1,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.027784590399999948,
+          -0.30075461439999995,
+          0.2,
+          0.07561270926443431
+        ],
+        "object": "black_bear"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          -0.4114164330479912,
+          0.10105365949309973,
+          0.2,
+          0.07561270926443431
+        ],
+        "object": "black_bear",
+        "destination": "handover"
+      },
+      "depends_on": [
+        1
+      ]
+    },
+    {
+      "step": 3,
+      "arm": "xarm2",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.4114164330479912,
+          0.10105365949309973,
+          0.15000000000000002,
+          0.07561270926443431
+        ],
+        "object": "black_bear"
+      },
+      "depends_on": [
+        2
+      ]
+    },
+    {
+      "step": 4,
+      "arm": "xarm2",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          -0.014675008228571408,
+          0.3026795702857143,
+          0.19000000000000003,
+          0.07561270926443431
+        ],
+        "object": "black_bear",
+        "destination": "container"
+      },
+      "depends_on": [
+        3
+      ]
+    }
+  ],
+  "results": [
+    {
+      "step": 1,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "black_bear"
+      }
+    },
+    {
+      "step": 2,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          -0.4114164330479912,
+          0.10105365949309973,
+          0.2,
+          0.07561270926443431
+        ],
+        "object": "black_bear",
+        "observed_xy": [
+          -0.4114164330479912,
+          0.10105365949309973
+        ],
+        "xy_error": 0.0
+      }
+    },
+    {
+      "step": 3,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "black_bear"
+      }
+    },
+    {
+      "step": 4,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          -0.014675008228571408,
+          0.3026795702857143,
+          0.19000000000000003,
+          0.07561270926443431
+        ],
+        "object": "black_bear",
+        "observed_xy": [
+          -0.014675008228571408,
+          0.3026795702857143
+        ],
+        "xy_error": 0.0
+      }
+    }
+  ],
+  "symbolic_view": {
+    "objects": [
+      {
+        "name": "black_bear",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm"
+        ]
+      },
+      {
+        "name": "container",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm2"
+        ]
+      }
+    ]
+  },
+  "arms": [
+    "xarm",
+    "xarm2"
+  ]
+}

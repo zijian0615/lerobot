@@ -1,0 +1,49 @@
+{
+  "objects": [
+    {
+      "name": "container",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm2",
+        "xarm"
+      ],
+      "preferred_arm": "xarm2"
+    },
+    {
+      "name": "white_box",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm2",
+        "xarm"
+      ],
+      "preferred_arm": "xarm2"
+    },
+    {
+      "name": "grey_box_left",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm",
+        "xarm2"
+      ],
+      "preferred_arm": "xarm"
+    },
+    {
+      "name": "grey_box_right",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm2",
+        "xarm"
+      ],
+      "preferred_arm": "xarm2"
+    },
+    {
+      "name": "grey_box_bottom",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm2",
+        "xarm"
+      ],
+      "preferred_arm": "xarm2"
+    }
+  ]
+}
