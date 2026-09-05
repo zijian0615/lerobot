@@ -1,0 +1,36 @@
+#based on https://github.com/marcel-dempers/docker-development-youtube-series/blob/master/ai/agents/openclaw/dockerfile
+
+#Get base node image
+FROM ubuntu:latest
+
+#Install packages curl and bash
+RUN apt-get update && apt-get install -y curl bash
+
+#Install Node.js
+RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
+    && apt-get install -y nodejs
+
+# Create non-root user
+RUN usermod -l openclaw -d /home/openclaw -m ubuntu \
+    && groupmod -n openclaw ubuntu
+
+# Install Openclaw without onboarding
+RUN su -c "curl -fsSL https://openclaw.ai/install.sh | bash -s -- --no-onboard" openclaw
+
+#Set up path environment variable 
+ENV PATH="/home/openclaw/.npm-global/bin:/home/openclaw/.local/bin:$PATH"
+
+# Switch to non-root user
+USER openclaw
+
+#set the working directory
+WORKDIR /home/openclaw
+
+#copy entrypoint script into container (used for installing plugins)
+COPY --chown=openclaw:openclaw entrypoint.sh /home/openclaw/entrypoint.sh
+
+#make script executable
+RUN chmod +x /home/openclaw/entrypoint.sh
+
+#make the script the entry point - this will run when the container starts
+ENTRYPOINT ["/home/openclaw/entrypoint.sh"]
