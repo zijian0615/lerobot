@@ -20,7 +20,7 @@ import json
 import os
 import re
 from collections.abc import Callable
-from typing import Any, TypedDict
+from typing import Any, NotRequired, TypedDict
 
 import numpy as np
 from PIL import Image
@@ -38,6 +38,8 @@ class RawDetection(TypedDict):
     box_2d: list[float]  # [ymin, xmin, ymax, xmax] in 0-1000
     grasp_point: list[float]  # [y, x] in 0-1000
     blocked_by: str | None
+    long_axis: NotRequired[list[list[float]] | None]  # [[y1,x1],[y2,x2]] in 0-1000
+    polygon: NotRequired[list[list[float]] | None]  # [[y,x], ...] outline in 0-1000
 
 
 class ParsedDetection(TypedDict):
@@ -45,6 +47,8 @@ class ParsedDetection(TypedDict):
     box_2d_px: tuple[float, float, float, float]  # xmin, ymin, xmax, ymax in pixels
     grasp_point_px: tuple[float, float]  # u, v in pixels
     blocked_by: str | None
+    long_axis_px: NotRequired[tuple[tuple[float, float], tuple[float, float]] | None]
+    polygon_px: NotRequired[list[tuple[float, float]] | None]
 
 
 VlmCaller = Callable[[np.ndarray, str, str], list[RawDetection]]
@@ -120,12 +124,53 @@ def _coerce_raw_detection(item: dict[str, Any]) -> RawDetection:
         if blocked.lower() in {"", "null", "none", "n/a"}:
             blocked = None
 
+    long_axis = _coerce_long_axis(item.get("long_axis"))
+    polygon = _coerce_polygon(item.get("polygon"))
+
     return {
         "name": name,
         "box_2d": [float(c) for c in box],
         "grasp_point": [float(c) for c in grasp],
         "blocked_by": blocked,
+        "long_axis": long_axis,
+        "polygon": polygon,
     }
+
+
+def _coerce_long_axis(raw: Any) -> list[list[float]] | None:
+    """Accept [[y,x],[y,x]], flat [y1,x1,y2,x2], or null-ish → None."""
+    if raw is None:
+        return None
+    if isinstance(raw, str) and raw.strip().lower() in {"", "null", "none", "n/a"}:
+        return None
+    if isinstance(raw, (list, tuple)) and len(raw) == 4 and all(
+        isinstance(v, (int, float)) for v in raw
+    ):
+        return [[float(raw[0]), float(raw[1])], [float(raw[2]), float(raw[3])]]
+    if not isinstance(raw, (list, tuple)) or len(raw) != 2:
+        return None
+    pts: list[list[float]] = []
+    for pt in raw:
+        if not isinstance(pt, (list, tuple)) or len(pt) != 2:
+            return None
+        pts.append([float(pt[0]), float(pt[1])])
+    return pts
+
+
+def _coerce_polygon(raw: Any) -> list[list[float]] | None:
+    """Accept [[y,x], ...] with ≥3 vertices, or null-ish → None."""
+    if raw is None:
+        return None
+    if isinstance(raw, str) and raw.strip().lower() in {"", "null", "none", "n/a"}:
+        return None
+    if not isinstance(raw, (list, tuple)) or len(raw) < 3:
+        return None
+    pts: list[list[float]] = []
+    for pt in raw:
+        if not isinstance(pt, (list, tuple)) or len(pt) != 2:
+            return None
+        pts.append([float(pt[0]), float(pt[1])])
+    return pts
 
 
 def parse_vlm_json_text(text: str) -> list[RawDetection]:
@@ -266,12 +311,32 @@ def parse_vlm_detections(
         if blocked == det["name"]:
             blocked = None
 
+        long_axis_px = None
+        raw_axis = det.get("long_axis")
+        if raw_axis is not None and len(raw_axis) == 2:
+            (y0, x0), (y1, x1) = raw_axis
+            u0 = _norm_to_px_x(x0, width)
+            v0 = _norm_to_px_y(y0, height)
+            u1 = _norm_to_px_x(x1, width)
+            v1 = _norm_to_px_y(y1, height)
+            long_axis_px = ((u0, v0), (u1, v1))
+
+        polygon_px = None
+        raw_poly = det.get("polygon")
+        if raw_poly is not None and len(raw_poly) >= 3:
+            polygon_px = [
+                (_norm_to_px_x(x_n, width), _norm_to_px_y(y_n, height))
+                for y_n, x_n in raw_poly
+            ]
+
         parsed.append(
             {
                 "name": det["name"],
                 "box_2d_px": (xmin, ymin, xmax, ymax),
                 "grasp_point_px": (u, v),
                 "blocked_by": blocked,
+                "long_axis_px": long_axis_px,
+                "polygon_px": polygon_px,
             }
         )
     return parsed

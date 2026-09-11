@@ -32,6 +32,20 @@ Dual-arm collaboration (plan with both arms, two executors)::
 
     python -m manipulation.run_xarm_live --collab --execute --skip-place-verify \\
         --instruction "put the black screw in the container"
+
+Keep running the same instruction for 10 minutes (robot stays connected)::
+
+    python -m manipulation.run_xarm_live --collab --execute --skip-place-verify \\
+        --loop-minutes 10 \\
+        --instruction "put all the screws into the container" \\
+        --camera /dev/video0
+
+Fixed plan (no planner Gemini; all steps on xarm / arm1)::
+
+    python -m manipulation.run_xarm_live --execute --skip-place-verify --fixed-plan \\
+        --loop-minutes 10 \\
+        --instruction "put all the screws into the container" \\
+        --camera /dev/video0
 """
 
 from __future__ import annotations
@@ -60,6 +74,7 @@ from manipulation.coordination import (  # noqa: E402
     overlap_from_workspaces,
 )
 from manipulation.executor import ArmExecutor, ExecutorConfig  # noqa: E402
+from manipulation.fixed_plan import plan_screws_to_container_xarm  # noqa: E402
 from manipulation.leaphand import LeapHandEE  # noqa: E402
 from manipulation.orchestrator import run_manipulation  # noqa: E402
 from manipulation.solver import SolverConfig  # noqa: E402
@@ -139,11 +154,13 @@ def _build_backend(
     if arm_affine is not None:
         logger.info("Using per-arm table_xy_affine for %s", arm_name)
     logger.info(
-        "Backend arm=%s flip_x=%s flip_y=%s base_xy=%s",
+        "Backend arm=%s flip_x=%s flip_y=%s base_xy=%s use_object_yaw=%s yaw_offset=%.3f",
         arm_name,
         flip_x,
         flip_y,
         base_xy,
+        bool(exe_cfg.get("use_object_yaw", True)),
+        float(exe_cfg.get("grasp_yaw_offset_rad", math.pi / 2.0)),
     )
     return XArmMotionBackend(
         robot,
@@ -156,6 +173,8 @@ def _build_backend(
         flip_y=flip_y,
         xy_offset_base_mm=(float(xy_off[0]), float(xy_off[1])),
         table_xy_affine=arm_affine,
+        use_object_yaw=bool(exe_cfg.get("use_object_yaw", True)),
+        grasp_yaw_offset_rad=float(exe_cfg.get("grasp_yaw_offset_rad", math.pi / 2.0)),
     )
 
 
@@ -168,7 +187,21 @@ def _apply_arm_table_affine(
         return (x_t, y_t, z_t, yaw_t)
     a, b = affine
     xy = a @ np.array([x_t, y_t], dtype=float) + b
-    return (float(xy[0]), float(xy[1]), z_t, yaw_t)
+    # Rotate yaw by the linear part of the affine.
+    direction = a @ np.array([math.cos(yaw_t), math.sin(yaw_t)], dtype=float)
+    yaw_out = float(math.atan2(direction[1], direction[0]))
+    return (float(xy[0]), float(xy[1]), z_t, yaw_out)
+
+
+def _map_table_yaw_to_base(yaw_t: float, *, flip_x: bool, flip_y: bool) -> float:
+    """Map a table-plane yaw through the same XY flips used for position."""
+    c = math.cos(yaw_t)
+    s = math.sin(yaw_t)
+    if flip_x:
+        c = -c
+    if flip_y:
+        s = -s
+    return float(math.atan2(s, c))
 
 
 def _table_pose_to_base_mm(
@@ -180,6 +213,7 @@ def _table_pose_to_base_mm(
     flip_x: bool = False,
     flip_y: bool = True,
     use_object_yaw: bool = False,
+    grasp_yaw_offset_rad: float = 0.0,
     table_xy_affine: tuple[np.ndarray, np.ndarray] | None = None,
 ) -> list[float]:
     """
@@ -190,6 +224,8 @@ def _table_pose_to_base_mm(
     ``flip_y`` matches the usual xArm mount (base +y opposite table +y).
     ``flip_x`` is for the mirrored Robot2 mount (base +X along −table-x).
     ``table_xy_affine`` is an optional per-arm residual on table XY.
+    ``grasp_yaw_offset_rad`` rotates jaws relative to object long axis
+    (π/2 ≈ fingers close across the short axis of a screw).
     """
     x_t, y_t, z_t, yaw_t = _apply_arm_table_affine(pose_table, table_xy_affine)
     x_b = (x_t - base_xy_table[0]) * 1000.0
@@ -200,7 +236,11 @@ def _table_pose_to_base_mm(
         y_b = -y_b
     z_b = (table_z_base_m + z_t) * 1000.0
     roll, pitch, yaw0 = topdown_rpy
-    yaw = yaw0 + (yaw_t if use_object_yaw else 0.0)
+    if use_object_yaw:
+        yaw_mapped = _map_table_yaw_to_base(yaw_t, flip_x=flip_x, flip_y=flip_y)
+        yaw = yaw0 + yaw_mapped + float(grasp_yaw_offset_rad)
+    else:
+        yaw = yaw0
     return [x_b, y_b, z_b, roll, pitch, yaw]
 
 
@@ -220,6 +260,8 @@ class XArmMotionBackend:
         flip_y: bool = True,
         xy_offset_base_mm: tuple[float, float] = (0.0, 0.0),
         table_xy_affine: tuple[np.ndarray, np.ndarray] | None = None,
+        use_object_yaw: bool = True,
+        grasp_yaw_offset_rad: float = math.pi / 2.0,
     ) -> None:
         self.robot = robot
         self.arm = robot.real_arm
@@ -232,6 +274,8 @@ class XArmMotionBackend:
         self.flip_y = flip_y
         self.xy_offset_base_mm = (float(xy_offset_base_mm[0]), float(xy_offset_base_mm[1]))
         self.table_xy_affine = table_xy_affine
+        self.use_object_yaw = bool(use_object_yaw)
+        self.grasp_yaw_offset_rad = float(grasp_yaw_offset_rad)
         self._ensure_mode0()
 
     def _ensure_mode0(self) -> None:
@@ -255,7 +299,8 @@ class XArmMotionBackend:
             topdown_rpy=self.topdown_rpy,
             flip_x=self.flip_x,
             flip_y=self.flip_y,
-            use_object_yaw=False,
+            use_object_yaw=self.use_object_yaw,
+            grasp_yaw_offset_rad=self.grasp_yaw_offset_rad,
             table_xy_affine=self.table_xy_affine,
         )
         xyzrpy[0] += self.xy_offset_base_mm[0]
@@ -333,6 +378,30 @@ def build_argparser() -> argparse.ArgumentParser:
     p.add_argument("--no-robot", action="store_true", help="Skip robot connect (plan/solve only)")
     p.add_argument("--lookahead", action=argparse.BooleanOptionalAction, default=True)
     p.add_argument("--skip-place-verify", action="store_true", help="Skip VLM re-perceive after Place")
+    p.add_argument(
+        "--loop-minutes",
+        type=float,
+        default=0.0,
+        help="With --execute: keep re-running the same instruction for this many minutes "
+        "(robot stays connected). 0 = single shot.",
+    )
+    p.add_argument(
+        "--loop-pause-s",
+        type=float,
+        default=2.0,
+        help="Seconds to wait between loop cycles (default: 2).",
+    )
+    p.add_argument(
+        "--fixed-plan",
+        action="store_true",
+        help="Skip planner Gemini; build Grasp→Place on xarm (arm1) from perception names.",
+    )
+    p.add_argument(
+        "--fixed-plan-arm",
+        type=str,
+        default="xarm",
+        help="Arm used by --fixed-plan (default: xarm = arm1).",
+    )
     p.add_argument("--out-dir", type=Path, default=Path(__file__).resolve().parent / "runs")
     return p
 
@@ -341,8 +410,13 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     args = build_argparser().parse_args(argv)
     calib = _load_calib(args.calib)
-    arm_names = _resolve_arm_names(args, calib)
-    logger.info("Active arms=%s collab=%s", arm_names, bool(args.collab))
+    if args.fixed_plan:
+        # Arm1-only fixed planner: ignore --collab / multi-arm selection.
+        arm_names = [str(args.fixed_plan_arm)]
+        logger.info("Fixed-plan mode: forcing arms=%s (planner VLM disabled)", arm_names)
+    else:
+        arm_names = _resolve_arm_names(args, calib)
+        logger.info("Active arms=%s collab=%s", arm_names, bool(args.collab))
     grasp_height = float(calib["grasp_height_m"])
     grasp_height_offsets = {
         str(k): float(v)
@@ -443,6 +517,22 @@ def main(argv: list[str] | None = None) -> int:
     )
     planner = Planner(max_attempts=2)
 
+    def plan_fn(symbolic_view, instruction, arms):
+        if args.fixed_plan:
+            plan = plan_screws_to_container_xarm(
+                symbolic_view,
+                instruction,
+                arms,
+                arm=str(args.fixed_plan_arm),
+            )
+            logger.info("Fixed plan (no planner Gemini): %s", json.dumps(plan, indent=2))
+        else:
+            logger.info("Planning for arms=%s instruction=%r", list(arms), instruction)
+            plan = planner(symbolic_view, instruction, arms)
+            logger.info("plan=%s", json.dumps(plan, indent=2))
+        (out_dir / "plan.json").write_text(json.dumps(plan, indent=2))
+        return plan
+
     # Cache last geometric view for place-verify shortcut.
     last_views: dict[str, Any] = {"symbolic": None, "geometric": None}
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -535,16 +625,10 @@ def main(argv: list[str] | None = None) -> int:
         geometric["overlap"] = ov
         last_views["symbolic"] = symbolic
         last_views["geometric"] = geometric
+        detections = perception_once.last_detections or detections
         _dump_perception_logs(image, symbolic, geometric, detections)
         logger.info("symbolic_view=%s", json.dumps(symbolic, indent=2))
         return symbolic, geometric
-
-    def plan_fn(symbolic_view, instruction, arms):
-        logger.info("Planning for arms=%s instruction=%r", list(arms), instruction)
-        plan = planner(symbolic_view, instruction, arms)
-        logger.info("plan=%s", json.dumps(plan, indent=2))
-        (out_dir / "plan.json").write_text(json.dumps(plan, indent=2))
-        return plan
 
     try:
         # Solver margin: use first arm's config (same default for both today).
@@ -705,36 +789,83 @@ def main(argv: list[str] | None = None) -> int:
                 float(ov_poly.centroid.y),
             )
 
-        result = run_manipulation(
-            args.instruction,
-            perceive=perceive_pair,
-            plan_fn=plan_fn,
-            executors=executors,
-            solver_config=SolverConfig(
-                grasp_height=grasp_height,
-                margin=solver_margin,
-                place_height_offsets_m=place_height_offsets,
-                place_height_offsets_by_arm=place_height_offsets_by_arm,
-                grasp_height_offsets_by_arm=grasp_height_offsets_by_arm,
-            ),
-            arms=arm_names,
-            lookahead=args.lookahead,
-            overlap_guard=overlap_guard,
-        )
+        loop_minutes = float(args.loop_minutes or 0.0)
+        deadline = time.perf_counter() + loop_minutes * 60.0 if loop_minutes > 0 else None
+        cycle = 0
+        last_status = "success"
+        while True:
+            cycle += 1
+            if deadline is not None:
+                remaining = deadline - time.perf_counter()
+                if remaining <= 0:
+                    logger.info("Loop time budget exhausted after %d cycle(s).", cycle - 1)
+                    break
+                logger.info(
+                    "Loop cycle %d starting (%.0fs remaining of %.1f min)…",
+                    cycle,
+                    remaining,
+                    loop_minutes,
+                )
+            else:
+                logger.info("Single-shot cycle starting…")
 
-        payload = {
-            "status": result.status,
-            "reason": result.reason,
-            "plan": result.plan,
-            "bound": result.bound,
-            "results": result.results,
-            "symbolic_view": result.symbolic_view,
-            "arms": arm_names,
-        }
-        (out_dir / "result.json").write_text(json.dumps(payload, indent=2, default=str))
-        print(json.dumps(payload, indent=2, default=str))
-        print(f"\nOutputs → {out_dir}")
-        return 0 if result.status == "success" else 1
+            # Fresh run dir per cycle so later rounds don't overwrite earlier logs.
+            if cycle > 1:
+                stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                out_dir = args.out_dir / stamp
+                perception_dir = PERCEPTION_RUNS / stamp
+                out_dir.mkdir(parents=True, exist_ok=True)
+                perception_dir.mkdir(parents=True, exist_ok=True)
+                perceive_count["n"] = 0
+                last_views["symbolic"] = None
+                last_views["geometric"] = None
+                last_place_cmd.clear()
+
+            result = run_manipulation(
+                args.instruction,
+                perceive=perceive_pair,
+                plan_fn=plan_fn,
+                executors=executors,
+                solver_config=SolverConfig(
+                    grasp_height=grasp_height,
+                    margin=solver_margin,
+                    place_height_offsets_m=place_height_offsets,
+                    place_height_offsets_by_arm=place_height_offsets_by_arm,
+                    grasp_height_offsets_by_arm=grasp_height_offsets_by_arm,
+                ),
+                arms=arm_names,
+                lookahead=args.lookahead,
+                overlap_guard=overlap_guard,
+            )
+
+            payload = {
+                "status": result.status,
+                "reason": result.reason,
+                "plan": result.plan,
+                "bound": result.bound,
+                "results": result.results,
+                "symbolic_view": result.symbolic_view,
+                "arms": arm_names,
+                "cycle": cycle,
+            }
+            (out_dir / "result.json").write_text(json.dumps(payload, indent=2, default=str))
+            print(json.dumps(payload, indent=2, default=str))
+            print(f"\nOutputs → {out_dir}")
+            last_status = result.status
+
+            if deadline is None:
+                break
+
+            remaining = deadline - time.perf_counter()
+            if remaining <= 0:
+                logger.info("Loop time budget exhausted after cycle %d.", cycle)
+                break
+            pause = min(float(args.loop_pause_s), max(remaining, 0.0))
+            if pause > 0:
+                logger.info("Loop pause %.1fs before next cycle…", pause)
+                time.sleep(pause)
+
+        return 0 if last_status == "success" else 1
     finally:
         for name, leap in list(leaps.items()):
             try:

@@ -163,10 +163,61 @@ def footprint_from_box(
     return orient(poly, sign=1.0)
 
 
+def footprint_from_polygon_px(
+    polygon_px: list[tuple[float, float]],
+    K: np.ndarray,
+    T_cam_table: np.ndarray,
+    *,
+    table_xy_affine: tuple[np.ndarray, np.ndarray] | None = None,
+) -> Polygon | None:
+    """Project an image-space outline to the table. None if fewer than 3 points."""
+    if len(polygon_px) < 3:
+        return None
+    a = b = None
+    if table_xy_affine is not None:
+        a, b = table_xy_affine
+    corners_xy = [
+        apply_table_xy_affine(to_table(uv, K, T_cam_table), a, b) for uv in polygon_px
+    ]
+    poly = Polygon(corners_xy)
+    if not poly.is_valid:
+        poly = poly.buffer(0)
+    if poly.is_empty or poly.area <= 0.0:
+        return None
+    return orient(poly, sign=1.0)
+
+
+def wrap_yaw_half_pi(yaw: float) -> float:
+    """Wrap yaw to ``(-pi/2, pi/2]`` (parallel jaws are 180°-symmetric)."""
+    y = float(yaw)
+    while y > math.pi / 2.0:
+        y -= math.pi
+    while y <= -math.pi / 2.0:
+        y += math.pi
+    return y
+
+
+def yaw_from_axis(
+    p0: tuple[float, float],
+    p1: tuple[float, float],
+    *,
+    min_length_m: float = 1e-4,
+) -> float | None:
+    """Yaw of the segment ``p0→p1`` in the table plane, or None if too short."""
+    dx = float(p1[0]) - float(p0[0])
+    dy = float(p1[1]) - float(p0[1])
+    if math.hypot(dx, dy) < min_length_m:
+        return None
+    return wrap_yaw_half_pi(math.atan2(dy, dx))
+
+
 def yaw_from_footprint(footprint: Polygon) -> float:
     """
     Orientation of the minimum-area rectangle of ``footprint``,
     wrapped to ``[-pi/2, pi/2]``.
+
+    Note: axis-aligned VLM boxes only yield ~0 / ±pi/2 after affine.
+    Prefer a rotated outline polygon or ``yaw_from_axis``.
     """
     mrr = footprint.minimum_rotated_rectangle
     if mrr.is_empty:
@@ -187,9 +238,4 @@ def yaw_from_footprint(footprint: Polygon) -> float:
             best_len = length
             best_yaw = math.atan2(dy, dx)
 
-    # Wrap to [-pi/2, pi/2].
-    while best_yaw > math.pi / 2.0:
-        best_yaw -= math.pi
-    while best_yaw <= -math.pi / 2.0:
-        best_yaw += math.pi
-    return float(best_yaw)
+    return wrap_yaw_half_pi(best_yaw)

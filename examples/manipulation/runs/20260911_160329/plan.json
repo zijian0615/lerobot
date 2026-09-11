@@ -1,0 +1,23 @@
+[
+  {
+    "step": 1,
+    "arm": "xarm",
+    "primitive": "Grasp",
+    "args": {
+      "object": "blue_wire_strippers"
+    },
+    "depends_on": []
+  },
+  {
+    "step": 2,
+    "arm": "xarm",
+    "primitive": "Place",
+    "args": {
+      "object": "blue_wire_strippers",
+      "destination": "orange_motor_box"
+    },
+    "depends_on": [
+      1
+    ]
+  }
+]

@@ -1,0 +1,23 @@
+[
+  {
+    "step": 1,
+    "arm": "xarm",
+    "primitive": "Grasp",
+    "args": {
+      "object": "orange_box"
+    },
+    "depends_on": []
+  },
+  {
+    "step": 2,
+    "arm": "xarm",
+    "primitive": "Place",
+    "args": {
+      "object": "orange_box",
+      "destination": "container"
+    },
+    "depends_on": [
+      1
+    ]
+  }
+]

@@ -257,18 +257,36 @@ def _draw_image_overlay(
     geometric_view: dict[str, Any],
     detections_px: list[dict[str, Any]] | None = None,
 ) -> np.ndarray:
-    """Draw 2D boxes / grasp points on the camera image for quick sanity checks."""
+    """Draw outline / boxes / grasp points on the camera image for sanity checks."""
     vis = image_rgb.copy()
     if detections_px:
         for det in detections_px:
             xmin, ymin, xmax, ymax = [int(round(v)) for v in det["box_2d_px"]]
             u, v = [int(round(c)) for c in det["grasp_point_px"]]
-            cv2.rectangle(vis, (xmin, ymin), (xmax, ymax), (0, 200, 0), 2)
+            poly = det.get("polygon_px")
+            if poly and len(poly) >= 3:
+                pts = np.array([[int(round(x)), int(round(y))] for x, y in poly], dtype=np.int32)
+                cv2.polylines(vis, [pts], isClosed=True, color=(0, 200, 0), thickness=2)
+                label_xy = (int(pts[0][0]), max(15, int(pts[0][1]) - 6))
+            else:
+                cv2.rectangle(vis, (xmin, ymin), (xmax, ymax), (0, 200, 0), 2)
+                label_xy = (xmin, max(15, ymin - 6))
+            axis = det.get("long_axis_px")
+            if axis is not None:
+                (u0, v0), (u1, v1) = axis
+                cv2.line(
+                    vis,
+                    (int(round(u0)), int(round(v0))),
+                    (int(round(u1)), int(round(v1))),
+                    (0, 220, 220),
+                    2,
+                    cv2.LINE_AA,
+                )
             cv2.circle(vis, (u, v), 5, (255, 0, 0), -1)
             cv2.putText(
                 vis,
                 det["name"],
-                (xmin, max(15, ymin - 6)),
+                label_xy,
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.5,
                 (0, 220, 0),
@@ -465,6 +483,7 @@ def main(argv: list[str] | None = None) -> int:
         geometric_path = stamp_dir / "geometric_view.json"
 
         cv2.imwrite(str(rgb_path), cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+        detections = perception_once.last_detections or detections
         overlay = _draw_image_overlay(image, geometric_view, detections)
         cv2.imwrite(str(overlay_path), cv2.cvtColor(overlay, cv2.COLOR_RGB2BGR))
         visualize_table_plane(

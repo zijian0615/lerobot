@@ -22,7 +22,14 @@ import numpy as np
 from shapely.geometry import Point, Polygon
 from shapely.ops import unary_union
 
-from .geometry import apply_table_xy_affine, footprint_from_box, to_table, yaw_from_footprint
+from .geometry import (
+    apply_table_xy_affine,
+    footprint_from_box,
+    footprint_from_polygon_px,
+    to_table,
+    yaw_from_axis,
+    yaw_from_footprint,
+)
 
 
 def resolve_grasp_height_m(
@@ -46,6 +53,7 @@ def resolve_grasp_height_m(
         if needle and needle in name:
             return z + float(offset)
     return z
+from .segment import refine_parsed_detections
 from .vlm import VlmCaller, call_gemini_robotics_er, parse_vlm_detections
 
 
@@ -148,7 +156,8 @@ class Perception:
     Assumptions:
       - single known table plane (z=0 in table frame)
       - top-down grasps at a fixed ``grasp_height``
-      - geometry from 2D boxes only (no SAM / depth)
+      - VLM box is only a ROI hint; yaw/footprint come from an image mask
+        min-area rectangle when segmentation succeeds
     """
 
     def __init__(
@@ -171,6 +180,7 @@ class Perception:
         self.prompt = prompt
         self.table_xy_affine = table_xy_affine
         self.grasp_height_offsets_m = dict(grasp_height_offsets_m or {})
+        self.last_detections: list = []
 
     def __call__(
         self,
@@ -211,6 +221,8 @@ class Perception:
         prompt_text = self.prompt if self.prompt is not None else ""
         raw = self.vlm_caller(image, instruction, prompt_text)
         detections = parse_vlm_detections(raw, image_hw=(height, width))
+        detections = refine_parsed_detections(image, detections)
+        self.last_detections = detections
 
         a = b = None
         if self.table_xy_affine is not None:
@@ -223,13 +235,30 @@ class Perception:
             grasp_xy = apply_table_xy_affine(
                 to_table(det["grasp_point_px"], K, T_cam_table), a, b
             )
-            footprint = footprint_from_box(
-                det["box_2d_px"],
-                K,
-                T_cam_table,
-                table_xy_affine=self.table_xy_affine,
-            )
+            poly_px = det.get("polygon_px")
+            footprint = None
+            if poly_px:
+                footprint = footprint_from_polygon_px(
+                    list(poly_px),
+                    K,
+                    T_cam_table,
+                    table_xy_affine=self.table_xy_affine,
+                )
+            if footprint is None:
+                footprint = footprint_from_box(
+                    det["box_2d_px"],
+                    K,
+                    T_cam_table,
+                    table_xy_affine=self.table_xy_affine,
+                )
             yaw = yaw_from_footprint(footprint)
+            axis_px = det.get("long_axis_px")
+            if axis_px is not None:
+                p0 = apply_table_xy_affine(to_table(axis_px[0], K, T_cam_table), a, b)
+                p1 = apply_table_xy_affine(to_table(axis_px[1], K, T_cam_table), a, b)
+                axis_yaw = yaw_from_axis(p0, p1)
+                if axis_yaw is not None:
+                    yaw = axis_yaw
             z = resolve_grasp_height_m(
                 det["name"], grasp_height, self.grasp_height_offsets_m
             )
