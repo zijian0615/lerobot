@@ -102,7 +102,7 @@ class ManipulationLoop:
 
         results: list[ExecutionResult] = []
         for i, step in enumerate(bound):
-            result = self._execute_step(step, remaining=bound[i + 1 :])
+            result = self._execute_step(step)
             results.append(result)
             logger.info(
                 "step=%s arm=%s prim=%s status=%s reason=%s params=%s",
@@ -162,35 +162,9 @@ class ManipulationLoop:
                     float(ov.centroid.y),
                 )
 
-    def _should_skip_overlap_retract(
-        self,
-        step: Mapping[str, Any],
-        remaining: Sequence[Mapping[str, Any]],
-    ) -> bool:
-        """
-        After Grasp: skip retract if this arm still has a Place of the same
-        object later (even if other arms' steps are interleaved).
-        """
-        if str(step.get("primitive")) != "Grasp":
-            return False
-        arm = str(step["arm"])
-        obj = (step.get("params") or {}).get("object")
-        if obj is None:
-            return False
-        for later in remaining:
-            if str(later.get("arm")) != arm:
-                continue
-            if str(later.get("primitive")) != "Place":
-                continue
-            if (later.get("params") or {}).get("object") == obj:
-                return True
-        return False
-
     def _execute_step(
         self,
         step: Mapping[str, Any],
-        *,
-        remaining: Sequence[Mapping[str, Any]] = (),
     ) -> ExecutionResult:
         arm = str(step["arm"])
         if arm not in self.executors:
@@ -220,12 +194,7 @@ class ManipulationLoop:
             return result
         finally:
             if held and self.overlap_guard is not None:
-                skip = (
-                    result is not None
-                    and result.get("status") == "success"
-                    and self._should_skip_overlap_retract(step, remaining)
-                )
-                self.overlap_guard.release_after(arm, retract=not skip)
+                self.overlap_guard.release_after(arm)
 
     def _recover(
         self,
@@ -269,7 +238,7 @@ class ManipulationLoop:
             self._log_bound(new_bound_tail, prefix="resolve")
             results = list(results_so_far[:-1])  # drop failed attempt
             for i, step in enumerate(new_bound_tail):
-                result = self._execute_step(step, remaining=new_bound_tail[i + 1 :])
+                result = self._execute_step(step)
                 results.append(result)
                 logger.info(
                     "retry step=%s status=%s reason=%s params=%s",
@@ -318,7 +287,7 @@ class ManipulationLoop:
         self._log_bound(new_bound, prefix="replan")
         results: list[ExecutionResult] = []
         for i, step in enumerate(new_bound):
-            result = self._execute_step(step, remaining=new_bound[i + 1 :])
+            result = self._execute_step(step)
             results.append(result)
             logger.info(
                 "replan step=%s status=%s reason=%s params=%s",

@@ -70,7 +70,6 @@ import cv2  # noqa: E402
 
 from manipulation.coordination import (  # noqa: E402
     OverlapGuard,
-    exclusive_retract_xy,
     overlap_from_workspaces,
 )
 from manipulation.executor import ArmExecutor, ExecutorConfig  # noqa: E402
@@ -79,7 +78,7 @@ from manipulation.leaphand import LeapHandEE  # noqa: E402
 from manipulation.orchestrator import run_manipulation  # noqa: E402
 from manipulation.solver import SolverConfig  # noqa: E402
 from planner import Planner  # noqa: E402
-from tabletop_perception.perception import Perception  # noqa: E402
+from tabletop_perception.perception import Perception, object_top_z_from_calib  # noqa: E402
 from tabletop_perception.run_xarm_live import (  # noqa: E402
     DEFAULT_CALIB,
     _capture_from_camera,
@@ -497,8 +496,15 @@ def main(argv: list[str] | None = None) -> int:
         logger.info("Skipping robot (--no-robot).")
 
     table_xy_affine = _table_xy_affine_from_calib(calib)
+    object_top_z_default, object_top_z = object_top_z_from_calib(calib)
     if table_xy_affine is not None:
         logger.info("Using table_xy_affine correction from calib.")
+    if object_top_z or object_top_z_default:
+        logger.info(
+            "Object top-face heights for pixel projection: default=%.3f m %s",
+            object_top_z_default,
+            object_top_z,
+        )
     if grasp_height_offsets:
         logger.info("Per-object grasp height offsets (global): %s", grasp_height_offsets)
     if grasp_height_offsets_by_arm:
@@ -514,6 +520,8 @@ def main(argv: list[str] | None = None) -> int:
         footprint_buffer_m=float(calib.get("footprint_buffer_m", 0.02)),
         table_xy_affine=table_xy_affine,
         grasp_height_offsets_m=grasp_height_offsets,
+        object_top_z_m=object_top_z,
+        object_top_z_m_default=object_top_z_default,
     )
     planner = Planner(max_attempts=2)
 
@@ -604,6 +612,8 @@ def main(argv: list[str] | None = None) -> int:
             vlm_caller=lambda _img, _ins, _p: raw,
             table_xy_affine=table_xy_affine,
             grasp_height_offsets_m=grasp_height_offsets,
+            object_top_z_m=object_top_z,
+            object_top_z_m_default=object_top_z_default,
         )
         symbolic, geometric = perception_once(
             image=image,
@@ -739,7 +749,7 @@ def main(argv: list[str] | None = None) -> int:
             executor.execute = _make_tracking()  # type: ignore[method-assign]
             executors[name] = executor
 
-        # Overlap = ∩ workspaces (clipped to table). Mutex + retract after in-zone steps.
+        # Overlap = ∩ workspaces (clipped to table). Mutex only; no post-step retract.
         ov_cfg = dict(calib.get("overlap_xy") or {})
         ov_poly = overlap_from_workspaces(
             arm_workspaces,
@@ -748,38 +758,8 @@ def main(argv: list[str] | None = None) -> int:
         )
         overlap_guard = OverlapGuard(
             ov_poly,
-            retract={},
             enabled=bool(ov_cfg) and not ov_poly.is_empty,
         )
-        for name in arm_names:
-            exe_cfg = _execution_cfg_for_arm(calib, name)
-            retract_z = grasp_height + float(exe_cfg.get("lift_offset_m", 0.08)) + 0.05
-            ws_poly = arm_workspaces[name]
-            backend = backends[name]
-
-            def _make_retract(
-                arm: str = name,
-                ws=ws_poly,
-                z: float = retract_z,
-                be=backend,
-            ):
-                def _retract_arm() -> None:
-                    xy = exclusive_retract_xy(ws, overlap_guard.overlap)
-                    if xy is None:
-                        logger.warning("retract skipped: no exclusive point for %s", arm)
-                        return
-                    logger.info(
-                        "retract %s → exclusive xy=(%.3f, %.3f) z=%.3f",
-                        arm,
-                        xy[0],
-                        xy[1],
-                        z,
-                    )
-                    be.move_to_pose((xy[0], xy[1], z, 0.0))
-
-                return _retract_arm
-
-            overlap_guard.retract[name] = _make_retract()
 
         if overlap_guard.enabled:
             logger.info(
@@ -852,6 +832,13 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(payload, indent=2, default=str))
             print(f"\nOutputs → {out_dir}")
             last_status = result.status
+
+            for name, robot in robots.items():
+                try:
+                    logger.info("Query finished → go home arm=%s", name)
+                    robot.move_to_home(speed_deg_s=20.0)
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("go home %s failed: %s", name, exc)
 
             if deadline is None:
                 break

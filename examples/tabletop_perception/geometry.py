@@ -27,9 +27,14 @@ def to_table(
     uv: tuple[float, float],
     K: np.ndarray,
     T_cam_table: np.ndarray,
+    z_plane: float = 0.0,
 ) -> tuple[float, float]:
     """
-    Intersect the camera ray through pixel ``(u, v)`` with the table plane z=0.
+    Intersect the camera ray through pixel ``(u, v)`` with ``z = z_plane``.
+
+    ``z_plane=0`` is the table surface. For a pixel on an object's visible
+    top, pass the object height so far-edge XY is not biased by projecting
+    a raised surface onto the table.
 
     ``T_cam_table`` is the camera pose expressed in the table frame
     (columns of R are camera axes in table coordinates; ``t`` is camera origin).
@@ -46,12 +51,16 @@ def to_table(
     r = t_ct[:3, :3]
     t = t_ct[:3, 3]
     ray_tab = r @ ray_cam
-    if ray_tab[2] >= 0.0:
+    if abs(float(ray_tab[2])) < 1e-9:
         raise ValueError(
-            f"Ray through pixel ({u:.1f}, {v:.1f}) does not point at the table "
-            f"(ray_tab[2]={ray_tab[2]:.6f} >= 0)."
+            f"Ray through pixel ({u:.1f}, {v:.1f}) is parallel to the table."
         )
-    s = -t[2] / ray_tab[2]
+    s = (float(z_plane) - float(t[2])) / float(ray_tab[2])
+    if s <= 0.0:
+        raise ValueError(
+            f"Ray through pixel ({u:.1f}, {v:.1f}) does not hit z={z_plane:.3f} "
+            f"(s={s:.6f} <= 0, ray_tab[2]={ray_tab[2]:.6f})."
+        )
     xy = t + s * ray_tab
     return float(xy[0]), float(xy[1])
 
@@ -135,13 +144,14 @@ def footprint_from_box(
     T_cam_table: np.ndarray,
     *,
     table_xy_affine: tuple[np.ndarray, np.ndarray] | None = None,
+    z_plane: float = 0.0,
 ) -> Polygon:
-    """Project the four bbox corners to the table and form a polygon."""
+    """Project the four bbox corners onto ``z=z_plane`` and form a polygon."""
     a = b = None
     if table_xy_affine is not None:
         a, b = table_xy_affine
     corners_xy = [
-        apply_table_xy_affine(to_table(uv, K, T_cam_table), a, b)
+        apply_table_xy_affine(to_table(uv, K, T_cam_table, z_plane=z_plane), a, b)
         for uv in bbox_corners_px(box_2d_px)
     ]
     poly = Polygon(corners_xy)
@@ -169,15 +179,17 @@ def footprint_from_polygon_px(
     T_cam_table: np.ndarray,
     *,
     table_xy_affine: tuple[np.ndarray, np.ndarray] | None = None,
+    z_plane: float = 0.0,
 ) -> Polygon | None:
-    """Project an image-space outline to the table. None if fewer than 3 points."""
+    """Project an image-space outline onto ``z=z_plane``. None if fewer than 3 points."""
     if len(polygon_px) < 3:
         return None
     a = b = None
     if table_xy_affine is not None:
         a, b = table_xy_affine
     corners_xy = [
-        apply_table_xy_affine(to_table(uv, K, T_cam_table), a, b) for uv in polygon_px
+        apply_table_xy_affine(to_table(uv, K, T_cam_table, z_plane=z_plane), a, b)
+        for uv in polygon_px
     ]
     poly = Polygon(corners_xy)
     if not poly.is_valid:

@@ -50,6 +50,14 @@
     ]
   ],
   "grasp_height_m": 0.2,
+  "object_top_z_m_default": 0.0,
+  "object_top_z_m": {
+    "_comment": "Visible top-face height (m) for pixel projection. Not gripper z. Unmatched names use object_top_z_m_default.",
+    "box": 0.05,
+    "screw": 0.01,
+    "container": 0.03,
+    "stand": 0.02
+  },
   "grasp_height_offset_m": {
     "_comment": "Global (all EEs): added to grasp_height_m when object name contains the key. Negative = lower.",
     "screw": -0.02,
@@ -305,20 +313,20 @@
     "_comment_manual_poses": "open_leap/close_leap: taught 16-DOF LEAP poses. When both set, open()/close() use them directly (skip formula thumb scales)."
   },
   "table_xy_affine": {
-    "_comment": "true_table = A @ raw_to_table(uv) + b  (metres)",
+    "_comment": "true_table = A @ pred_table + b (metres). pred = to_table(uv, z=object_top).",
     "A": [
       [
-        -0.146414,
-        1.215001
+        -0.087362,
+        1.44789
       ],
       [
-        1.275861,
-        0.092045
+        1.353882,
+        0.13476
       ]
     ],
     "b": [
-      -0.145722,
-      0.104489
+      -0.13037,
+      0.094876
     ]
   }
 }

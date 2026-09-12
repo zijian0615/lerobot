@@ -53,6 +53,43 @@ def resolve_grasp_height_m(
         if needle and needle in name:
             return z + float(offset)
     return z
+
+
+def resolve_object_top_z_m(
+    object_name: str,
+    heights_m: dict[str, float] | None = None,
+    default_m: float = 0.0,
+) -> float:
+    """Visible top-face height used when unprojecting grasp pixels.
+
+    This is the object's physical height above the table, not the gripper
+    approach height. Keys match as case-insensitive substrings (same as
+    :func:`resolve_grasp_height_m`). Unmatched names use ``default_m``.
+    """
+    if not heights_m:
+        return float(default_m)
+    name = object_name.lower().replace(" ", "_")
+    for key, height in heights_m.items():
+        if str(key).startswith("_"):
+            continue
+        needle = str(key).lower().replace(" ", "_")
+        if needle and needle in name:
+            return float(height)
+    return float(default_m)
+
+
+def object_top_z_from_calib(calib: dict) -> tuple[float, dict[str, float]]:
+    """Load ``(default_m, {name: height_m})`` from a calib dict."""
+    default_m = float(calib.get("object_top_z_m_default", 0.0))
+    raw = dict(calib.get("object_top_z_m") or {})
+    heights = {
+        str(k): float(v)
+        for k, v in raw.items()
+        if not str(k).startswith("_")
+    }
+    return default_m, heights
+
+
 from .segment import refine_parsed_detections
 from .vlm import VlmCaller, call_gemini_robotics_er, parse_vlm_detections
 
@@ -155,7 +192,9 @@ class Perception:
 
     Assumptions:
       - single known table plane (z=0 in table frame)
-      - top-down grasps at a fixed ``grasp_height``
+      - object pixels are unprojected onto ``z = object_top_z`` (class height),
+        not the table; table_polygon stays at z=0
+      - top-down grasps at a fixed ``grasp_height`` (gripper z, separate)
       - VLM box is only a ROI hint; yaw/footprint come from an image mask
         min-area rectangle when segmentation succeeds
     """
@@ -168,6 +207,8 @@ class Perception:
         prompt: str | None = None,
         table_xy_affine: tuple[np.ndarray, np.ndarray] | None = None,
         grasp_height_offsets_m: dict[str, float] | None = None,
+        object_top_z_m: dict[str, float] | None = None,
+        object_top_z_m_default: float = 0.0,
     ) -> None:
         self.footprint_buffer_m = float(footprint_buffer_m)
         self.vlm_caller: VlmCaller = vlm_caller or (
@@ -180,6 +221,8 @@ class Perception:
         self.prompt = prompt
         self.table_xy_affine = table_xy_affine
         self.grasp_height_offsets_m = dict(grasp_height_offsets_m or {})
+        self.object_top_z_m = dict(object_top_z_m or {})
+        self.object_top_z_m_default = float(object_top_z_m_default)
         self.last_detections: list = []
 
     def __call__(
@@ -232,8 +275,11 @@ class Perception:
         geometric_objects: list[GeometricObject] = []
         footprints: list[Polygon] = []
         for det in detections:
+            z_top = resolve_object_top_z_m(
+                det["name"], self.object_top_z_m, self.object_top_z_m_default
+            )
             grasp_xy = apply_table_xy_affine(
-                to_table(det["grasp_point_px"], K, T_cam_table), a, b
+                to_table(det["grasp_point_px"], K, T_cam_table, z_plane=z_top), a, b
             )
             poly_px = det.get("polygon_px")
             footprint = None
@@ -243,6 +289,7 @@ class Perception:
                     K,
                     T_cam_table,
                     table_xy_affine=self.table_xy_affine,
+                    z_plane=z_top,
                 )
             if footprint is None:
                 footprint = footprint_from_box(
@@ -250,12 +297,17 @@ class Perception:
                     K,
                     T_cam_table,
                     table_xy_affine=self.table_xy_affine,
+                    z_plane=z_top,
                 )
             yaw = yaw_from_footprint(footprint)
             axis_px = det.get("long_axis_px")
             if axis_px is not None:
-                p0 = apply_table_xy_affine(to_table(axis_px[0], K, T_cam_table), a, b)
-                p1 = apply_table_xy_affine(to_table(axis_px[1], K, T_cam_table), a, b)
+                p0 = apply_table_xy_affine(
+                    to_table(axis_px[0], K, T_cam_table, z_plane=z_top), a, b
+                )
+                p1 = apply_table_xy_affine(
+                    to_table(axis_px[1], K, T_cam_table, z_plane=z_top), a, b
+                )
                 axis_yaw = yaw_from_axis(p0, p1)
                 if axis_yaw is not None:
                     yaw = axis_yaw
@@ -345,6 +397,8 @@ def run_perception(
     prompt: str | None = None,
     table_xy_affine: tuple[np.ndarray, np.ndarray] | None = None,
     grasp_height_offsets_m: dict[str, float] | None = None,
+    object_top_z_m: dict[str, float] | None = None,
+    object_top_z_m_default: float = 0.0,
 ) -> tuple[SymbolicView, GeometricView]:
     """Functional entry point wrapping :class:`Perception`."""
     return Perception(
@@ -353,6 +407,8 @@ def run_perception(
         prompt=prompt,
         table_xy_affine=table_xy_affine,
         grasp_height_offsets_m=grasp_height_offsets_m,
+        object_top_z_m=object_top_z_m,
+        object_top_z_m_default=object_top_z_m_default,
     ).run(
         image=image,
         K=K,

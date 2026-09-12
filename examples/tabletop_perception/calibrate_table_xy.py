@@ -15,19 +15,27 @@
 """
 Multi-point table XY calibration (fixes position-dependent grasp bias).
 
-Place the SAME object at ≥3 spread-out spots. At each spot the arm hovers at
-the predicted table XY; WASD-jog onto the object and confirm
-(w=+X上, s=-X下, a=+Y左, d=-Y右).
+Place the SAME object at ≥3 spread-out spots. Cover the **image top**
+(far table edge) — that is where the current 4-point affine is weakest.
+At each spot the arm hovers at the predicted table XY; WASD-jog onto the
+object and confirm (w=+X上, s=-X下, a=+Y左, d=-Y右).
 
-Robot1 (shared camera affine)::
+Predictions use the same ``z=h`` top-face projection as live perception.
+
+Robot1 (shared camera affine, 6 points, 2–3 at image top)::
 
     python -m tabletop_perception.calibrate_table_xy \\
-      --arm xarm --object black_plush_bear --n-points 4
+      --arm xarm --camera /dev/video0 --object box --n-points 6
+
+Keep previous samples and add more (recomputes pred from stored uv)::
+
+    python -m tabletop_perception.calibrate_table_xy \\
+      --arm xarm --camera /dev/video0 --object box --n-points 3 --append
 
 Robot2 (per-arm residual affine; does NOT overwrite Robot1)::
 
     python -m tabletop_perception.calibrate_table_xy \\
-      --arm xarm2 --object black_plush_bear --n-points 4 --hover-z-mm 320
+      --arm xarm2 --camera /dev/video0 --object box --n-points 6 --hover-z-mm 320
 """
 
 from __future__ import annotations
@@ -60,7 +68,57 @@ from tabletop_perception.run_xarm_live import (
     _robot_cfg_from_calib,
     _table_xy_affine_from_calib,
 )
+from tabletop_perception.perception import (
+    object_top_z_from_calib,
+    resolve_object_top_z_m,
+)
 from tabletop_perception.vlm import call_gemini_robotics_er, parse_vlm_detections
+
+_FAR_EDGE_V_MAX = 160.0
+
+
+def _uv_zone(uv: tuple[float, float], image_h: float = 480.0) -> str:
+    v = float(uv[1])
+    if v <= _FAR_EDGE_V_MAX:
+        return "FAR (image top)"
+    if v >= image_h - _FAR_EDGE_V_MAX:
+        return "NEAR (image bottom)"
+    return "MID"
+
+
+def _samples_path(calib_path: Path, arm: str) -> Path:
+    named = Path(calib_path).with_name(f"table_xy_calib_samples_{arm}.json")
+    legacy = Path(calib_path).with_name("table_xy_calib_samples.json")
+    if named.exists():
+        return named
+    if arm == "xarm" and legacy.exists():
+        return legacy
+    return named
+
+
+def _recompute_pred(
+    sample: dict,
+    *,
+    k: np.ndarray,
+    t_ct: np.ndarray,
+    z_heights: dict[str, float],
+    z_default: float,
+    use_global: bool,
+    global_affine: tuple[np.ndarray, np.ndarray] | None,
+) -> dict:
+    """Refresh raw/pred table XY from stored uv with current z=h projection."""
+    uv = tuple(float(v) for v in sample["uv"])
+    z_top = resolve_object_top_z_m(str(sample.get("name", "")), z_heights, z_default)
+    raw_t = to_table(uv, k, t_ct, z_plane=z_top)
+    if use_global and global_affine is not None:
+        pred_t = apply_table_xy_affine(raw_t, global_affine[0], global_affine[1])
+    else:
+        pred_t = raw_t
+    out = dict(sample)
+    out["z_plane"] = z_top
+    out["raw_table_xy"] = [float(raw_t[0]), float(raw_t[1])]
+    out["pred_table_xy"] = [float(pred_t[0]), float(pred_t[1])]
+    return out
 
 
 def _table_to_base_xy(
@@ -111,32 +169,48 @@ def _parse_offset(line: str) -> tuple[float, float]:
     return float(parts[0]), float(parts[1])
 
 
-def _pick_detection(dets: list[dict], object_name: str | None) -> dict:
-    if not dets:
-        raise RuntimeError("VLM returned no detections")
-    if object_name:
+def _pick_detection(dets: list[dict], object_name: str | None) -> dict | None:
+    """Return a detection, or ``None`` to recapture this round.
+
+    SSH: type an index and Enter, or ``r`` to retry, ``q`` to stop.
+    Never Ctrl-C — previous ``ok`` samples are checkpointed.
+    """
+    if object_name and dets:
         key = object_name.lower().replace(" ", "_")
         matches = [
             d for d in dets if key in d["name"].lower().replace(" ", "_")
         ]
         if len(matches) == 1:
+            print(f"Using match: {matches[0]['name']}")
             return matches[0]
         if len(matches) > 1:
             print(f"Multiple matches for {object_name!r}:")
             dets = matches
         else:
-            print(
-                f"Object {object_name!r} not found; pick from detections "
-                f"(or Ctrl-C and re-run with --object <name>):"
-            )
-    if len(dets) == 1:
-        print(f"Using sole detection: {dets[0]['name']}")
-        return dets[0]
-    print("Detections:")
-    for i, d in enumerate(dets):
-        print(f"  [{i}] {d['name']} grasp_px={d['grasp_point_px']}")
-    idx = int(input("Pick index > ").strip())
-    return dets[idx]
+            print(f"没有名叫 {object_name!r} 的检测，选编号或重拍。")
+
+    if not dets:
+        print("VLM 这一帧没有检测。")
+    else:
+        print("Detections:")
+        for i, d in enumerate(dets):
+            print(f"  [{i}] {d['name']} grasp_px={d['grasp_point_px']}")
+
+    while True:
+        sys.stdout.flush()
+        line = input("Pick index（r=重拍这一轮, q=结束并保存已有点）> ").strip().lower()
+        if line in ("r", "retry", "rest"):
+            print("重拍这一轮（已确认的点还在）。")
+            return None
+        if line in ("q", "quit"):
+            raise KeyboardInterrupt("user quit pick")
+        if not line:
+            continue
+        try:
+            idx = int(line)
+            return dets[idx]
+        except (ValueError, IndexError):
+            print("  输入编号（如 0）、r 重拍、或 q 结束。不要 Ctrl-C。")
 
 
 def _write_affine_block(a: np.ndarray, b: np.ndarray, *, comment: str) -> dict:
@@ -157,7 +231,23 @@ def main() -> int:
     p.add_argument("--camera", type=str, default=None)
     p.add_argument("--robot-ip", type=str, default=None)
     p.add_argument("--object", type=str, default=None, help="Target object name substring")
-    p.add_argument("--n-points", type=int, default=4)
+    p.add_argument(
+        "--n-points",
+        type=int,
+        default=6,
+        help="New samples to collect this run (default 6; put 2–3 at image top)",
+    )
+    p.add_argument(
+        "--append",
+        action="store_true",
+        help="Keep previous samples and add --n-points more (recomputes pred from uv)",
+    )
+    p.add_argument(
+        "--samples",
+        type=Path,
+        default=None,
+        help="Existing samples JSON for --append (default: table_xy_calib_samples_<arm>.json)",
+    )
     p.add_argument("--hover-z-mm", type=float, default=280.0)
     p.add_argument("--speed", type=float, default=40.0)
     p.add_argument("--roll", type=float, default=math.pi)
@@ -181,8 +271,10 @@ def main() -> int:
     p.add_argument("--instruction", type=str, default="detect all graspable objects on the table")
     p.add_argument("--no-write", action="store_true")
     args = p.parse_args()
-    if args.n_points < 3:
-        raise SystemExit("--n-points must be >= 3")
+    if args.n_points < 1:
+        raise SystemExit("--n-points must be >= 1")
+    if not args.append and args.n_points < 3:
+        raise SystemExit("--n-points must be >= 3 (or use --append)")
 
     calib = _load_calib(args.calib)
     cam_cfg = calib["camera"]
@@ -200,6 +292,7 @@ def main() -> int:
     flip_y = bool(exe.get("flip_y", True))
     xy_off = [float(v) for v in exe.get("xy_offset_base_mm", [0.0, 0.0])]
     global_affine = _table_xy_affine_from_calib(calib)
+    z_default, z_heights = object_top_z_from_calib(calib)
 
     # xarm: refit shared camera affine (ignore previous).
     # xarm2: keep shared affine; fit residual so Robot1 is not overwritten.
@@ -210,39 +303,121 @@ def main() -> int:
         # Legacy default: collect against raw.
         use_global = False
 
-    print(f"arm={args.arm} ip={ip}")
+    print(f"arm={args.arm} ip={ip} camera={camera_path}")
     print(f"base_xy={base_xy} flip_x={flip_x} flip_y={flip_y} xy_offset={xy_off}")
+    print(
+        f"Projection z=h from calib object_top_z_m (default={z_default:.3f} m): "
+        f"{z_heights}"
+    )
+    if str(camera_path) not in {"/dev/video0", "0"}:
+        print(
+            "WARNING: live runs use --camera /dev/video0 (Aoni overhead). "
+            "Pass the same camera here or the affine will not match."
+        )
     if use_global and global_affine is not None:
-        print("Pred XY = global table_xy_affine(raw)  → fit per-arm residual affine")
+        print("Pred XY = global table_xy_affine(to_table(uv, z=h))  → fit per-arm residual")
     else:
-        print("Pred XY = raw pinhole to_table(uv)  → fit affine")
+        print("Pred XY = to_table(uv, z=h)  → fit affine")
         if global_affine is not None and args.arm == "xarm":
             print("Note: ignoring existing table_xy_affine while collecting samples.")
+
+    samples_file = args.samples or _samples_path(args.calib, args.arm)
+    samples: list[dict] = []
+    if args.append:
+        if not samples_file.exists():
+            raise SystemExit(f"--append but no samples file: {samples_file}")
+        prev = json.loads(samples_file.read_text())
+        raw_prev = list(prev.get("samples") or [])
+        samples = [
+            _recompute_pred(
+                s,
+                k=k,
+                t_ct=t_ct,
+                z_heights=z_heights,
+                z_default=z_default,
+                use_global=use_global,
+                global_affine=global_affine,
+            )
+            for s in raw_prev
+        ]
+        print(f"Loaded {len(samples)} previous samples from {samples_file}")
+        for i, s in enumerate(samples):
+            uv = tuple(float(v) for v in s["uv"])
+            print(
+                f"  prev[{i}] {s.get('name')} uv=({uv[0]:.0f},{uv[1]:.0f}) "
+                f"{_uv_zone(uv)}"
+            )
+        n_far = sum(1 for s in samples if _uv_zone(tuple(s["uv"])) == "FAR (image top)")
+        if n_far < 2:
+            print(
+                f"Far-edge coverage is thin ({n_far} point(s) with v≤{_FAR_EDGE_V_MAX:.0f}). "
+                "Put the new samples near the image TOP."
+            )
 
     print(
         f"\nPlace the SAME object at {args.n_points} spread-out locations "
         f"inside {args.arm} workspace.\n"
-        "At each hover, WASD-jog the gripper onto the object, then ok/Enter.\n"
+        "Suggested layout (image coords: top = far table edge):\n"
+        "  2× image TOP / far edge   ← currently the weak region\n"
+        "  2× image CENTER\n"
+        "  2× image BOTTOM / near robots\n"
+        "Use a box if you will grasp boxes (same top height as live z=h).\n"
+        "\nSSH / line-mode (do NOT hold WASD like a game):\n"
+        "  1) Place the object, then press Enter once to capture.\n"
+        "  2) After the arm hovers, type a command and Enter:\n"
+        "       w      one step +X (上)\n"
+        "       d 3    three steps -Y (右)\n"
+        "       ok     confirm this sample\n"
         "  w=+X(上)  s=-X(下)  a=+Y(左)  d=-Y(右)\n"
     )
+    sys.stdout.flush()
 
     robot = _connect_xarm(calib, ip, arm_name=args.arm)
     arm = robot.real_arm
-    samples: list[dict] = []
+    time.sleep(0.4)
+    out_samples = args.samples or Path(args.calib).with_name(
+        f"table_xy_calib_samples_{args.arm}.json"
+    )
+
+    def _checkpoint() -> None:
+        payload = {
+            "arm": args.arm,
+            "camera": str(camera_path),
+            "use_global_affine_as_pred": use_global,
+            "object_top_z_m": z_heights,
+            "object_top_z_m_default": z_default,
+            "samples": samples,
+            "partial": True,
+        }
+        out_samples.write_text(json.dumps(payload, indent=2) + "\n")
+        print(f"  checkpoint {len(samples)} sample(s) → {out_samples}")
+
+    interrupted = False
     try:
         for i in range(args.n_points):
-            input(f"[{i+1}/{args.n_points}] Place object, then Enter to capture … ")
-            image = _capture_from_camera(
-                camera_path,
-                width=int(cam_cfg["width"]),
-                height=int(cam_cfg["height"]),
-                fps=int(cam_cfg["fps"]),
-            )
-            raw = call_gemini_robotics_er(image, args.instruction)
-            dets = parse_vlm_detections(raw, image_hw=(image.shape[0], image.shape[1]))
-            det = _pick_detection(dets, args.object)
+            print()
+            print(f"===== [{i+1}/{args.n_points}] =====")
+            det = None
+            while det is None:
+                print("摆好物体后，只按一次 Enter 拍照。现在不要按 WASD。")
+                sys.stdout.flush()
+                input(">>> 按 Enter 拍照：")
+                print("拍照中…")
+                sys.stdout.flush()
+                image = _capture_from_camera(
+                    camera_path,
+                    width=int(cam_cfg["width"]),
+                    height=int(cam_cfg["height"]),
+                    fps=int(cam_cfg["fps"]),
+                )
+                print(f"图像 {image.shape}，正在调用 VLM（SSH 下可能要等几秒）…")
+                sys.stdout.flush()
+                raw = call_gemini_robotics_er(image, args.instruction)
+                dets = parse_vlm_detections(raw, image_hw=(image.shape[0], image.shape[1]))
+                det = _pick_detection(dets, args.object)
             uv = tuple(float(v) for v in det["grasp_point_px"])
-            raw_t = to_table(uv, k, t_ct)
+            z_top = resolve_object_top_z_m(det["name"], z_heights, z_default)
+            raw_t = to_table(uv, k, t_ct, z_plane=z_top)
             if use_global and global_affine is not None:
                 a_g, b_g = global_affine
                 pred_t = apply_table_xy_affine(raw_t, a_g, b_g)
@@ -258,7 +433,8 @@ def main() -> int:
             cmd_x += xy_off[0]
             cmd_y += xy_off[1]
             print(
-                f"  detected={det['name']} uv={uv} "
+                f"  detected={det['name']} uv={uv} zone={_uv_zone(uv)} "
+                f"z_h={z_top:.3f}m "
                 f"pred_table=({pred_t[0]:.3f},{pred_t[1]:.3f}) "
                 f"cmd_base_mm=({cmd_x:.1f},{cmd_y:.1f})"
             )
@@ -298,6 +474,7 @@ def main() -> int:
                     "arm": args.arm,
                     "name": det["name"],
                     "uv": list(uv),
+                    "z_plane": z_top,
                     "raw_table_xy": list(raw_t),
                     "pred_table_xy": list(pred_t),
                     "true_table_xy": list(true_t),
@@ -310,11 +487,24 @@ def main() -> int:
                 f"  residual=({dx:+.1f},{dy:+.1f}) mm → "
                 f"true_table=({true_t[0]:.3f},{true_t[1]:.3f})"
             )
+            _checkpoint()
+    except KeyboardInterrupt:
+        interrupted = True
+        print(f"\n停止采集。已确认 {len(samples)} 个点仍会保存。")
     finally:
         try:
             robot.disconnect()
         except Exception:  # noqa: BLE001
             pass
+
+    if len(samples) < 3:
+        if samples:
+            _checkpoint()
+        print(
+            f"Need at least 3 samples to fit affine, got {len(samples)}. "
+            f"Resume with --append --n-points {max(1, 3 - len(samples))}"
+        )
+        return 1 if interrupted else 0
 
     pred = [tuple(s["pred_table_xy"]) for s in samples]
     true = [tuple(s["true_table_xy"]) for s in samples]
@@ -330,13 +520,28 @@ def main() -> int:
     print(f"b = {b.tolist()}")
     print("=====================================")
 
-    out_samples = Path(args.calib).with_name(f"table_xy_calib_samples_{args.arm}.json")
+    n_far = sum(1 for s in samples if _uv_zone(tuple(s["uv"])) == "FAR (image top)")
+    n_near = sum(1 for s in samples if _uv_zone(tuple(s["uv"])) == "NEAR (image bottom)")
+    print(
+        f"Coverage: n={len(samples)}  far/top={n_far}  mid="
+        f"{len(samples) - n_far - n_near}  near/bottom={n_near}"
+    )
+    if n_far < 2:
+        print(
+            "WARNING: fewer than 2 far-edge (image-top) samples. "
+            "Re-run with --append --n-points 3 and place those at the far edge."
+        )
+
     out_samples.write_text(
         json.dumps(
             {
                 "arm": args.arm,
+                "camera": str(camera_path),
                 "use_global_affine_as_pred": use_global,
+                "object_top_z_m": z_heights,
+                "object_top_z_m_default": z_default,
                 "samples": samples,
+                "partial": False,
                 "A": a.tolist(),
                 "b": b.tolist(),
                 "metrics": metrics,
@@ -358,7 +563,7 @@ def main() -> int:
             + (
                 "pred = global table_xy_affine(raw); per-arm residual."
                 if use_global
-                else "pred = raw to_table(uv)."
+                else "pred = to_table(uv, z=object_top)."
             )
         ),
     )

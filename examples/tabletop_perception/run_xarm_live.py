@@ -50,7 +50,7 @@ _EXAMPLES_DIR = Path(__file__).resolve().parents[1]
 if str(_EXAMPLES_DIR) not in sys.path:
     sys.path.insert(0, str(_EXAMPLES_DIR))
 
-from tabletop_perception.perception import Perception  # noqa: E402
+from tabletop_perception.perception import Perception, object_top_z_from_calib  # noqa: E402
 from tabletop_perception.visualize import visualize_table_plane  # noqa: E402
 
 DEFAULT_CALIB = Path(__file__).resolve().parent / "calib" / "xarm_overhead.json"
@@ -399,6 +399,7 @@ def main(argv: list[str] | None = None) -> int:
         for k, v in dict(calib.get("grasp_height_offset_m") or {}).items()
         if not str(k).startswith("_")
     }
+    object_top_z_default, object_top_z = object_top_z_from_calib(calib)
     footprint_buffer = float(calib.get("footprint_buffer_m", 0.02))
 
     prompt = None
@@ -442,12 +443,19 @@ def main(argv: list[str] | None = None) -> int:
             print("Using table_xy_affine correction from calib.")
         if grasp_height_offsets:
             print(f"Per-object grasp height offsets: {grasp_height_offsets}")
+        if object_top_z or object_top_z_default:
+            print(
+                f"Object top-face heights for projection: "
+                f"default={object_top_z_default:.3f} m {object_top_z}"
+            )
         perception_once = Perception(
             footprint_buffer_m=footprint_buffer,
             prompt=prompt,
             vlm_caller=lambda _img, _ins, _p: raw,
             table_xy_affine=affine,
             grasp_height_offsets_m=grasp_height_offsets,
+            object_top_z_m=object_top_z,
+            object_top_z_m_default=object_top_z_default,
         )
         symbolic_view, geometric_view = perception_once(
             image=image,
