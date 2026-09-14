@@ -1,0 +1,92 @@
+{
+  "status": "success",
+  "reason": "",
+  "plan": [
+    {
+      "step": 1,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "args": {
+        "object": "screw"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm",
+      "primitive": "Place",
+      "args": {
+        "object": "screw",
+        "destination": "container"
+      },
+      "depends_on": [
+        1
+      ]
+    }
+  ],
+  "bound": [
+    {
+      "step": 1,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.1572477603182064,
+          0.0710841094869489,
+          0.17,
+          -1.5063586201423234
+        ],
+        "object": "screw"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          -0.15384189980169374,
+          0.09006217204005129,
+          0.24000000000000002,
+          -1.5063586201423234
+        ],
+        "object": "screw",
+        "destination": "container"
+      },
+      "depends_on": [
+        1
+      ]
+    }
+  ],
+  "results": [
+    {
+      "step": 1,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "screw"
+      }
+    },
+    {
+      "step": 2,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          -0.15384189980169374,
+          0.09006217204005129,
+          0.24000000000000002,
+          -1.5063586201423234
+        ],
+        "object": "screw",
+        "observed_xy": [
+          -0.15384189980169374,
+          0.09006217204005129
+        ],
+        "xy_error": 0.0
+      }
+    }
+  ]
+}

@@ -32,6 +32,25 @@ from .geometry import (
 )
 
 
+# Calib keys that also apply to other name substrings (one offset for both).
+_GRASP_OFFSET_ALIASES = {
+    "stand": ("ring",),
+}
+
+
+def matches_height_key(object_name: str, key: str) -> bool:
+    """True if ``key`` (or an alias such as stand→ring) appears in the object name."""
+    if str(key).startswith("_"):
+        return False
+    hay = object_name.lower().replace(" ", "_")
+    needle = str(key).lower().replace(" ", "_")
+    if not needle:
+        return False
+    if needle in hay:
+        return True
+    return any(alias in hay for alias in _GRASP_OFFSET_ALIASES.get(needle, ()))
+
+
 def resolve_grasp_height_m(
     object_name: str,
     default_height_m: float,
@@ -40,17 +59,14 @@ def resolve_grasp_height_m(
     """
     ``z = default + offset`` where ``offset`` is the first matching key in
     ``height_offsets_m`` (case-insensitive substring on the object name).
-    Negative offset lowers the gripper.
+    ``stand`` also matches names containing ``ring``. Negative offset lowers
+    the gripper.
     """
     z = float(default_height_m)
     if not height_offsets_m:
         return z
-    name = object_name.lower().replace(" ", "_")
     for key, offset in height_offsets_m.items():
-        if str(key).startswith("_"):
-            continue
-        needle = str(key).lower().replace(" ", "_")
-        if needle and needle in name:
+        if matches_height_key(object_name, str(key)):
             return z + float(offset)
     return z
 
@@ -68,12 +84,8 @@ def resolve_object_top_z_m(
     """
     if not heights_m:
         return float(default_m)
-    name = object_name.lower().replace(" ", "_")
     for key, height in heights_m.items():
-        if str(key).startswith("_"):
-            continue
-        needle = str(key).lower().replace(" ", "_")
-        if needle and needle in name:
+        if matches_height_key(object_name, str(key)):
             return float(height)
     return float(default_m)
 
@@ -91,7 +103,7 @@ def object_top_z_from_calib(calib: dict) -> tuple[float, dict[str, float]]:
 
 
 from .segment import refine_parsed_detections
-from .vlm import VlmCaller, call_gemini_robotics_er, parse_vlm_detections
+from .vlm import VlmCaller, call_detection_vlm, parse_vlm_detections
 
 
 class SymbolicObject(TypedDict):
@@ -209,13 +221,19 @@ class Perception:
         grasp_height_offsets_m: dict[str, float] | None = None,
         object_top_z_m: dict[str, float] | None = None,
         object_top_z_m_default: float = 0.0,
+        thinking_budget: int = -1,
+        model: str = "gemini",
     ) -> None:
         self.footprint_buffer_m = float(footprint_buffer_m)
+        self.thinking_budget = int(thinking_budget)
+        self.model = str(model)
         self.vlm_caller: VlmCaller = vlm_caller or (
-            lambda image, instruction, prompt_text: call_gemini_robotics_er(
+            lambda image, instruction, prompt_text: call_detection_vlm(
                 image,
                 instruction,
                 prompt=prompt_text or None,
+                model=self.model,
+                thinking_budget=self.thinking_budget,
             )
         )
         self.prompt = prompt
@@ -399,6 +417,8 @@ def run_perception(
     grasp_height_offsets_m: dict[str, float] | None = None,
     object_top_z_m: dict[str, float] | None = None,
     object_top_z_m_default: float = 0.0,
+    thinking_budget: int = -1,
+    model: str = "gemini",
 ) -> tuple[SymbolicView, GeometricView]:
     """Functional entry point wrapping :class:`Perception`."""
     return Perception(
@@ -409,6 +429,8 @@ def run_perception(
         grasp_height_offsets_m=grasp_height_offsets_m,
         object_top_z_m=object_top_z_m,
         object_top_z_m_default=object_top_z_m_default,
+        thinking_budget=thinking_budget,
+        model=model,
     ).run(
         image=image,
         K=K,

@@ -1,0 +1,94 @@
+{
+  "status": "success",
+  "reason": "",
+  "plan": [
+    {
+      "step": 1,
+      "arm": "xarm2",
+      "primitive": "Grasp",
+      "args": {
+        "object": "red_tape"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm2",
+      "primitive": "Place",
+      "args": {
+        "object": "red_tape",
+        "destination": "grid",
+        "region": "bottom_right"
+      },
+      "depends_on": [
+        1
+      ]
+    }
+  ],
+  "bound": [
+    {
+      "step": 1,
+      "arm": "xarm2",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.15005203759526708,
+          0.28087608629023847,
+          0.2,
+          -1.506358620142323
+        ],
+        "object": "red_tape"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm2",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          -0.19527793701019114,
+          0.11859482171652426,
+          0.21000000000000002,
+          -1.506358620142323
+        ],
+        "object": "red_tape",
+        "destination": "grid",
+        "region": "bottom_right"
+      },
+      "depends_on": [
+        1
+      ]
+    }
+  ],
+  "results": [
+    {
+      "step": 1,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "red_tape"
+      }
+    },
+    {
+      "step": 2,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          -0.19527793701019114,
+          0.11859482171652426,
+          0.21000000000000002,
+          -1.506358620142323
+        ],
+        "object": "red_tape",
+        "observed_xy": [
+          -0.19527793701019114,
+          0.11859482171652426
+        ],
+        "xy_error": 0.0
+      }
+    }
+  ]
+}

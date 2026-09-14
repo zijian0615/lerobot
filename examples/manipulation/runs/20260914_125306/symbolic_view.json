@@ -1,0 +1,64 @@
+{
+  "objects": [
+    {
+      "name": "tic_tac_toe_board",
+      "blocked_by": "center_gray_piece",
+      "in_workspace": [
+        "xarm2",
+        "xarm"
+      ],
+      "preferred_arm": "xarm2"
+    },
+    {
+      "name": "center_gray_piece",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm2",
+        "xarm"
+      ],
+      "preferred_arm": "xarm2"
+    },
+    {
+      "name": "upper_left_black_piece",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm"
+      ],
+      "preferred_arm": "xarm"
+    },
+    {
+      "name": "lower_left_black_piece",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm"
+      ],
+      "preferred_arm": "xarm"
+    },
+    {
+      "name": "upper_right_black_white_piece",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm2"
+      ],
+      "preferred_arm": "xarm2"
+    },
+    {
+      "name": "middle_right_black_white_piece",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm2",
+        "xarm"
+      ],
+      "preferred_arm": "xarm2"
+    },
+    {
+      "name": "lower_right_white_piece",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm2",
+        "xarm"
+      ],
+      "preferred_arm": "xarm2"
+    }
+  ]
+}

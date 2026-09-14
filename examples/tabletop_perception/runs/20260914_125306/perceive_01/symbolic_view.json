@@ -1,0 +1,63 @@
+{
+  "objects": [
+    {
+      "name": "board",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm2",
+        "xarm"
+      ],
+      "preferred_arm": "xarm2"
+    },
+    {
+      "name": "tic_tac_toe_piece_upper_left",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm"
+      ],
+      "preferred_arm": "xarm"
+    },
+    {
+      "name": "tic_tac_toe_piece_middle_left",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm"
+      ],
+      "preferred_arm": "xarm"
+    },
+    {
+      "name": "tic_tac_toe_piece_lower_left",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm"
+      ],
+      "preferred_arm": "xarm"
+    },
+    {
+      "name": "tic_tac_toe_piece_upper_right",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm2"
+      ],
+      "preferred_arm": "xarm2"
+    },
+    {
+      "name": "tic_tac_toe_piece_middle_right",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm2",
+        "xarm"
+      ],
+      "preferred_arm": "xarm2"
+    },
+    {
+      "name": "tic_tac_toe_piece_lower_right",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm2",
+        "xarm"
+      ],
+      "preferred_arm": "xarm2"
+    }
+  ]
+}

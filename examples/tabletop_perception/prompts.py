@@ -28,7 +28,14 @@ Task instruction: "{instruction}"
 Return the fields below for the objects relevant to this instruction.
 
 TASK 1 - DETECTION
-- Exclude the robot arm, gripper, and the table surface itself.
+- Exclude the robot arm, gripper, and the bare table.
+- The task instruction is the naming source of truth. If it refers to
+  a region by color, pattern, or phrase (e.g. "the red region",
+  "the grid", "left half of the mat"), detect that region as its own
+  object and name it from those words (red_region, grid, …).
+  Outline that named region only — not a larger parent tray/board.
+- Also include movable objects the instruction mentions (screws,
+  pieces, cups, …) and any play surface needed as a destination.
 - Limit to 10 objects.
 - Each object needs a unique lowercase snake_case name. If two objects
   look identical, disambiguate by color or position (e.g. red_cup,

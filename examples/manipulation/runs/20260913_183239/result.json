@@ -1,0 +1,92 @@
+{
+  "status": "success",
+  "reason": "",
+  "plan": [
+    {
+      "step": 1,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "args": {
+        "object": "black_screw"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm",
+      "primitive": "Place",
+      "args": {
+        "object": "black_screw",
+        "destination": "tic_tac_toe_board"
+      },
+      "depends_on": [
+        1
+      ]
+    }
+  ],
+  "bound": [
+    {
+      "step": 1,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.31202837124211935,
+          -0.14943658480080485,
+          0.17,
+          -1.5063586201423247
+        ],
+        "object": "black_screw"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          -0.1608870674801827,
+          0.07943405360717859,
+          0.17,
+          -1.5063586201423247
+        ],
+        "object": "black_screw",
+        "destination": "tic_tac_toe_board"
+      },
+      "depends_on": [
+        1
+      ]
+    }
+  ],
+  "results": [
+    {
+      "step": 1,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "black_screw"
+      }
+    },
+    {
+      "step": 2,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          -0.1608870674801827,
+          0.07943405360717859,
+          0.17,
+          -1.5063586201423247
+        ],
+        "object": "black_screw",
+        "observed_xy": [
+          -0.1608870674801827,
+          0.07943405360717859
+        ],
+        "xy_error": 0.0
+      }
+    }
+  ]
+}

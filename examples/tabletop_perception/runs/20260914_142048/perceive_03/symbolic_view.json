@@ -1,0 +1,62 @@
+{
+  "objects": [
+    {
+      "name": "grid",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm2",
+        "xarm"
+      ],
+      "preferred_arm": "xarm2"
+    },
+    {
+      "name": "screw_1",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm"
+      ],
+      "preferred_arm": "xarm"
+    },
+    {
+      "name": "screw_2",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm"
+      ],
+      "preferred_arm": "xarm"
+    },
+    {
+      "name": "screw_3",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm"
+      ],
+      "preferred_arm": "xarm"
+    },
+    {
+      "name": "box_on_grid",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm2",
+        "xarm"
+      ],
+      "preferred_arm": "xarm2"
+    },
+    {
+      "name": "box_right_top",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm2"
+      ],
+      "preferred_arm": "xarm2"
+    },
+    {
+      "name": "box_right_bottom",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm2"
+      ],
+      "preferred_arm": "xarm2"
+    }
+  ]
+}

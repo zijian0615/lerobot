@@ -348,6 +348,20 @@ def build_argparser() -> argparse.ArgumentParser:
         action="store_true",
         help="Skip Gemini and inject a small hardcoded detection list (pipeline dry-run)",
     )
+    p.add_argument(
+        "--thinking-budget",
+        type=int,
+        default=-1,
+        help="Gemini thinking budget: 0=off (faster), -1=dynamic (default), or a positive token cap. "
+        "With --model gpt-6 this maps to reasoning effort.",
+    )
+    p.add_argument(
+        "--model",
+        "--vlm",
+        dest="model",
+        default="gemini",
+        help="Base VLM: gemini (default) or gpt-6 (OpenAI gpt-6-astra, needs OPENAI_API_KEY).",
+    )
     return p
 
 
@@ -434,7 +448,12 @@ def main(argv: list[str] | None = None) -> int:
             print("Using --mock-vlm (no Gemini call).")
             raw = _mock_detections_for_scene()
         else:
-            perception = Perception(footprint_buffer_m=footprint_buffer, prompt=prompt)
+            perception = Perception(
+                footprint_buffer_m=footprint_buffer,
+                prompt=prompt,
+                thinking_budget=int(args.thinking_budget),
+                model=str(args.model),
+            )
             raw = perception.vlm_caller(image, args.instruction, prompt or "")
         detections = parse_vlm_detections(raw, image_hw=(image.shape[0], image.shape[1]))
         # Reuse the same VLM result (no second API call).

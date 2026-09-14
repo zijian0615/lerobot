@@ -1,0 +1,1 @@
+play the tic-tac-toe as the first player and fillout the board with the opponent

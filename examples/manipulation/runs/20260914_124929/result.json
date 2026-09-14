@@ -1,0 +1,137 @@
+{
+  "status": "fail",
+  "reason": "exception:RuntimeError:set_position failed code=-9 pose=[69.43845609649408, 113.17294227225916, 250.00000000000006, 3.1415926535, 0.0, 1.6055159360988565]",
+  "plan": [
+    {
+      "step": 1,
+      "arm": "xarm2",
+      "primitive": "Grasp",
+      "args": {
+        "object": "gray_ring_on_board"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm2",
+      "primitive": "Place",
+      "args": {
+        "object": "gray_ring_on_board",
+        "destination": "free_space"
+      },
+      "depends_on": [
+        1
+      ]
+    },
+    {
+      "step": 3,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "args": {
+        "object": "black_piece_middle_left"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 4,
+      "arm": "xarm",
+      "primitive": "Place",
+      "args": {
+        "object": "black_piece_middle_left",
+        "destination": "board",
+        "region": "top_left"
+      },
+      "depends_on": [
+        2,
+        3
+      ]
+    }
+  ],
+  "bound": [
+    {
+      "step": 1,
+      "arm": "xarm2",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.17520052258453445,
+          0.0516215704644143,
+          0.16000000000000003,
+          -1.5063586201423236
+        ],
+        "object": "gray_ring_on_board"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm2",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          -0.39315773465695886,
+          0.27846097571064937,
+          0.17000000000000004,
+          -1.5063586201423236
+        ],
+        "object": "gray_ring_on_board",
+        "destination": "free_space"
+      },
+      "depends_on": [
+        1
+      ]
+    },
+    {
+      "step": 3,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.020822279980728595,
+          -0.2110029463993534,
+          0.2,
+          0.09280600305377212
+        ],
+        "object": "black_piece_middle_left"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 4,
+      "arm": "xarm",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          -0.022434960911059374,
+          -0.017666606666629274,
+          0.21000000000000002,
+          0.09280600305377212
+        ],
+        "object": "black_piece_middle_left",
+        "destination": "board",
+        "region": "top_left"
+      },
+      "depends_on": [
+        2,
+        3
+      ]
+    }
+  ],
+  "results": [
+    {
+      "step": 1,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "gray_ring_on_board"
+      }
+    },
+    {
+      "step": 2,
+      "status": "fail",
+      "reason": "exception:RuntimeError:set_position failed code=-9 pose=[69.43845609649408, 113.17294227225916, 250.00000000000006, 3.1415926535, 0.0, 1.6055159360988565]",
+      "observed": {}
+    }
+  ]
+}
