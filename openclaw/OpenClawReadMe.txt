@@ -1,6 +1,10 @@
 This folder contains the Docker code for deploying a secure container
 containing an Openclaw agent
 
+Need to build the image
+    in the directory containing the dockerfile: 
+        docker build . -t oc-image
+
 1. Make a directory to persist openclaw data as a volume
     mkdir ~/.openclaw
 2. Copy an existing config file into the volume
@@ -19,14 +23,15 @@ containing an Openclaw agent
         -e OPENCLAW_GATEWAY_TOKEN=${OPENCLAW_GATEWAY_TOKEN} \
         -e GEMINI_API_KEY=${GEMINI_API_KEY} \
         --cap-drop ALL \
-        -v $PWD:/work \
+        -v /work \
         -v ~/.openclaw:/home/openclaw/.openclaw \
         -w /work \
-
+        oc-iamge
 
 
  
 
+    docker run -it --rm --name openclaw -e OPENCLAW_GATEWAY_TOKEN=idk -e GEMINI_API_KEY=gemini --cap-drop ALL -v $PWD:/work -v ~/.openclaw:/home/openclaw/.openclaw -w /work oc-image
 
 
 
