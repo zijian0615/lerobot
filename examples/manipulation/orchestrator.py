@@ -81,6 +81,7 @@ class ManipulationLoop:
         arms: Sequence[str] | None = None,
         lookahead: bool = True,
         overlap_guard: OverlapGuard | None = None,
+        on_phase: Callable[[str, str], None] | None = None,
     ) -> None:
         self.perceive = perceive
         self.plan_fn = plan_fn
@@ -89,20 +90,43 @@ class ManipulationLoop:
         self.arms = list(arms) if arms is not None else list(executors.keys())
         self.lookahead = lookahead
         self.overlap_guard = overlap_guard
+        self.on_phase = on_phase
+
+    def _phase(self, phase: str, detail: str = "") -> None:
+        if self.on_phase is not None:
+            self.on_phase(phase, detail)
+
+    def _step_detail(self, step: Mapping[str, Any], index: int, total: int) -> str:
+        prim = str(step.get("primitive") or "")
+        params = step.get("params") or step.get("args") or {}
+        obj = params.get("object") or ""
+        dest = params.get("destination") or ""
+        detail = prim
+        if obj:
+            detail += f"  {obj}"
+        if dest:
+            detail += f" → {dest}"
+        detail += f"  ·  step {index + 1}/{total}"
+        return detail
 
     def run(self, instruction: str) -> LoopResult:
+        self._phase("perceiving", "vision VLM")
         symbolic_view, geometric_view = self.perceive()
         symbolic_view = _as_dict(symbolic_view)
         geometric_view = _as_dict(geometric_view)
         self._sync_overlap(geometric_view)
 
+        self._phase("planning", instruction)
         plan = self.plan_fn(symbolic_view, instruction, self.arms)
+        self._phase("solving", f"{len(plan)} step(s)")
         bound = solve(plan, geometric_view, self.solver_config, lookahead=self.lookahead)
         self._log_bound(bound)
 
         results: list[ExecutionResult] = []
+        n = len(bound)
         for i, step in enumerate(bound):
-            result = self._execute_step(step, remaining=bound[i + 1 :])
+            self._phase("execution", self._step_detail(step, i, n))
+            result = self._execute_step(step)
             results.append(result)
             logger.info(
                 "step=%s arm=%s prim=%s status=%s reason=%s params=%s",
@@ -125,8 +149,10 @@ class ManipulationLoop:
                 old_bound=bound,
                 results_so_far=results,
             )
+            self._phase("failed", recovered.reason or result.get("reason") or "")
             return recovered
 
+        self._phase("done", "success")
         return LoopResult(
             status="success",
             reason="",
@@ -134,6 +160,67 @@ class ManipulationLoop:
             bound=bound,
             results=results,
             symbolic_view=symbolic_view,
+            geometric_view=geometric_view,
+        )
+
+    def execute_bound_plan(
+        self,
+        plan: Sequence[Mapping[str, Any]],
+        geometric_view: Mapping[str, Any],
+        *,
+        symbolic_view: Mapping[str, Any] | None = None,
+    ) -> LoopResult:
+        """Solve + execute a plan that was already decided (no perceive / no plan VLM)."""
+        geometric_view = _as_dict(geometric_view)
+        self._sync_overlap(geometric_view)
+        if not plan:
+            self._phase("done", "empty_plan")
+            return LoopResult(
+                status="success",
+                reason="empty_plan",
+                plan=[],
+                bound=[],
+                results=[],
+                symbolic_view=_as_dict(symbolic_view or {}),
+                geometric_view=geometric_view,
+            )
+        self._phase("solving", f"{len(plan)} step(s)")
+        bound = solve(plan, geometric_view, self.solver_config, lookahead=self.lookahead)
+        self._log_bound(bound)
+        results: list[ExecutionResult] = []
+        n = len(bound)
+        for i, step in enumerate(bound):
+            self._phase("execution", self._step_detail(step, i, n))
+            result = self._execute_step(step)
+            results.append(result)
+            logger.info(
+                "step=%s arm=%s prim=%s status=%s reason=%s params=%s",
+                step["step"],
+                step["arm"],
+                step["primitive"],
+                result["status"],
+                result["reason"],
+                json.dumps(step.get("params") or {}, sort_keys=True),
+            )
+            if result["status"] != "success":
+                self._phase("failed", str(result.get("reason") or "step_failed"))
+                return LoopResult(
+                    status="fail",
+                    reason=str(result.get("reason") or "step_failed"),
+                    plan=list(plan),
+                    bound=bound,
+                    results=results,
+                    symbolic_view=_as_dict(symbolic_view or {}),
+                    geometric_view=geometric_view,
+                )
+        self._phase("done", "success")
+        return LoopResult(
+            status="success",
+            reason="",
+            plan=list(plan),
+            bound=bound,
+            results=results,
+            symbolic_view=_as_dict(symbolic_view or {}),
             geometric_view=geometric_view,
         )
 
@@ -162,35 +249,9 @@ class ManipulationLoop:
                     float(ov.centroid.y),
                 )
 
-    def _should_skip_overlap_retract(
-        self,
-        step: Mapping[str, Any],
-        remaining: Sequence[Mapping[str, Any]],
-    ) -> bool:
-        """
-        After Grasp: skip retract if this arm still has a Place of the same
-        object later (even if other arms' steps are interleaved).
-        """
-        if str(step.get("primitive")) != "Grasp":
-            return False
-        arm = str(step["arm"])
-        obj = (step.get("params") or {}).get("object")
-        if obj is None:
-            return False
-        for later in remaining:
-            if str(later.get("arm")) != arm:
-                continue
-            if str(later.get("primitive")) != "Place":
-                continue
-            if (later.get("params") or {}).get("object") == obj:
-                return True
-        return False
-
     def _execute_step(
         self,
         step: Mapping[str, Any],
-        *,
-        remaining: Sequence[Mapping[str, Any]] = (),
     ) -> ExecutionResult:
         arm = str(step["arm"])
         if arm not in self.executors:
@@ -203,11 +264,15 @@ class ManipulationLoop:
         params = step.get("params") or {}
         pose = params.get("pose")
         xy = (float(pose[0]), float(pose[1])) if pose is not None and len(pose) >= 2 else None
-        held = False
         result: ExecutionResult | None = None
         try:
             if self.overlap_guard is not None:
-                held = self.overlap_guard.acquire(arm, xy)
+                try:
+                    self.overlap_guard.acquire(arm, xy)
+                except OverlapBusy:
+                    if not self.overlap_guard.yield_to(arm):
+                        raise
+                    self.overlap_guard.acquire(arm, xy)
         except OverlapBusy as exc:
             return {
                 "step": int(step["step"]),
@@ -219,13 +284,8 @@ class ManipulationLoop:
             result = self.executors[arm].execute(step)
             return result
         finally:
-            if held and self.overlap_guard is not None:
-                skip = (
-                    result is not None
-                    and result.get("status") == "success"
-                    and self._should_skip_overlap_retract(step, remaining)
-                )
-                self.overlap_guard.release_after(arm, retract=not skip)
+            if self.overlap_guard is not None:
+                self.overlap_guard.after_step(arm, xy)
 
     def _recover(
         self,
@@ -269,7 +329,7 @@ class ManipulationLoop:
             self._log_bound(new_bound_tail, prefix="resolve")
             results = list(results_so_far[:-1])  # drop failed attempt
             for i, step in enumerate(new_bound_tail):
-                result = self._execute_step(step, remaining=new_bound_tail[i + 1 :])
+                result = self._execute_step(step)
                 results.append(result)
                 logger.info(
                     "retry step=%s status=%s reason=%s params=%s",
@@ -318,7 +378,7 @@ class ManipulationLoop:
         self._log_bound(new_bound, prefix="replan")
         results: list[ExecutionResult] = []
         for i, step in enumerate(new_bound):
-            result = self._execute_step(step, remaining=new_bound[i + 1 :])
+            result = self._execute_step(step)
             results.append(result)
             logger.info(
                 "replan step=%s status=%s reason=%s params=%s",
@@ -376,6 +436,7 @@ def run_manipulation(
     arms: Sequence[str] | None = None,
     lookahead: bool = True,
     overlap_guard: OverlapGuard | None = None,
+    on_phase: Callable[[str, str], None] | None = None,
 ) -> LoopResult:
     return ManipulationLoop(
         perceive=perceive,
@@ -385,4 +446,5 @@ def run_manipulation(
         arms=arms,
         lookahead=lookahead,
         overlap_guard=overlap_guard,
+        on_phase=on_phase,
     ).run(instruction)

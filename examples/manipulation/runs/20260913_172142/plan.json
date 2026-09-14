@@ -1,0 +1,24 @@
+[
+  {
+    "step": 1,
+    "arm": "xarm",
+    "primitive": "Grasp",
+    "args": {
+      "object": "screw_on_table"
+    },
+    "depends_on": []
+  },
+  {
+    "step": 2,
+    "arm": "xarm",
+    "primitive": "Place",
+    "args": {
+      "object": "screw_on_table",
+      "destination": "stand",
+      "region": "right"
+    },
+    "depends_on": [
+      1
+    ]
+  }
+]

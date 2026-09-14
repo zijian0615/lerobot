@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Multi-arm overlap zone: mutex + post-task retract."""
+"""Multi-arm overlap zone mutex: hold while in-zone, vacate before handoff."""
 
 from __future__ import annotations
 
@@ -102,14 +102,12 @@ def exclusive_retract_xy(
 class OverlapGuard:
     """
     Policy:
-      1. Poses inside overlap require the mutex (no two arms in-zone at once
-         during a step).
-      2. After Place (or any step that should clear the zone): retract to
-         exclusive workspace, then release.
-      3. After Grasp when a later Place of the same object by this arm exists:
-         release the mutex **without** retracting (arm stays at lift) so
-         Grasp→Place is direct even if other arms' steps are interleaved.
-         Plans are assumed sequential (no true parallel overlap use).
+      1. A pose inside overlap requires the mutex. Same arm may keep working
+         in-zone (Grasp → Place) without retracting.
+      2. After a step, keep the mutex if that arm's destination is still in
+         overlap — the EE is physically there.
+      3. When a *different* arm needs the zone, retract the holder to its
+         exclusive workspace first, then transfer the lock.
     """
 
     def __init__(
@@ -139,10 +137,7 @@ class OverlapGuard:
         return xy_in_overlap(xy, self.overlap, margin_m=self.margin_m)
 
     def acquire(self, arm: str, xy: tuple[float, float] | None) -> bool:
-        """
-        Returns True if this step is inside the overlap (caller must
-        ``release_after``).
-        """
+        """Return True if this step is inside the overlap (caller must ``after_step``)."""
         if not self.enabled:
             return False
         if not self.in_overlap(xy):
@@ -154,24 +149,42 @@ class OverlapGuard:
         self._holder = arm
         return True
 
-    def release_after(self, arm: str, *, retract: bool = True) -> None:
-        """
-        Finish an overlap step and always clear the mutex.
+    def yield_to(self, requester: str) -> bool:
+        """Retract the current holder so ``requester`` can enter the overlap."""
+        holder = self._holder
+        if holder is None or holder == requester:
+            return True
+        fn = self.retract.get(holder)
+        if fn is None:
+            logger.warning("overlap yield: no retract callback for holder=%s", holder)
+            return False
+        logger.info("overlap yield holder=%s → requester=%s", holder, requester)
+        try:
+            fn()
+        except Exception:
+            logger.exception("overlap retract failed for holder=%s", holder)
+            return False
+        logger.info("overlap release arm=%s (vacated)", holder)
+        self._holder = None
+        return True
 
-        ``retract=True``: move to exclusive workspace first.
-        ``retract=False``: stay put (e.g. post-Grasp lift) then free the lock
-        so another arm's sequential step can run before this arm's Place.
-        """
+    def after_step(self, arm: str, xy: tuple[float, float] | None) -> None:
+        """Keep the mutex if ``arm`` is still in-zone; release only after it leaves."""
+        if not self.enabled:
+            return
+        if xy is None:
+            return
+        if self.in_overlap(xy):
+            self._holder = arm
+            return
+        if self._holder == arm:
+            logger.info("overlap release arm=%s (left zone)", arm)
+            self._holder = None
+
+    def release_after(self, arm: str, *, retract: bool = False) -> None:
+        """Compatibility wrapper. Does not retract; occupancy follows ``after_step``."""
+        del retract
         if self._holder != arm:
             return
-        try:
-            if retract:
-                fn = self.retract.get(arm)
-                if fn is not None:
-                    logger.info("overlap retract arm=%s", arm)
-                    fn()
-                logger.info("overlap release arm=%s", arm)
-            else:
-                logger.info("overlap release arm=%s (skip retract)", arm)
-        finally:
-            self._holder = None
+        logger.info("overlap release arm=%s", arm)
+        self._holder = None

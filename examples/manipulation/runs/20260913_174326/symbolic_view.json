@@ -1,0 +1,12 @@
+{
+  "objects": [
+    {
+      "name": "black_stand",
+      "blocked_by": null,
+      "in_workspace": [
+        "xarm"
+      ],
+      "preferred_arm": "xarm"
+    }
+  ]
+}

@@ -1,0 +1,164 @@
+[
+  {
+    "step": 1,
+    "arm": "xarm2",
+    "primitive": "Grasp",
+    "args": {
+      "object": "upper_box"
+    },
+    "depends_on": []
+  },
+  {
+    "step": 2,
+    "arm": "xarm",
+    "primitive": "Grasp",
+    "args": {
+      "object": "upper_screw"
+    },
+    "depends_on": []
+  },
+  {
+    "step": 3,
+    "arm": "xarm2",
+    "primitive": "Place",
+    "args": {
+      "object": "upper_box",
+      "destination": "container"
+    },
+    "depends_on": [
+      1
+    ]
+  },
+  {
+    "step": 4,
+    "arm": "xarm",
+    "primitive": "Place",
+    "args": {
+      "object": "upper_screw",
+      "destination": "container"
+    },
+    "depends_on": [
+      2,
+      3
+    ]
+  },
+  {
+    "step": 5,
+    "arm": "xarm2",
+    "primitive": "Grasp",
+    "args": {
+      "object": "right_box"
+    },
+    "depends_on": [
+      3
+    ]
+  },
+  {
+    "step": 6,
+    "arm": "xarm2",
+    "primitive": "Place",
+    "args": {
+      "object": "right_box",
+      "destination": "container"
+    },
+    "depends_on": [
+      4,
+      5
+    ]
+  },
+  {
+    "step": 7,
+    "arm": "xarm",
+    "primitive": "Grasp",
+    "args": {
+      "object": "middle_screw"
+    },
+    "depends_on": [
+      4
+    ]
+  },
+  {
+    "step": 8,
+    "arm": "xarm",
+    "primitive": "Place",
+    "args": {
+      "object": "middle_screw",
+      "destination": "container"
+    },
+    "depends_on": [
+      6,
+      7
+    ]
+  },
+  {
+    "step": 9,
+    "arm": "xarm2",
+    "primitive": "Grasp",
+    "args": {
+      "object": "white_box"
+    },
+    "depends_on": [
+      6
+    ]
+  },
+  {
+    "step": 10,
+    "arm": "xarm2",
+    "primitive": "Place",
+    "args": {
+      "object": "white_box",
+      "destination": "container"
+    },
+    "depends_on": [
+      8,
+      9
+    ]
+  },
+  {
+    "step": 11,
+    "arm": "xarm",
+    "primitive": "Grasp",
+    "args": {
+      "object": "lower_screw"
+    },
+    "depends_on": [
+      8
+    ]
+  },
+  {
+    "step": 12,
+    "arm": "xarm",
+    "primitive": "Place",
+    "args": {
+      "object": "lower_screw",
+      "destination": "container"
+    },
+    "depends_on": [
+      10,
+      11
+    ]
+  },
+  {
+    "step": 13,
+    "arm": "xarm",
+    "primitive": "Grasp",
+    "args": {
+      "object": "left_box"
+    },
+    "depends_on": [
+      12
+    ]
+  },
+  {
+    "step": 14,
+    "arm": "xarm",
+    "primitive": "Place",
+    "args": {
+      "object": "left_box",
+      "destination": "container"
+    },
+    "depends_on": [
+      13
+    ]
+  }
+]

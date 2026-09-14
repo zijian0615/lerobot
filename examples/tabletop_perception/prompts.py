@@ -25,15 +25,23 @@ tabletop scene.
 
 Task instruction: "{instruction}"
 
-Return three things for the objects relevant to this instruction.
+Return the fields below for the objects relevant to this instruction.
 
 TASK 1 - DETECTION
-- Exclude the robot arm, gripper, and the table surface itself.
+- Exclude the robot arm, gripper, and the bare table.
+- The task instruction is the naming source of truth. If it refers to
+  a region by color, pattern, or phrase (e.g. "the red region",
+  "the grid", "left half of the mat"), detect that region as its own
+  object and name it from those words (red_region, grid, …).
+  Outline that named region only — not a larger parent tray/board.
+- Also include movable objects the instruction mentions (screws,
+  pieces, cups, …) and any play surface needed as a destination.
 - Limit to 10 objects.
 - Each object needs a unique lowercase snake_case name. If two objects
   look identical, disambiguate by color or position (e.g. red_cup,
   blue_cup) rather than numbering.
 - box_2d format: [ymin, xmin, ymax, xmax], integers normalized to 0-1000.
+  This axis-aligned box is only a fallback; do not use it for orientation.
 
 TASK 2 - OCCLUSION
 For each object, report which single other detected object lies on top
@@ -49,6 +57,25 @@ should close. Format [y, x], integers normalized to 0-1000.
 - Avoid any part of the object that is covered by another object.
 - Prefer a point near the object's center of mass for stability.
 
+TASK 4 - OUTLINE (silhouette / top-face polygon)
+Give 4-8 vertices that trace the visible object outline, in order
+(clockwise or counterclockwise). Format [[y, x], ...], integers
+normalized to 0-1000.
+- For boxes / blocks / containers: the four corners of the top face,
+  rotated with the object. Do NOT copy the axis-aligned box_2d corners.
+- For elongated objects: a tight quad around the visible body.
+- For round objects: 6-8 points on the rim.
+- Vertices must lie on the object, not on shadows or the table.
+
+TASK 5 - FACE / LONG AXIS (grasp yaw)
+Two points on the object along the direction the gripper should align
+to. Format [[y1, x1], [y2, x2]], integers normalized to 0-1000.
+- Elongated objects (screws, pens, tools): the longest visible axis,
+  near the tips.
+- Boxes / rectangles: two endpoints of one longer top-face edge.
+- Square objects: two endpoints of any top-face edge.
+- Only truly round objects (balls, cups from above) may set this null.
+
 Return a single JSON object, no markdown fencing, no explanation:
 
 {{
@@ -56,8 +83,18 @@ Return a single JSON object, no markdown fencing, no explanation:
     {{
       "name": "box",
       "box_2d": [400, 300, 560, 520],
+      "polygon": [[410, 340], [430, 510], [550, 490], [530, 320]],
       "blocked_by": "bottle",
-      "grasp_point": [530, 320]
+      "grasp_point": [480, 415],
+      "long_axis": [[410, 340], [430, 510]]
+    }},
+    {{
+      "name": "screw",
+      "box_2d": [500, 200, 560, 480],
+      "polygon": [[505, 210], [515, 470], [555, 465], [545, 205]],
+      "blocked_by": null,
+      "grasp_point": [530, 340],
+      "long_axis": [[520, 220], [540, 460]]
     }}
   ]
 }}

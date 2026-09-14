@@ -17,13 +17,25 @@
 from __future__ import annotations
 
 import copy
+import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
-from shapely.geometry import GeometryCollection, MultiPolygon, Point, Polygon
+from shapely.geometry import GeometryCollection, MultiPolygon, Point, Polygon, box
 from shapely.ops import unary_union
+
+try:
+    from tabletop_perception.perception import matches_height_key
+except ImportError:  # pragma: no cover
+
+    def matches_height_key(object_name: str, key: str) -> bool:
+        if str(key).startswith("_"):
+            return False
+        hay = object_name.lower().replace(" ", "_")
+        needle = str(key).lower().replace(" ", "_")
+        return bool(needle) and needle in hay
 
 try:
     from shapely import polylabel as _polylabel
@@ -56,6 +68,8 @@ class SolverConfig:
     # Per-arm object-name substring → Δz (m), applied at bind time for that arm.
     # Use for EE-specific tip offsets (e.g. LeapHand bear=-0.05; parallel gripper 0).
     grasp_height_offsets_by_arm: dict[str, dict[str, float]] = field(default_factory=dict)
+    # Extra +z when Place has no destination-specific height offset (table / board).
+    place_clearance_m: float = 0.01
 
 
 def _resolve_object_height_offset_m(
@@ -67,12 +81,8 @@ def _resolve_object_height_offset_m(
     z = float(base_z_m)
     if not offsets:
         return z
-    name = object_name.lower().replace(" ", "_")
     for key, offset in offsets.items():
-        if str(key).startswith("_"):
-            continue
-        needle = str(key).lower().replace(" ", "_")
-        if needle and needle in name:
+        if matches_height_key(object_name, str(key)):
             return z + float(offset)
     return z
 
@@ -140,13 +150,17 @@ def _resolve_place_z_m(
     base_z = _arm_object_z_m(arm=arm, object_name=obj, base_z_m=base_z, config=config)
     place_offs = dict(config.place_height_offsets_m)
     place_offs.update(config.place_height_offsets_by_arm.get(arm) or {})
+    clearance = float(config.place_clearance_m)
     if dest in state:
         layer = _match_name_offset_m(dest, place_offs)
         if layer is not None:
             support_z = float(state[dest].grasp_pose[2])
             return support_z + layer
-        return base_z
-    return _resolve_place_height_m(dest, base_z, place_offs)
+        return base_z + clearance
+    z = _resolve_place_height_m(dest, base_z, place_offs)
+    if _match_name_offset_m(dest, place_offs) is None:
+        z += clearance
+    return z
 
 
 @dataclass
@@ -248,6 +262,180 @@ def _init_state(geometric_view: Mapping[str, Any], grasp_height: float) -> dict[
     return state
 
 
+# Camera-aligned place slots on a named support:
+#   image left = table −y, image right = table +y
+#   image up / far = table +x, image down / near = table −x
+_PLACE_REGION_ALIASES = {
+    "l": "left",
+    "image_left": "left",
+    "west": "left",
+    "left_side": "left",
+    "left_half": "left",
+    "r": "right",
+    "image_right": "right",
+    "east": "right",
+    "right_side": "right",
+    "right_half": "right",
+    "up": "top",
+    "far": "top",
+    "north": "top",
+    "top_side": "top",
+    "far_side": "top",
+    "down": "bottom",
+    "near": "bottom",
+    "south": "bottom",
+    "bottom_side": "bottom",
+    "near_side": "bottom",
+    "upper_left": "top_left",
+    "tl": "top_left",
+    "nw": "top_left",
+    "upper_right": "top_right",
+    "tr": "top_right",
+    "ne": "top_right",
+    "lower_left": "bottom_left",
+    "bl": "bottom_left",
+    "sw": "bottom_left",
+    "lower_right": "bottom_right",
+    "br": "bottom_right",
+    "se": "bottom_right",
+    "q1": "1/4",
+    "first_quarter": "1/4",
+    "q2": "2/4",
+    "second_quarter": "2/4",
+    "q3": "3/4",
+    "third_quarter": "3/4",
+    "q4": "4/4",
+    "fourth_quarter": "4/4",
+    "middle": "center",
+    "centre": "center",
+    "mid": "center",
+}
+
+
+def normalize_place_region(spec: str | None) -> str | None:
+    if spec is None:
+        return None
+    s = str(spec).strip().lower().replace(" ", "_").replace("-", "_")
+    if not s:
+        return None
+    return _PLACE_REGION_ALIASES.get(s, s)
+
+
+def _alias_destination(dest: str, known: set[str]) -> str:
+    """Match ``tictactoe_board`` to ``tic_tac_toe_board`` (ignore underscores)."""
+    if dest in known or dest in {"free_space", "handover"}:
+        return dest
+    compact = dest.lower().replace("_", "").replace("-", "").replace(" ", "")
+    for name in known:
+        if str(name).lower().replace("_", "").replace("-", "") == compact:
+            return str(name)
+    tokens = {t for t in re.findall(r"[a-z0-9]+", dest.lower()) if t not in {"the", "a", "an", "of", "on"}}
+    scored = []
+    for name in known:
+        ot = set(re.findall(r"[a-z0-9]+", str(name).lower()))
+        if tokens & ot:
+            scored.append(str(name))
+    if len(scored) == 1:
+        return scored[0]
+    surfaces = [
+        str(name)
+        for name in known
+        if any(k in str(name).lower() for k in ("board", "tray", "stand", "mat", "container", "region", "grid"))
+        and "screw" not in str(name).lower()
+    ]
+    if len(surfaces) == 1:
+        return surfaces[0]
+    return dest
+
+
+def _inset_place_region(region: Polygon, inset_m: float = 0.02) -> Polygon:
+    geom = _as_polygon(region)
+    if geom.is_empty or inset_m <= 0:
+        return geom
+    minx, miny, maxx, maxy = geom.bounds
+    inset = min(float(inset_m), 0.2 * min(maxx - minx, maxy - miny))
+    if inset <= 1e-4:
+        return geom
+    shrunk = _as_polygon(geom.buffer(-inset))
+    return geom if shrunk.is_empty else shrunk
+
+
+def parse_place_destination(
+    args: Mapping[str, Any],
+    known_objects: set[str] | None = None,
+) -> tuple[str, str | None]:
+    """Return ``(destination_name, region_spec)``.
+
+    Accepts ``args.region`` / ``side`` / ``slot``, or ``destination="stand/left"``
+    / ``"stand/2/4"``.
+    """
+    dest = str(args.get("destination") or "")
+    spec = args.get("region")
+    if spec is None:
+        spec = args.get("side")
+    if spec is None:
+        spec = args.get("slot")
+    spec_s = None if spec is None else str(spec)
+    known = known_objects or set()
+    if dest not in known and dest not in {"free_space", "handover"} and "/" in dest:
+        base, _, rest = dest.partition("/")
+        if not known or base in known:
+            dest = base
+            spec_s = spec_s or rest
+    return dest, normalize_place_region(spec_s)
+
+
+def clip_place_region(region_poly: Polygon, spec: str | None) -> Polygon:
+    """Clip a destination footprint to a camera-aligned half, quadrant, or k/n slot."""
+    spec_n = normalize_place_region(spec)
+    geom = _as_polygon(region_poly)
+    if spec_n is None or geom.is_empty:
+        return geom
+    minx, miny, maxx, maxy = geom.bounds
+    if maxx <= minx or maxy <= miny:
+        return geom
+    cx = 0.5 * (minx + maxx)
+    cy = 0.5 * (miny + maxy)
+    windows = {
+        "left": box(minx, miny, maxx, cy),
+        "right": box(minx, cy, maxx, maxy),
+        "bottom": box(minx, miny, cx, maxy),
+        "top": box(cx, miny, maxx, maxy),
+        "top_left": box(cx, miny, maxx, cy),
+        "top_right": box(cx, cy, maxx, maxy),
+        "bottom_left": box(minx, miny, cx, cy),
+        "bottom_right": box(minx, cy, cx, maxy),
+        "center": box(
+            minx + (maxx - minx) / 3.0,
+            miny + (maxy - miny) / 3.0,
+            maxx - (maxx - minx) / 3.0,
+            maxy - (maxy - miny) / 3.0,
+        ),
+    }
+    window = windows.get(spec_n)
+    if window is None:
+        m = re.fullmatch(r"(\d+)/(\d+)", spec_n)
+        if m is None:
+            raise NoLegalPlacement(0, f"Unknown place region {spec!r}")
+        k, n = int(m.group(1)), int(m.group(2))
+        if n < 2 or n > 32 or k < 1 or k > n:
+            raise NoLegalPlacement(0, f"Invalid place slot {spec!r}")
+        span_x = maxx - minx
+        span_y = maxy - miny
+        if span_y >= span_x:
+            y0 = miny + (k - 1) / n * span_y
+            y1 = miny + k / n * span_y
+            window = box(minx, y0, maxx, y1)
+        else:
+            x0 = minx + (k - 1) / n * span_x
+            x1 = minx + k / n * span_x
+            window = box(x0, miny, x1, maxy)
+    clipped = _as_polygon(geom.intersection(window))
+    if clipped.is_empty:
+        raise NoLegalPlacement(0, f"Place region {spec_n!r} is empty on destination")
+    return clipped
+
+
 def _region_polygon(
     dest: str,
     geometric_view: Mapping[str, Any],
@@ -271,8 +459,9 @@ def _region_polygon(
         cx = float(np.mean([ws.centroid.x for ws in workspaces]))
         cy = float(np.mean([ws.centroid.y for ws in workspaces]))
         return Point(cx, cy).buffer(config.handover_radius)
-    if dest in state:
-        return _as_polygon(state[dest].footprint)
+    aliased = _alias_destination(dest, set(state))
+    if aliased in state:
+        return _as_polygon(state[aliased].footprint)
     raise KeyError(f"Unknown Place destination {dest!r}")
 
 
@@ -371,11 +560,13 @@ def _compute_future(
             if obj in sim:
                 reserved.append(_buffer(sim[obj].footprint, config.margin))
         elif prim == "Place":
-            dest = str(args["destination"])
+            dest, region_spec = parse_place_destination(args, set(sim))
             obj = str(args["object"])
             if dest == "free_space":
                 continue
             region = _region_polygon(dest, geometric_view, config, sim)
+            if dest in sim and region_spec:
+                region = clip_place_region(region, region_spec)
             # Support object / handover overlap: shareable — do not carve whole region.
             if dest not in sim and dest != "handover":
                 reserved.append(region)
@@ -454,6 +645,7 @@ def solve(
             place_height_offsets_m=place_offs,
             place_height_offsets_by_arm=place_by_arm,
             grasp_height_offsets_by_arm=by_arm,
+            place_clearance_m=float(config.get("place_clearance_m", 0.01)),
         )
 
     state = _init_state(geometric_view, config.grasp_height)
@@ -495,16 +687,29 @@ def solve(
 
         elif prim == "Place":
             obj = str(args["object"])
-            dest = str(args["destination"])
+            dest, region_spec = parse_place_destination(args, set(state))
+            dest = _alias_destination(dest, set(state))
             if obj not in state:
                 raise NoLegalPlacement(sid, f"Unknown object {obj!r}")
 
             if dest == "free_space":
                 region = free_space
+                if region_spec:
+                    try:
+                        region = clip_place_region(region, region_spec)
+                    except NoLegalPlacement as exc:
+                        raise NoLegalPlacement(sid, str(exc).split(": ", 1)[-1]) from exc
                 # Relocating obj: ignore its old footprint only.
                 exclude_names = {obj}
             else:
                 region = _region_polygon(dest, geometric_view, config, state)
+                if dest in state and region_spec:
+                    try:
+                        region = clip_place_region(region, region_spec)
+                    except NoLegalPlacement as exc:
+                        raise NoLegalPlacement(sid, str(exc).split(": ", 1)[-1]) from exc
+                if dest in state:
+                    region = _inset_place_region(region)
                 # Placing onto a named object/region: that target is support, not obstacle.
                 exclude_names = {obj, dest} if dest in state else {obj}
                 # Items already parked on the same support (multi-place) must not
@@ -549,14 +754,25 @@ def solve(
                 else:
                     pt = nearest_points(legal, seed)[0]
                     x, y = float(pt.x), float(pt.y)
-            else:
+            elif dest == "free_space":
                 x, y = _farthest_from_boundary(legal, config.polylabel_tolerance)
+            else:
+                # Named support (board / tray / stand): sit in the cell center,
+                # not a table-corner leftover of free_space.
+                seed = legal.centroid
+                if legal.contains(seed) or legal.covers(seed):
+                    x, y = float(seed.x), float(seed.y)
+                else:
+                    rp = legal.representative_point()
+                    x, y = float(rp.x), float(rp.y)
             yaw = float(state[obj].yaw)
             z = _resolve_place_z_m(
                 arm=arm, obj=obj, dest=dest, state=state, config=config
             )
             pose = [x, y, z, yaw]
             params = {"pose": pose, "object": obj, "destination": dest}
+            if region_spec:
+                params["region"] = region_spec
 
             if debug_step is not None and sid == debug_step and debug_out is not None:
                 debug_out["chosen"] = (x, y)

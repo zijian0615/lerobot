@@ -50,7 +50,7 @@ _EXAMPLES_DIR = Path(__file__).resolve().parents[1]
 if str(_EXAMPLES_DIR) not in sys.path:
     sys.path.insert(0, str(_EXAMPLES_DIR))
 
-from tabletop_perception.perception import Perception  # noqa: E402
+from tabletop_perception.perception import Perception, object_top_z_from_calib  # noqa: E402
 from tabletop_perception.visualize import visualize_table_plane  # noqa: E402
 
 DEFAULT_CALIB = Path(__file__).resolve().parent / "calib" / "xarm_overhead.json"
@@ -257,18 +257,36 @@ def _draw_image_overlay(
     geometric_view: dict[str, Any],
     detections_px: list[dict[str, Any]] | None = None,
 ) -> np.ndarray:
-    """Draw 2D boxes / grasp points on the camera image for quick sanity checks."""
+    """Draw outline / boxes / grasp points on the camera image for sanity checks."""
     vis = image_rgb.copy()
     if detections_px:
         for det in detections_px:
             xmin, ymin, xmax, ymax = [int(round(v)) for v in det["box_2d_px"]]
             u, v = [int(round(c)) for c in det["grasp_point_px"]]
-            cv2.rectangle(vis, (xmin, ymin), (xmax, ymax), (0, 200, 0), 2)
+            poly = det.get("polygon_px")
+            if poly and len(poly) >= 3:
+                pts = np.array([[int(round(x)), int(round(y))] for x, y in poly], dtype=np.int32)
+                cv2.polylines(vis, [pts], isClosed=True, color=(0, 200, 0), thickness=2)
+                label_xy = (int(pts[0][0]), max(15, int(pts[0][1]) - 6))
+            else:
+                cv2.rectangle(vis, (xmin, ymin), (xmax, ymax), (0, 200, 0), 2)
+                label_xy = (xmin, max(15, ymin - 6))
+            axis = det.get("long_axis_px")
+            if axis is not None:
+                (u0, v0), (u1, v1) = axis
+                cv2.line(
+                    vis,
+                    (int(round(u0)), int(round(v0))),
+                    (int(round(u1)), int(round(v1))),
+                    (0, 220, 220),
+                    2,
+                    cv2.LINE_AA,
+                )
             cv2.circle(vis, (u, v), 5, (255, 0, 0), -1)
             cv2.putText(
                 vis,
                 det["name"],
-                (xmin, max(15, ymin - 6)),
+                label_xy,
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.5,
                 (0, 220, 0),
@@ -330,6 +348,20 @@ def build_argparser() -> argparse.ArgumentParser:
         action="store_true",
         help="Skip Gemini and inject a small hardcoded detection list (pipeline dry-run)",
     )
+    p.add_argument(
+        "--thinking-budget",
+        type=int,
+        default=-1,
+        help="Gemini thinking budget: 0=off (faster), -1=dynamic (default), or a positive token cap. "
+        "With --model gpt-6 this maps to reasoning effort.",
+    )
+    p.add_argument(
+        "--model",
+        "--vlm",
+        dest="model",
+        default="gemini",
+        help="Base VLM: gemini (default) or gpt-6 (OpenAI gpt-6-astra, needs OPENAI_API_KEY).",
+    )
     return p
 
 
@@ -381,6 +413,7 @@ def main(argv: list[str] | None = None) -> int:
         for k, v in dict(calib.get("grasp_height_offset_m") or {}).items()
         if not str(k).startswith("_")
     }
+    object_top_z_default, object_top_z = object_top_z_from_calib(calib)
     footprint_buffer = float(calib.get("footprint_buffer_m", 0.02))
 
     prompt = None
@@ -415,7 +448,12 @@ def main(argv: list[str] | None = None) -> int:
             print("Using --mock-vlm (no Gemini call).")
             raw = _mock_detections_for_scene()
         else:
-            perception = Perception(footprint_buffer_m=footprint_buffer, prompt=prompt)
+            perception = Perception(
+                footprint_buffer_m=footprint_buffer,
+                prompt=prompt,
+                thinking_budget=int(args.thinking_budget),
+                model=str(args.model),
+            )
             raw = perception.vlm_caller(image, args.instruction, prompt or "")
         detections = parse_vlm_detections(raw, image_hw=(image.shape[0], image.shape[1]))
         # Reuse the same VLM result (no second API call).
@@ -424,12 +462,19 @@ def main(argv: list[str] | None = None) -> int:
             print("Using table_xy_affine correction from calib.")
         if grasp_height_offsets:
             print(f"Per-object grasp height offsets: {grasp_height_offsets}")
+        if object_top_z or object_top_z_default:
+            print(
+                f"Object top-face heights for projection: "
+                f"default={object_top_z_default:.3f} m {object_top_z}"
+            )
         perception_once = Perception(
             footprint_buffer_m=footprint_buffer,
             prompt=prompt,
             vlm_caller=lambda _img, _ins, _p: raw,
             table_xy_affine=affine,
             grasp_height_offsets_m=grasp_height_offsets,
+            object_top_z_m=object_top_z,
+            object_top_z_m_default=object_top_z_default,
         )
         symbolic_view, geometric_view = perception_once(
             image=image,
@@ -465,6 +510,7 @@ def main(argv: list[str] | None = None) -> int:
         geometric_path = stamp_dir / "geometric_view.json"
 
         cv2.imwrite(str(rgb_path), cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+        detections = perception_once.last_detections or detections
         overlay = _draw_image_overlay(image, geometric_view, detections)
         cv2.imwrite(str(overlay_path), cv2.cvtColor(overlay, cv2.COLOR_RGB2BGR))
         visualize_table_plane(

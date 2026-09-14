@@ -1,0 +1,35 @@
+[
+  {
+    "step": 1,
+    "arm": "xarm",
+    "primitive": "Grasp",
+    "params": {
+      "pose": [
+        -0.14708225417142856,
+        -0.11799951108571427,
+        0.2,
+        0.1021286384180442
+      ],
+      "object": "box"
+    },
+    "depends_on": []
+  },
+  {
+    "step": 2,
+    "arm": "xarm",
+    "primitive": "Place",
+    "params": {
+      "pose": [
+        -0.14901697102425007,
+        0.05953077782857141,
+        0.24000000000000002,
+        0.1021286384180442
+      ],
+      "object": "box",
+      "destination": "container"
+    },
+    "depends_on": [
+      1
+    ]
+  }
+]

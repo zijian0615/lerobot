@@ -1,0 +1,183 @@
+{
+  "status": "fail",
+  "reason": "resolve_failed:[GraspUnreachable] step 3: Grasp point (-0.148, -0.172) outside workspace of 'xarm2'",
+  "plan": [
+    {
+      "step": 1,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "args": {
+        "object": "black_stand"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm",
+      "primitive": "Present",
+      "args": {
+        "object": "black_stand"
+      },
+      "depends_on": [
+        1
+      ]
+    },
+    {
+      "step": 3,
+      "arm": "xarm2",
+      "primitive": "Grasp",
+      "args": {
+        "object": "black_stand"
+      },
+      "depends_on": [
+        2
+      ]
+    },
+    {
+      "step": 4,
+      "arm": "xarm",
+      "primitive": "Release",
+      "args": {},
+      "depends_on": [
+        3
+      ]
+    },
+    {
+      "step": 5,
+      "arm": "xarm2",
+      "primitive": "LiftUp",
+      "args": {},
+      "depends_on": [
+        4
+      ]
+    }
+  ],
+  "bound": [
+    {
+      "step": 1,
+      "arm": "xarm",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.24407039870575242,
+          -0.11395420469974228,
+          0.18000000000000002,
+          0.18671810461227306
+        ],
+        "object": "black_stand"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm",
+      "primitive": "Present",
+      "params": {
+        "pose": [
+          -0.36094501007738383,
+          0.03984779960062728,
+          0.26,
+          0.18671810461227306
+        ],
+        "object": "black_stand",
+        "handover_share": true
+      },
+      "depends_on": [
+        1
+      ]
+    },
+    {
+      "step": 3,
+      "arm": "xarm2",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.3732014975834309,
+          0.18240465740297007,
+          0.25,
+          0.18671810461227306
+        ],
+        "object": "black_stand",
+        "handover_share": true,
+        "stay": true
+      },
+      "depends_on": [
+        2
+      ]
+    },
+    {
+      "step": 4,
+      "arm": "xarm",
+      "primitive": "Release",
+      "params": {
+        "pose": [
+          -0.12151153052971372,
+          -0.2625181667665357,
+          0.28,
+          0.0
+        ],
+        "object": ""
+      },
+      "depends_on": [
+        3
+      ]
+    },
+    {
+      "step": 5,
+      "arm": "xarm2",
+      "primitive": "LiftUp",
+      "params": {},
+      "depends_on": [
+        4
+      ]
+    }
+  ],
+  "results": [
+    {
+      "step": 1,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "black_stand"
+      }
+    },
+    {
+      "step": 2,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "pose": [
+          -0.36094501007738383,
+          0.03984779960062728,
+          0.26,
+          0.18671810461227306
+        ],
+        "object": "black_stand"
+      }
+    },
+    {
+      "step": 3,
+      "status": "fail",
+      "reason": "exception:RuntimeError:set_position failed code=-9 pose=[80.12770045590433, 202.4253470688683, 330.0, 3.1415926535, 0.0, 1.2925032615008853]",
+      "observed": {}
+    }
+  ],
+  "symbolic_view": {
+    "objects": [
+      {
+        "name": "black_stand",
+        "blocked_by": null,
+        "in_workspace": [
+          "xarm"
+        ],
+        "preferred_arm": "xarm"
+      }
+    ]
+  },
+  "arms": [
+    "xarm",
+    "xarm2"
+  ],
+  "cycle": 1
+}

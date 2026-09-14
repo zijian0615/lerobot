@@ -18,9 +18,16 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any, TypedDict
 
+from openai_backend import (
+    GPT6_JSON_ONLY,
+    call_openai_responses,
+    reasoning_effort_from_thinking_budget,
+    resolve_base_model,
+)
 from .json_util import strip_markdown_fences
 from .prompts import DEFAULT_PLANNING_PROMPT
 
@@ -28,6 +35,92 @@ GEMINI_ROBOTICS_ER_MODEL = "gemini-robotics-er-2-preview"
 
 ALLOWED_PRIMITIVES = frozenset({"Grasp", "Place", "LiftUp"})
 SYMBOLIC_DESTINATIONS = frozenset({"free_space", "handover"})
+_PLACE_REGION_NAMES = frozenset(
+    {
+        "left",
+        "right",
+        "top",
+        "bottom",
+        "top_left",
+        "top_right",
+        "bottom_left",
+        "bottom_right",
+        "center",
+        "centre",
+        "middle",
+        "mid",
+        "far",
+        "near",
+        "l",
+        "r",
+        "left_side",
+        "right_side",
+        "left_half",
+        "right_half",
+        "1/2",
+        "2/2",
+        "1/4",
+        "2/4",
+        "3/4",
+        "4/4",
+        "q1",
+        "q2",
+        "q3",
+        "q4",
+    }
+)
+
+
+_SURFACE_NAME_KEYS = ("board", "tray", "stand", "mat", "container", "region", "grid")
+
+
+def _alias_object_name(name: str, object_names: set[str]) -> str:
+    if name in object_names:
+        return name
+    compact = name.lower().replace("_", "").replace("-", "").replace(" ", "")
+    for obj in object_names:
+        if obj.lower().replace("_", "").replace("-", "") == compact:
+            return obj
+    tokens = {t for t in re.findall(r"[a-z0-9]+", name.lower()) if t not in {"the", "a", "an", "of", "on"}}
+    scored = []
+    for obj in object_names:
+        ot = set(re.findall(r"[a-z0-9]+", obj.lower()))
+        overlap = tokens & ot
+        if overlap:
+            scored.append((len(overlap), obj))
+    if len(scored) == 1:
+        return scored[0][1]
+    surfaces = [
+        obj
+        for obj in object_names
+        if any(k in obj.lower() for k in _SURFACE_NAME_KEYS) and "screw" not in obj.lower()
+    ]
+    if name not in object_names and name not in SYMBOLIC_DESTINATIONS and len(surfaces) == 1:
+        return surfaces[0]
+    return name
+
+
+def _split_place_destination(dest: str, object_names: set[str]) -> tuple[str, str | None]:
+    dest = _alias_object_name(dest, object_names)
+    if dest in object_names or dest in SYMBOLIC_DESTINATIONS:
+        return dest, None
+    if "/" in dest:
+        base, _, rest = dest.partition("/")
+        base = _alias_object_name(base, object_names)
+        if base in object_names:
+            return base, rest
+    return dest, None
+
+
+def _place_region_ok(spec: str) -> bool:
+    s = spec.strip().lower().replace(" ", "_").replace("-", "_")
+    if s in _PLACE_REGION_NAMES:
+        return True
+    m = re.fullmatch(r"(\d+)/(\d+)", s)
+    if not m:
+        return False
+    k, n = int(m.group(1)), int(m.group(2))
+    return 1 <= k <= n <= 32
 
 
 class PlanStep(TypedDict):
@@ -36,6 +129,12 @@ class PlanStep(TypedDict):
     primitive: str
     args: dict[str, Any]
     depends_on: list[int]
+
+
+class PlanDecision(TypedDict):
+    status: str  # "act" | "wait" | "done"
+    reason: str
+    plan: list[PlanStep]
 
 
 class PlanValidationError(Exception):
@@ -97,21 +196,25 @@ def _contains_number(value: Any, *, path: str) -> str | None:
 
 
 def _normalize_plan_payload(payload: Any) -> list[dict[str, Any]]:
-    if isinstance(payload, dict) and "plan" in payload:
-        payload = payload["plan"]
+    if isinstance(payload, dict):
+        payload = payload.get("plan", [])
+    if payload is None:
+        payload = []
     if not isinstance(payload, list):
         raise PlanValidationError("parse", f"Plan payload must be a list, got {type(payload)!r}")
     return payload
 
 
-def parse_plan_json_text(text: str) -> list[PlanStep]:
-    """Parse VLM text into raw plan steps (no semantic validation)."""
-    try:
-        payload = json.loads(strip_markdown_fences(text))
-    except json.JSONDecodeError as exc:
-        raise PlanValidationError("parse", f"Malformed JSON: {exc}") from exc
+def _coerce_status(status: str, plan: Sequence[Any]) -> str:
+    s = status.strip().lower()
+    if plan:
+        return "act"
+    if s in {"wait", "done"}:
+        return s
+    return "wait"
 
-    raw_steps = _normalize_plan_payload(payload)
+
+def _parse_raw_steps(raw_steps: Sequence[Any]) -> list[PlanStep]:
     steps: list[PlanStep] = []
     for item in raw_steps:
         if not isinstance(item, Mapping):
@@ -133,6 +236,32 @@ def parse_plan_json_text(text: str) -> list[PlanStep]:
                 "depends_on": depends,
             }
         )
+    return steps
+
+
+def parse_planner_document(text: str) -> tuple[list[PlanStep], str, str]:
+    """Parse ``{status, reason, plan}`` or a bare plan list."""
+    try:
+        payload = json.loads(strip_markdown_fences(text))
+    except json.JSONDecodeError as exc:
+        raise PlanValidationError("parse", f"Malformed JSON: {exc}") from exc
+
+    if isinstance(payload, list):
+        steps = _parse_raw_steps(payload)
+        return steps, _coerce_status("", steps), ""
+    if not isinstance(payload, Mapping):
+        raise PlanValidationError(
+            "parse", f"Plan payload must be an object or list, got {type(payload)!r}"
+        )
+    steps = _parse_raw_steps(_normalize_plan_payload(payload))
+    status = _coerce_status(str(payload.get("status") or ""), steps)
+    reason = str(payload.get("reason") or "")
+    return steps, status, reason
+
+
+def parse_plan_json_text(text: str) -> list[PlanStep]:
+    """Parse VLM text into raw plan steps (no semantic validation)."""
+    steps, _status, _reason = parse_planner_document(text)
     return steps
 
 
@@ -206,7 +335,8 @@ def validate_plan(
         )
 
     if not steps:
-        raise PlanValidationError("parse", "Plan is empty")
+        # Empty plan is valid: wait for the human, or the task is already done.
+        return []
 
     step_ids = {s["step"] for s in steps}
 
@@ -267,13 +397,23 @@ def validate_plan(
                     f"Unknown object {obj!r} in Place",
                     step=sid,
                 )
-            if dest not in SYMBOLIC_DESTINATIONS and dest not in object_names:
+            dest_name, dest_region = _split_place_destination(dest, object_names)
+            region = args.get("region") or args.get("side") or args.get("slot") or dest_region
+            if dest_name not in SYMBOLIC_DESTINATIONS and dest_name not in object_names:
                 raise PlanValidationError(
                     "c",
                     f"Unknown destination {dest!r} in Place "
                     f"(not an object and not free_space/handover)",
                     step=sid,
                 )
+            if region is not None:
+                if not isinstance(region, str) or not _place_region_ok(region):
+                    raise PlanValidationError(
+                        "c",
+                        f"Unknown Place region {region!r}; "
+                        "use left/right/top/bottom, a quadrant, or k/n (e.g. 3/10)",
+                        step=sid,
+                    )
         elif prim == "LiftUp":
             # Optional object name for clarity; if present must exist.
             obj = args.get("object")
@@ -374,6 +514,7 @@ def build_planning_prompt(
     *,
     prompt_template: str | None = None,
     feedback: str | None = None,
+    history: str | None = None,
 ) -> str:
     template = prompt_template or DEFAULT_PLANNING_PROMPT
     feedback_block = ""
@@ -383,53 +524,73 @@ def build_planning_prompt(
             f"{feedback}\n"
             "Fix the violation and return a corrected plan.\n"
         )
+    history_block = ""
+    if history:
+        history_block = f"INTERACTION SO FAR\n{history}\n\n"
     return template.format(
         scene_json=json.dumps(symbolic_view, indent=2, ensure_ascii=False),
         instruction=instruction,
         arms_json=json.dumps(list(arms), ensure_ascii=False),
         feedback_block=feedback_block,
+        history_block=history_block,
     )
 
 
-def call_planner_vlm(
+def call_planner_decision(
     symbolic_view: Mapping[str, Any],
     instruction: str,
     arms: Sequence[str],
     *,
     prompt_template: str | None = None,
     feedback: str | None = None,
+    history: str | None = None,
     model: str = GEMINI_ROBOTICS_ER_MODEL,
     api_key: str | None = None,
-) -> list[PlanStep]:
-    """
-    Single swappable VLM entry point for planning (text-only).
-
-    On malformed JSON: retry the API once, then raise.
-    """
-    from google import genai
-    from google.genai import types
-
+    thinking_budget: int = -1,
+) -> PlanDecision:
+    """Text-only planner VLM. Returns ``status`` + validated plan."""
     prompt_text = build_planning_prompt(
         symbolic_view,
         instruction,
         arms,
         prompt_template=prompt_template,
         feedback=feedback,
+        history=history,
     )
-    key = api_key or os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
-    client = genai.Client(api_key=key) if key else genai.Client()
-
+    backend, api_model = resolve_base_model(model)
     last_error: Exception | None = None
     text = ""
     for attempt in range(2):
         try:
-            response = client.models.generate_content(
-                model=model,
-                contents=[prompt_text],
-                config=types.GenerateContentConfig(temperature=0.2),
-            )
-            text = getattr(response, "text", None) or ""
-            return parse_plan_json_text(text)
+            if backend == "gpt-6":
+                text = call_openai_responses(
+                    model=api_model,
+                    input_payload=prompt_text + GPT6_JSON_ONLY,
+                    api_key=api_key,
+                    reasoning_effort=reasoning_effort_from_thinking_budget(
+                        thinking_budget
+                    ),
+                )
+            else:
+                from google import genai
+                from google.genai import types
+
+                key = (
+                    api_key
+                    or os.environ.get("GOOGLE_API_KEY")
+                    or os.environ.get("GEMINI_API_KEY")
+                )
+                client = genai.Client(api_key=key) if key else genai.Client()
+                response = client.models.generate_content(
+                    model=api_model,
+                    contents=[prompt_text],
+                    config=types.GenerateContentConfig(temperature=0.2),
+                )
+                text = getattr(response, "text", None) or ""
+            steps, status, reason = parse_planner_document(text)
+            plan = validate_plan(steps, symbolic_view, arms)
+            status = _coerce_status(status, plan)
+            return {"status": status, "reason": reason, "plan": plan}
         except PlanValidationError as exc:
             last_error = exc
             if attempt == 0:
@@ -447,6 +608,30 @@ def call_planner_vlm(
     raise RuntimeError("Unreachable")  # pragma: no cover
 
 
+def call_planner_vlm(
+    symbolic_view: Mapping[str, Any],
+    instruction: str,
+    arms: Sequence[str],
+    *,
+    prompt_template: str | None = None,
+    feedback: str | None = None,
+    model: str = GEMINI_ROBOTICS_ER_MODEL,
+    api_key: str | None = None,
+    thinking_budget: int = -1,
+) -> list[PlanStep]:
+    """Single swappable VLM entry point for planning (text-only)."""
+    return call_planner_decision(
+        symbolic_view,
+        instruction,
+        arms,
+        prompt_template=prompt_template,
+        feedback=feedback,
+        model=model,
+        api_key=api_key,
+        thinking_budget=thinking_budget,
+    )["plan"]
+
+
 class Planner:
     """Wraps a planner VLM call + validation retries (no geometry)."""
 
@@ -456,9 +641,13 @@ class Planner:
         vlm_caller: PlannerVlmCaller | None = None,
         prompt_template: str | None = None,
         max_attempts: int = 2,
+        model: str = GEMINI_ROBOTICS_ER_MODEL,
+        thinking_budget: int = -1,
     ) -> None:
         self.prompt_template = prompt_template
         self.max_attempts = max(1, int(max_attempts))
+        self.model = str(model)
+        self.thinking_budget = int(thinking_budget)
         self.vlm_caller: PlannerVlmCaller = vlm_caller or (
             lambda scene, instruction, arms, feedback: call_planner_vlm(
                 scene,
@@ -466,6 +655,8 @@ class Planner:
                 arms,
                 prompt_template=self.prompt_template,
                 feedback=feedback,
+                model=self.model,
+                thinking_budget=self.thinking_budget,
             )
         )
 
@@ -495,6 +686,37 @@ class Planner:
             )
             try:
                 return validate_plan(raw_plan, symbolic_view, arms)
+            except PlanValidationError as exc:
+                last_exc = exc
+                feedback = str(exc)
+                continue
+
+        assert last_exc is not None
+        raise last_exc
+
+    def decide(
+        self,
+        symbolic_view: Mapping[str, Any],
+        instruction: str,
+        arms: Sequence[str],
+        *,
+        history: str | None = None,
+    ) -> PlanDecision:
+        feedback: str | None = None
+        last_exc: PlanValidationError | None = None
+
+        for _attempt in range(self.max_attempts):
+            try:
+                return call_planner_decision(
+                    dict(symbolic_view),
+                    instruction,
+                    list(arms),
+                    prompt_template=self.prompt_template,
+                    feedback=feedback,
+                    history=history,
+                    model=self.model,
+                    thinking_budget=self.thinking_budget,
+                )
             except PlanValidationError as exc:
                 last_exc = exc
                 feedback = str(exc)

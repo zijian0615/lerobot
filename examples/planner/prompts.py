@@ -39,12 +39,14 @@ AVAILABLE PRIMITIVES
   LiftUp requires the arm to be holding something.
 
 DESTINATIONS
-  Use a named region from the scene, or one of these symbolic
-  destinations:
+  destination MUST be an object name from SCENE, or one of:
     "free_space"  any clear area on the table, chosen by the geometry
                   layer so as not to interfere with later steps
     "handover"    a spot reachable by two arms, for passing an object
                   between them
+  Do not invent names from the instruction. If the instruction says
+  "the red region" and SCENE has red_region, use "red_region". If
+  SCENE has only one board/tray/mat, use that object's name.
 
 SCENE
 {scene_json}
@@ -78,17 +80,56 @@ RULES
 7. When the instruction says ALL of a class (e.g. all screws), include a
    Grasp+Place for every matching object still on the table (not already
    inside the destination).
+8. If the instruction names a part of a destination (left / right / far
+   top / near bottom, a quadrant, or one of N equal slots), set
+   args.region. Geometry clips the destination footprint — do not output
+   coordinates. Camera frame: left=image-left, right=image-right,
+   top=far edge, bottom=near the robot bases.
+     halves: left, right, top, bottom
+     quadrants: top_left, top_right, bottom_left, bottom_right
+     center / middle: the middle third of the destination
+     equal slots along the long axis: k/n for any n (2–32), e.g. 1/4, 3/10
+       (1 = camera-left, or camera-near if the object is longer up-down)
+   Example: "left side of the stand" → destination "stand", region "left"
+   Example: "second quarter of the stand" → destination "stand", region "2/4"
+   Example: "the 7th of 10 equal parts of the stand" → region "7/10"
+9. Interactive / multi-turn tasks (games, fill-the-board, handoffs):
+   decide the robot's NEXT action only (typically one Grasp + one Place).
+   Set status:
+     "act"   — execute the plan now
+     "wait"  — only if a HUMAN / external player must move, and they
+               have not placed yet
+     "done"  — the instruction is finished (board full, no remaining
+               unused pieces, or the task is complete); plan=[]
+   Judge THIS scene. A previous wait is not a reason to wait again.
+   Two or more AVAILABLE ARMS: the arms ARE the players / "opponent".
+   Do not wait for a human. After one arm Places, the next look is the
+   OTHER arm's turn (use a remaining unused piece of the other side if
+   the game has two kinds). Alternate until done. Unchanged object names
+   after a robot act are expected — still status=act for the other arm.
+   Wait for a human only if the instruction clearly names a person
+   ("play with me", "human opponent", "wait for the user").
+   One arm only: wait when the other (human) player has not moved yet;
+   act after their piece appears or board occupancy changes.
+   Grasp a remaining unused piece, not one already on the destination.
+   Place game pieces onto the named board/tray object in SCENE, with
+   args.region for the empty cell (center, top_left, top_right, …).
+   Never Place a game piece onto free_space — that is the whole table
+   and the piece will land off the board.
+   Do not plan more than one turn in this response.
 
-{feedback_block}
+{history_block}{feedback_block}
 
 Return a single JSON object, no markdown fencing, no explanation:
 
 {{
+  "status": "act",
+  "reason": "robot places one black screw",
   "plan": [
     {{"step": 1, "arm": "arm1", "primitive": "Grasp",
      "args": {{"object": "bottle"}}, "depends_on": []}},
     {{"step": 2, "arm": "arm1", "primitive": "Place",
-     "args": {{"object": "bottle", "destination": "free_space"}},
+     "args": {{"object": "bottle", "destination": "tray", "region": "left"}},
      "depends_on": [1]}}
   ]
 }}

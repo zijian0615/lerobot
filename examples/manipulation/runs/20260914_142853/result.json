@@ -1,0 +1,94 @@
+{
+  "status": "success",
+  "reason": "",
+  "plan": [
+    {
+      "step": 1,
+      "arm": "xarm2",
+      "primitive": "Grasp",
+      "args": {
+        "object": "box_right_top"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm2",
+      "primitive": "Place",
+      "args": {
+        "object": "box_right_top",
+        "destination": "grid",
+        "region": "bottom_right"
+      },
+      "depends_on": [
+        1
+      ]
+    }
+  ],
+  "bound": [
+    {
+      "step": 1,
+      "arm": "xarm2",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          -0.10729468727138543,
+          0.320491935200711,
+          0.16,
+          -1.2623281613057458
+        ],
+        "object": "box_right_top"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "xarm2",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          -0.16800987243224266,
+          0.12157253832534808,
+          0.17,
+          -1.2623281613057458
+        ],
+        "object": "box_right_top",
+        "destination": "grid",
+        "region": "bottom_right"
+      },
+      "depends_on": [
+        1
+      ]
+    }
+  ],
+  "results": [
+    {
+      "step": 1,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "box_right_top"
+      }
+    },
+    {
+      "step": 2,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          -0.16800987243224266,
+          0.12157253832534808,
+          0.17,
+          -1.2623281613057458
+        ],
+        "object": "box_right_top",
+        "observed_xy": [
+          -0.16800987243224266,
+          0.12157253832534808
+        ],
+        "xy_error": 0.0
+      }
+    }
+  ]
+}

@@ -49,7 +49,10 @@ class ArmExecutor:
     One executor instance per arm.
 
     Grasp(pose): open → above → descend → close → ascend
+                 (stay=True skips the final ascend — in-hand receive)
     Place(pose): above → descend → open → ascend
+    Present(pose): fly the held object to pose, keep closed
+    Release(pose): open, then retract to pose
     LiftUp():    up by lift_offset
     """
 
@@ -97,6 +100,10 @@ class ArmExecutor:
                 return self._grasp(sid, params)
             if prim == "Place":
                 return self._place(sid, params)
+            if prim == "Present":
+                return self._present(sid, params)
+            if prim == "Release":
+                return self._release(sid, params)
             if prim == "LiftUp":
                 return self._lift_up(sid)
             return {
@@ -120,7 +127,9 @@ class ArmExecutor:
         self._go(self._above(pose))
         self._go(pose)  # type: ignore[arg-type]
         self.gripper("close")
-        self._go(self._above(pose))
+        # Stay on the object so the giver can Release while both still hold.
+        if not params.get("stay"):
+            self._go(self._above(pose))
 
         ok, width = self._width_ok()
         observed = {"gripper_width": width, "object": params.get("object")}
@@ -178,6 +187,42 @@ class ArmExecutor:
                 "observed": observed,
             }
         return {"step": step, "status": "success", "reason": "", "observed": observed}
+
+    def _present(self, step: int, params: Mapping[str, Any]) -> ExecutionResult:
+        pose = tuple(float(v) for v in params["pose"])
+        assert len(pose) == 4
+        transit_z = pose[2]
+        if self.get_current_pose is not None:
+            cur = self.get_current_pose()
+            transit_z = max(float(cur[2]), float(pose[2]))
+        elif self._last_pose is not None:
+            transit_z = max(float(self._last_pose[2]), float(pose[2]))
+        self._go((pose[0], pose[1], transit_z, pose[3]))
+        self._go(pose)  # type: ignore[arg-type]
+        return {
+            "step": step,
+            "status": "success",
+            "reason": "",
+            "observed": {"pose": list(pose), "object": params.get("object")},
+        }
+
+    def _release(self, step: int, params: Mapping[str, Any]) -> ExecutionResult:
+        self.gripper("open")
+        pose = params.get("pose")
+        if pose is not None:
+            target = tuple(float(v) for v in pose)
+            assert len(target) == 4
+            if self._last_pose is not None:
+                self._go(self._above(self._last_pose))
+            self._go(target)  # type: ignore[arg-type]
+        elif self._last_pose is not None:
+            self._go(self._above(self._last_pose))
+        return {
+            "step": step,
+            "status": "success",
+            "reason": "",
+            "observed": {"object": params.get("object")},
+        }
 
     def _lift_up(self, step: int) -> ExecutionResult:
         if self.get_current_pose is not None:

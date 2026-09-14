@@ -1,0 +1,23 @@
+[
+  {
+    "step": 1,
+    "arm": "xarm",
+    "primitive": "Grasp",
+    "args": {
+      "object": "black_stand"
+    },
+    "depends_on": []
+  },
+  {
+    "step": 2,
+    "arm": "xarm",
+    "primitive": "Place",
+    "args": {
+      "object": "black_stand",
+      "destination": "handover"
+    },
+    "depends_on": [
+      1
+    ]
+  }
+]

@@ -6,6 +6,13 @@
     "height": 480,
     "fps": 30
   },
+  "wrist_camera": {
+    "_comment": "xarm1 wrist Innomaker U20CAM. Overhead live runs use --camera /dev/video0.",
+    "index_or_path": "/dev/video2",
+    "width": 640,
+    "height": 480,
+    "fps": 30
+  },
   "K": [
     [
       700.0,
@@ -50,8 +57,16 @@
     ]
   ],
   "grasp_height_m": 0.2,
+  "object_top_z_m_default": 0.0,
+  "object_top_z_m": {
+    "_comment": "Visible top-face height (m) for pixel projection. Not gripper z. Unmatched names use object_top_z_m_default.",
+    "box": 0.05,
+    "screw": 0.01,
+    "container": 0.03,
+    "stand": 0.02
+  },
   "grasp_height_offset_m": {
-    "_comment": "Global (all EEs): added to grasp_height_m when object name contains the key. Negative = lower.",
+    "_comment": "Global (all EEs): added to grasp_height_m when object name contains the key. Negative = lower. Key stand also matches ring.",
     "screw": -0.02,
     "stand": -0.02
   },
@@ -64,10 +79,11 @@
     }
   },
   "place_height_offset_m": {
-    "_comment": "When Place destination is a named object matching the key: z = support.grasp_z + offset (stacks accumulate). stand=+0.02 per layer; container=+0.04 above support. Per-arm overrides: execution_by_arm.*.place_height_offset_m",
-    "stand": 0.02,
+    "_comment": "When Place destination is a named object matching the key: z = support.grasp_z + offset (stacks accumulate). stand=+0.03 per layer; container=+0.04 above support. Per-arm overrides: execution_by_arm.*.place_height_offset_m",
+    "stand": 0.03,
     "container": 0.04
   },
+  "place_clearance_m": 0.01,
   "footprint_buffer_m": 0.02,
   "table_polygon_xy": [
     [
@@ -94,7 +110,7 @@
       "xarm2"
     ],
     "clip_to_table": true,
-    "_policy": "Mutex: only one arm may be inside overlap during a step. After Grasp, if a later Place of the same object by that arm exists, skip retract (stay at lift) and release the lock so Grasp\u2192Place is direct even with interleaved other-arm steps. After Place (or Grasp with no pending Place), retract to exclusive workspace then release."
+    "_policy": "Mutex: only one arm may occupy overlap. Same arm may keep working in-zone (Grasp then Place) without retracting. The lock stays held while that arm's last pose is still inside overlap. When the other arm needs the zone, retract the occupant to its exclusive workspace first, then transfer the lock."
   },
   "arm_workspaces_xy": {
     "xarm": {
@@ -186,6 +202,9 @@
         0.0,
         0.0
       ],
+      "use_object_yaw": true,
+      "grasp_yaw_offset_rad": 0.0,
+      "_yaw_note": "Object long-axis yaw + 0 so parallel jaws close across the short axis. +pi/2 made jaws align along the screw (2026-09-11).",
       "move_speed_mm_s": 80.0,
       "move_acc_mm_s2": 500.0,
       "solver_margin_m": 0.03,
@@ -196,8 +215,8 @@
         "screw": -0.01
       },
       "place_height_offset_m": {
-        "_comment": "arm1 parallel gripper: place onto stand +2cm higher than global (0.02\u21920.04).",
-        "stand": 0.04
+        "_comment": "arm1 parallel gripper: place onto stand 1cm lower than the previous +0.04.",
+        "stand": 0.03
       }
     },
     "xarm2": {
@@ -219,12 +238,20 @@
         0.0,
         0.0
       ],
+      "use_object_yaw": true,
+      "grasp_yaw_offset_rad": 0.0,
+      "_yaw_note": "LeapHand thumb-middle pinch across the short axis (perpendicular to object long edge). Unset offset defaulted to +pi/2 and aligned fingers along the long edge.",
       "move_speed_mm_s": 80.0,
       "move_acc_mm_s2": 500.0,
       "solver_margin_m": 0.03,
       "approach_offset_m": 0.08,
       "lift_offset_m": 0.08,
       "ee": "leaphand",
+      "grasp_height_offset_m": {
+        "_comment": "arm2 LeapHand extras on top of perception z. stand/ring 0.18-0.02=0.16; box 0.20-0.04=0.16. stand also matches ring.",
+        "stand": -0.02,
+        "box": -0.04
+      },
       "table_xy_affine": {
         "_comment": "true_table = A @ pred_table + b (metres). pred = global table_xy_affine(raw); per-arm residual.",
         "A": [
@@ -264,58 +291,58 @@
       "6": 3772
     },
     "open_leap": [
-      2.74429,
-      -0.7133,
-      3.20755,
-      3.1508,
-      3.02961,
-      -0.67495,
-      6.2387,
-      3.29806,
-      3.12012,
-      4.18317,
-      2.89002,
-      3.40237,
-      4.68171,
-      3.07256,
-      2.31478,
-      3.16614
+      2.93911,
+      -0.59058,
+      2.94678,
+      3.24897,
+      3.00507,
+      -0.5599,
+      6.03315,
+      3.38396,
+      3.12318,
+      4.14021,
+      3.2321,
+      3.15693,
+      4.78602,
+      3.08637,
+      2.94064,
+      3.17534
     ],
     "close_leap": [
-      3.02654,
-      0.01381,
-      3.37016,
-      3.14926,
-      3.05262,
-      0.13806,
-      6.20495,
-      3.17687,
-      2.93604,
-      4.88573,
-      3.04649,
-      3.40237,
-      4.85045,
-      3.09864,
-      3.64627,
-      2.76117
+      3.01887,
+      0.33287,
+      3.14313,
+      3.07563,
+      2.85934,
+      0.28685,
+      6.11905,
+      2.78111,
+      2.73662,
+      4.8075,
+      3.69076,
+      2.82406,
+      4.80596,
+      3.32567,
+      3.61252,
+      2.72282
     ],
     "_comment_manual_poses": "open_leap/close_leap: taught 16-DOF LEAP poses. When both set, open()/close() use them directly (skip formula thumb scales)."
   },
   "table_xy_affine": {
-    "_comment": "true_table = A @ raw_to_table(uv) + b  (metres)",
+    "_comment": "true_table = A @ pred_table + b (metres). pred = to_table(uv, z=object_top).",
     "A": [
       [
-        -0.146414,
-        1.215001
+        -0.087362,
+        1.44789
       ],
       [
-        1.275861,
-        0.092045
+        1.353882,
+        0.13476
       ]
     ],
     "b": [
-      -0.145722,
-      0.104489
+      -0.13037,
+      0.094876
     ]
   }
 }
