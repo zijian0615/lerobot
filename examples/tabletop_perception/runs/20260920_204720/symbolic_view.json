@@ -1,0 +1,52 @@
+{
+  "objects": [
+    {
+      "name": "black_frame",
+      "blocked_by": null,
+      "in_workspace": [
+        "fanuc"
+      ],
+      "preferred_arm": "fanuc"
+    },
+    {
+      "name": "black_frame_2",
+      "blocked_by": null,
+      "in_workspace": [
+        "fanuc"
+      ],
+      "preferred_arm": "fanuc"
+    },
+    {
+      "name": "screw",
+      "blocked_by": null,
+      "in_workspace": [
+        "fanuc"
+      ],
+      "preferred_arm": "fanuc"
+    },
+    {
+      "name": "screw_2",
+      "blocked_by": null,
+      "in_workspace": [
+        "fanuc"
+      ],
+      "preferred_arm": "fanuc"
+    },
+    {
+      "name": "screw_3",
+      "blocked_by": null,
+      "in_workspace": [
+        "fanuc"
+      ],
+      "preferred_arm": "fanuc"
+    },
+    {
+      "name": "screw_4",
+      "blocked_by": null,
+      "in_workspace": [
+        "fanuc"
+      ],
+      "preferred_arm": "fanuc"
+    }
+  ]
+}

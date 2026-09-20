@@ -1,0 +1,39 @@
+{
+  "object": "black_piece",
+  "uv": [
+    503.5555555555555,
+    294.1015873015873
+  ],
+  "zone": "MID",
+  "pred_table_m": [
+    0.14758433761451248,
+    0.3664706319365079
+  ],
+  "target_uf_xy_mm": [
+    147.5843376145125,
+    366.4706319365079
+  ],
+  "workspace_mm": [
+    296.909,
+    481.909,
+    -273.187,
+    326.813
+  ],
+  "inside_workspace": false,
+  "taught_wpr_deg": [
+    178.202,
+    -1.589,
+    -0.633
+  ],
+  "grasp_wpr_deg": [
+    178.202,
+    -1.589,
+    -91.40267667571527
+  ],
+  "yaw_note": "long-axis yaw=89.2\u00b0 \u2192 R=-91.4\u00b0 (perp. long edge, offset=0\u00b0)",
+  "travel_z_mm": -200.0,
+  "grasp_z_mm": -280.0,
+  "lift_z_mm": -200.0,
+  "vlm": "cosmos",
+  "perceive_dir": "/home/gb2_8634/lerobot/examples/tabletop_perception/runs/20260920_182415/perceive_01"
+}

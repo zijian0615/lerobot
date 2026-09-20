@@ -1,0 +1,20 @@
+{
+  "objects": [
+    {
+      "name": "purple_screwdriver",
+      "blocked_by": null,
+      "in_workspace": [
+        "fanuc"
+      ],
+      "preferred_arm": "fanuc"
+    },
+    {
+      "name": "black_square",
+      "blocked_by": null,
+      "in_workspace": [
+        "fanuc"
+      ],
+      "preferred_arm": "fanuc"
+    }
+  ]
+}

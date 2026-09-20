@@ -1,0 +1,39 @@
+{
+  "object": "screw",
+  "uv": [
+    613.24467472654,
+    733.055843408175
+  ],
+  "zone": "NEAR (image bottom)",
+  "pred_table_m": [
+    0.4682668751983057,
+    -0.21961311446689696
+  ],
+  "target_uf_xy_mm": [
+    468.2668751983057,
+    -219.61311446689697
+  ],
+  "workspace_mm": [
+    250.45,
+    550.45,
+    -266.198,
+    288.802
+  ],
+  "inside_workspace": true,
+  "taught_wpr_deg": [
+    178.206,
+    -1.585,
+    9.606
+  ],
+  "grasp_wpr_deg": [
+    178.206,
+    -1.585,
+    8.39660570686388
+  ],
+  "yaw_note": "long-axis yaw=-1.2\u00b0 \u2192 R=8.4\u00b0 (perp. long edge, offset=0\u00b0)",
+  "travel_z_mm": -240.0,
+  "grasp_z_mm": -320.0,
+  "lift_z_mm": -240.0,
+  "vlm": "cosmos",
+  "perceive_dir": "/home/gb2_8634/lerobot/examples/tabletop_perception/runs/20260920_204610/perceive_01"
+}

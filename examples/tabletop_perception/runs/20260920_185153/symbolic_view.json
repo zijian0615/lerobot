@@ -1,0 +1,48 @@
+{
+  "objects": [
+    {
+      "name": "red_pen",
+      "blocked_by": null,
+      "in_workspace": [
+        "fanuc"
+      ],
+      "preferred_arm": "fanuc"
+    },
+    {
+      "name": "black_block",
+      "blocked_by": null,
+      "in_workspace": [
+        "fanuc"
+      ],
+      "preferred_arm": "fanuc"
+    },
+    {
+      "name": "black_frame",
+      "blocked_by": null,
+      "in_workspace": [
+        "fanuc"
+      ],
+      "preferred_arm": "fanuc"
+    },
+    {
+      "name": "small_black_piece",
+      "blocked_by": null,
+      "in_workspace": [
+        "fanuc"
+      ],
+      "preferred_arm": "fanuc"
+    },
+    {
+      "name": "small_grey_object",
+      "blocked_by": null,
+      "in_workspace": [],
+      "preferred_arm": null
+    },
+    {
+      "name": "white_bottle",
+      "blocked_by": null,
+      "in_workspace": [],
+      "preferred_arm": null
+    }
+  ]
+}

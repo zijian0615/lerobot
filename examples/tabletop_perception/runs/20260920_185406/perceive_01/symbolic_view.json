@@ -1,0 +1,102 @@
+{
+  "objects": [
+    {
+      "name": "black_piece",
+      "blocked_by": null,
+      "in_workspace": [
+        "fanuc"
+      ],
+      "preferred_arm": "fanuc"
+    },
+    {
+      "name": "black_block",
+      "blocked_by": null,
+      "in_workspace": [
+        "fanuc"
+      ],
+      "preferred_arm": "fanuc"
+    },
+    {
+      "name": "black_piece_2",
+      "blocked_by": null,
+      "in_workspace": [
+        "fanuc"
+      ],
+      "preferred_arm": "fanuc"
+    },
+    {
+      "name": "black_block_2",
+      "blocked_by": null,
+      "in_workspace": [],
+      "preferred_arm": null
+    },
+    {
+      "name": "black_piece_3",
+      "blocked_by": null,
+      "in_workspace": [
+        "fanuc"
+      ],
+      "preferred_arm": "fanuc"
+    },
+    {
+      "name": "black_piece_4",
+      "blocked_by": null,
+      "in_workspace": [
+        "fanuc"
+      ],
+      "preferred_arm": "fanuc"
+    },
+    {
+      "name": "black_piece_5",
+      "blocked_by": null,
+      "in_workspace": [
+        "fanuc"
+      ],
+      "preferred_arm": "fanuc"
+    },
+    {
+      "name": "black_block_3",
+      "blocked_by": null,
+      "in_workspace": [],
+      "preferred_arm": null
+    },
+    {
+      "name": "black_piece_6",
+      "blocked_by": null,
+      "in_workspace": [
+        "fanuc"
+      ],
+      "preferred_arm": "fanuc"
+    },
+    {
+      "name": "black_bar",
+      "blocked_by": null,
+      "in_workspace": [
+        "fanuc"
+      ],
+      "preferred_arm": "fanuc"
+    },
+    {
+      "name": "black_piece_7",
+      "blocked_by": null,
+      "in_workspace": [
+        "fanuc"
+      ],
+      "preferred_arm": "fanuc"
+    },
+    {
+      "name": "black_piece_8",
+      "blocked_by": null,
+      "in_workspace": [],
+      "preferred_arm": null
+    },
+    {
+      "name": "black_bar_2",
+      "blocked_by": null,
+      "in_workspace": [
+        "fanuc"
+      ],
+      "preferred_arm": "fanuc"
+    }
+  ]
+}

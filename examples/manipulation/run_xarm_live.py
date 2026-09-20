@@ -458,8 +458,7 @@ def build_argparser() -> argparse.ArgumentParser:
         "--vlm",
         dest="model",
         default="gemini",
-        help="Base VLM for perceive + plan: gemini (default) or gpt-6 "
-        "(OpenAI gpt-6-astra, needs OPENAI_API_KEY).",
+        help="Base VLM for perceive + plan: gemini, gpt-6, or cosmos / cosmos3-nano.",
     )
     p.add_argument(
         "--thinking-budget",

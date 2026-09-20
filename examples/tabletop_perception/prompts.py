@@ -99,3 +99,44 @@ Return a single JSON object, no markdown fencing, no explanation:
   ]
 }}
 """.strip()
+
+
+# Cosmos Nano is weak at tiny objects in a full-arm frame. We send a table
+# crop (robot painted out). Keep this short, no filled example it can copy.
+COSMOS_DETECTION_PROMPT = """
+This image is a crop of a white table. The yellow robot was removed.
+Task: "{instruction}"
+
+List only real 3D objects sitting on the table (tools, blocks, frames, rods).
+Ignore printed drawings, grid outlines, text, yellow circle, cables, and empty table.
+Do not invent an object. If a region is only a drawing, skip it.
+Name from visible color and shape (lowercase snake_case). Do not use names
+that appear only as examples in any prompt.
+
+Coordinates are 0-1000 on THIS cropped image, origin at the top-left.
+- box_2d: [ymin, xmin, ymax, xmax] tight on the object pixels
+- grasp_point: [y, x] on the object, not on white table
+- long_axis: [[y1, x1], [y2, x2]] along the longest edge; null if round
+- blocked_by: null unless something sits on the object
+No polygon. No markdown. At most 6 objects.
+
+{{"objects":[{{"name":"...","box_2d":[ymin,xmin,ymax,xmax],"blocked_by":null,"grasp_point":[y,x],"long_axis":[[y1,x1],[y2,x2]]}}]}}
+""".strip()
+
+# Close-up tile sheet. Geometry comes from classical blobs, not the VLM.
+COSMOS_NAMING_PROMPT = """
+Each numbered tile is a close-up of ONE region from a white table.
+Task: "{instruction}"
+
+Name the real 3D object in that tile. Allowed names only:
+red_pen, screw, vial, black_frame, black_block, purple_screwdriver, skip.
+
+black_frame = hollow black plastic square on the table (you can see through the middle).
+black_block = solid black rectangle/plate, no hole.
+screw = short metal screw or bolt on the table, including tiny ones near the yellow diamond.
+red_pen = red pen.
+vial = small bottle or cap.
+skip = cables, yellow robot, printed grid/lines, or unrecognizable junk.
+A short dark stick on the table is a screw, never skip.
+Do not invent extra ids. One name per tile.
+""".strip()

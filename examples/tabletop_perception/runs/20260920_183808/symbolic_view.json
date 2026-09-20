@@ -1,0 +1,74 @@
+{
+  "objects": [
+    {
+      "name": "red_pen",
+      "blocked_by": null,
+      "in_workspace": [
+        "fanuc"
+      ],
+      "preferred_arm": "fanuc"
+    },
+    {
+      "name": "black_block",
+      "blocked_by": null,
+      "in_workspace": [
+        "fanuc"
+      ],
+      "preferred_arm": "fanuc"
+    },
+    {
+      "name": "black_bracket",
+      "blocked_by": null,
+      "in_workspace": [
+        "fanuc"
+      ],
+      "preferred_arm": "fanuc"
+    },
+    {
+      "name": "black_peg",
+      "blocked_by": null,
+      "in_workspace": [
+        "fanuc"
+      ],
+      "preferred_arm": "fanuc"
+    },
+    {
+      "name": "plastic_vial",
+      "blocked_by": null,
+      "in_workspace": [],
+      "preferred_arm": null
+    },
+    {
+      "name": "screw_1",
+      "blocked_by": null,
+      "in_workspace": [
+        "fanuc"
+      ],
+      "preferred_arm": "fanuc"
+    },
+    {
+      "name": "screw_2",
+      "blocked_by": null,
+      "in_workspace": [
+        "fanuc"
+      ],
+      "preferred_arm": "fanuc"
+    },
+    {
+      "name": "screw_3",
+      "blocked_by": null,
+      "in_workspace": [
+        "fanuc"
+      ],
+      "preferred_arm": "fanuc"
+    },
+    {
+      "name": "screw_4",
+      "blocked_by": null,
+      "in_workspace": [
+        "fanuc"
+      ],
+      "preferred_arm": "fanuc"
+    }
+  ]
+}

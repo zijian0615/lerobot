@@ -1,0 +1,43 @@
+[
+  {
+    "name": "purple_screwdriver",
+    "box_2d": [
+      547.0,
+      706.0,
+      614.0,
+      790.0
+    ],
+    "grasp_point": [
+      570.0,
+      747.0
+    ],
+    "blocked_by": null,
+    "long_axis": [
+      [
+        547.0,
+        706.0
+      ],
+      [
+        594.0,
+        779.0
+      ]
+    ],
+    "polygon": null
+  },
+  {
+    "name": "black_square",
+    "box_2d": [
+      725.0,
+      512.0,
+      798.0,
+      606.0
+    ],
+    "grasp_point": [
+      754.0,
+      556.0
+    ],
+    "blocked_by": null,
+    "long_axis": null,
+    "polygon": null
+  }
+]

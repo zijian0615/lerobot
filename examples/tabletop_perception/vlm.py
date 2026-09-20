@@ -18,8 +18,10 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 import re
+import time
 from collections.abc import Callable
 from typing import Any, NotRequired, TypedDict
 
@@ -27,18 +29,24 @@ import numpy as np
 from PIL import Image
 
 from openai_backend import (
+    COSMOS3_NANO_MODEL,
+    COSMOS_JSON_ONLY,
+    COSMOS_NAME_ENUM,
+    COSMOS_NAMING_JSON_SCHEMA,
     GPT6_ASTRA_MODEL,
     GPT6_JSON_ONLY,
+    call_nvidia_chat_completions,
     call_openai_responses,
     reasoning_effort_from_thinking_budget,
     resolve_base_model,
 )
-from .prompts import DEFAULT_DETECTION_PROMPT
+from .prompts import COSMOS_NAMING_PROMPT, DEFAULT_DETECTION_PROMPT
 
 # 1.5-preview is retired; use ER 2 (or pass model= to override).
 GEMINI_ROBOTICS_ER_MODEL = "gemini-robotics-er-2-preview"
 
 _FENCE_RE = re.compile(r"^```(?:json)?\s*\n?(.*?)\n?```\s*$", re.DOTALL | re.IGNORECASE)
+_THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
 logger = logging.getLogger(__name__)
 
 
@@ -77,6 +85,27 @@ def strip_markdown_fences(text: str) -> str:
     return stripped
 
 
+def _strip_think_blocks(text: str) -> str:
+    """Drop Cosmos/Qwen ``<think>…</think>``. Unclosed think ⇒ empty (no JSON yet)."""
+    stripped = _THINK_RE.sub("", text)
+    if "</think>" in stripped.lower():
+        parts = re.split(r"</think>", stripped, maxsplit=1, flags=re.IGNORECASE)
+        stripped = parts[-1]
+    elif "<think>" in stripped.lower():
+        return ""
+    return stripped.strip()
+
+
+def _json_candidate(text: str) -> str:
+    cleaned = strip_markdown_fences(_strip_think_blocks(text))
+    brace = cleaned.find("{")
+    bracket = cleaned.find("[")
+    starts = [i for i in (brace, bracket) if i >= 0]
+    if not starts:
+        return cleaned
+    return cleaned[min(starts) :].strip()
+
+
 def _strip_trailing_commas(text: str) -> str:
     """Tolerate common LLM JSON: ``,}`` / ``,]`` (also nested)."""
     prev = None
@@ -89,11 +118,38 @@ def _strip_trailing_commas(text: str) -> str:
 
 
 def _loads_json(text: str) -> Any:
-    cleaned = strip_markdown_fences(text)
+    cleaned = _json_candidate(text)
     try:
         return json.loads(cleaned)
     except json.JSONDecodeError:
         return json.loads(_strip_trailing_commas(cleaned))
+
+
+def _salvage_object_dicts(text: str) -> list[dict[str, Any]]:
+    """Pull complete object dicts from truncated ``{"objects":[...]}`` JSON."""
+    cleaned = _json_candidate(text)
+    start = cleaned.find("[")
+    if start < 0:
+        return []
+    decoder = json.JSONDecoder()
+    objs: list[dict[str, Any]] = []
+    i = start + 1
+    n = len(cleaned)
+    while i < n:
+        while i < n and cleaned[i] in " \t\n\r,":
+            i += 1
+        if i >= n or cleaned[i] in "]":
+            break
+        if cleaned[i] != "{":
+            break
+        try:
+            obj, end = decoder.raw_decode(cleaned, i)
+        except json.JSONDecodeError:
+            break
+        if isinstance(obj, dict):
+            objs.append(obj)
+        i = end
+    return objs
 
 
 def _normalize_objects_payload(payload: Any) -> list[dict[str, Any]]:
@@ -208,8 +264,15 @@ def _coerce_polygon(raw: Any) -> list[list[float]] | None:
 
 def parse_vlm_json_text(text: str) -> list[RawDetection]:
     """Parse VLM text into raw detections. Raises ``json.JSONDecodeError`` / ``ValueError``."""
-    payload = _loads_json(text)
-    objects = _normalize_objects_payload(payload)
+    try:
+        payload = _loads_json(text)
+        objects = _normalize_objects_payload(payload)
+    except (json.JSONDecodeError, ValueError):
+        salvaged = _salvage_object_dicts(text)
+        if not salvaged:
+            raise
+        print(f"[vlm] truncated JSON, salvaged {len(salvaged)} complete objects", flush=True)
+        objects = salvaged
     out: list[RawDetection] = []
     errors: list[str] = []
     for obj in objects:
@@ -236,6 +299,18 @@ def _png_bytes(image: np.ndarray) -> bytes:
 
     buf = io.BytesIO()
     Image.fromarray(image).save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def _jpeg_bytes(image: np.ndarray, *, quality: int = 85) -> bytes:
+    if image.dtype != np.uint8:
+        raise TypeError(f"image must be uint8 RGB, got dtype={image.dtype}")
+    if image.ndim != 3 or image.shape[2] != 3:
+        raise ValueError(f"image must be HxWx3 RGB, got shape={image.shape}")
+    import io
+
+    buf = io.BytesIO()
+    Image.fromarray(image).save(buf, format="JPEG", quality=int(quality), optimize=True)
     return buf.getvalue()
 
 
@@ -295,6 +370,327 @@ def call_gpt6_detection(
     raise RuntimeError("Unreachable")  # pragma: no cover
 
 
+_COSMOS_SKIP_NAMES = frozenset(
+    {
+        "skip",
+        "none",
+        "null",
+        "n_a",
+        "na",
+        "print",
+        "printed",
+        "drawing",
+        "grid",
+        "table",
+        "robot",
+        "arm",
+        "cable",
+        "wire",
+        "empty",
+        "background",
+        "shadow",
+        "text",
+        "yellow_circle",
+        "yellow_diamond",
+    }
+)
+
+
+_COSMOS_MAX_BLOBS = 12
+_COSMOS_TILE_PX = 256
+
+
+def _select_cosmos_blobs(
+    blobs: list[dict],
+    limit: int = _COSMOS_MAX_BLOBS,
+    *,
+    image_h: int = 480,
+) -> list[dict]:
+    """Largest blobs, plus leftover NEAR-band screws that would otherwise be dropped."""
+    ranked = sorted(blobs, key=lambda b: -float(b.get("area") or 0.0))
+    picked = ranked[: max(1, int(limit))]
+    picked_ids = {id(b) for b in picked}
+    near_y = 0.70 * float(image_h)
+    extra: list[dict] = []
+    for blob in ranked:
+        if id(blob) in picked_ids:
+            continue
+        if float(blob["grasp_point_px"][1]) < near_y:
+            continue
+        if float(blob.get("area") or 0.0) < 36.0 * (float(image_h) / 480.0):
+            continue
+        extra.append(blob)
+        if len(picked) + len(extra) >= int(limit):
+            break
+    return picked + extra
+
+
+def _cosmos_object_sheet(image: np.ndarray, blobs: list[dict]) -> np.ndarray:
+    """One close-up tile per blob so Nano sees the object, not a tiny box on the table."""
+    import cv2
+
+    n = max(len(blobs), 1)
+    cols = min(4, n)
+    rows = int(math.ceil(n / cols))
+    tile = _COSMOS_TILE_PX
+    canvas = np.full((rows * tile, cols * tile, 3), 245, dtype=np.uint8)
+    height, width = image.shape[:2]
+    for i, blob in enumerate(blobs):
+        r, c = divmod(i, cols)
+        x0, y0, x1, y1 = (float(v) for v in blob["box_2d_px"])
+        bw, bh = max(x1 - x0, 8.0), max(y1 - y0, 8.0)
+        margin = int(max(6.0, 0.12 * max(bw, bh)))
+        xa = max(0, int(math.floor(x0)) - margin)
+        ya = max(0, int(math.floor(y0)) - margin)
+        xb = min(width, int(math.ceil(x1)) + margin)
+        yb = min(height, int(math.ceil(y1)) + margin)
+        crop = image[ya:yb, xa:xb]
+        if crop.size == 0:
+            crop = np.full((tile - 16, tile - 16, 3), 245, dtype=np.uint8)
+        inner = tile - 28
+        ch, cw = crop.shape[:2]
+        scale = min(inner / max(ch, 1), inner / max(cw, 1))
+        nw, nh = max(1, int(cw * scale)), max(1, int(ch * scale))
+        resized = cv2.resize(crop, (nw, nh), interpolation=cv2.INTER_AREA)
+        cell = canvas[r * tile : (r + 1) * tile, c * tile : (c + 1) * tile]
+        ox = (tile - nw) // 2
+        oy = 22 + (inner - nh) // 2
+        cell[oy : oy + nh, ox : ox + nw] = resized
+        cv2.rectangle(cell, (2, 2), (tile - 3, tile - 3), (40, 40, 40), 2)
+        cv2.putText(
+            cell,
+            str(i + 1),
+            (8, 20),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            (200, 0, 0),
+            2,
+            cv2.LINE_AA,
+        )
+    return canvas
+
+
+def _blob_to_raw_detection(blob: dict, name: str, image_hw: tuple[int, int]) -> RawDetection:
+    height, width = image_hw
+
+    def yn(y: float) -> float:
+        return float(y) / float(height) * 1000.0
+
+    def xn(x: float) -> float:
+        return float(x) / float(width) * 1000.0
+
+    x0, y0, x1, y1 = blob["box_2d_px"]
+    gu, gv = blob["grasp_point_px"]
+    raw: RawDetection = {
+        "name": name,
+        "box_2d": [yn(y0), xn(x0), yn(y1), xn(x1)],
+        "grasp_point": [yn(gv), xn(gu)],
+        "blocked_by": None,
+        "long_axis": None,
+        "polygon": None,
+    }
+    axis = blob.get("long_axis_px")
+    if axis is not None and len(axis) == 2:
+        (u0, v0), (u1, v1) = axis
+        raw["long_axis"] = [[yn(v0), xn(u0)], [yn(v1), xn(u1)]]
+    poly = blob.get("polygon_px")
+    if poly:
+        raw["polygon"] = [[yn(v), xn(u)] for u, v in poly]
+    return raw
+
+
+def _parse_cosmos_names(text: str) -> dict[int, str]:
+    payload = _loads_json(text)
+    items = _normalize_objects_payload(payload)
+    names: dict[int, str] = {}
+    for i, item in enumerate(items, start=1):
+        if not isinstance(item, dict):
+            continue
+        raw_id = item.get("id", item.get("index"))
+        try:
+            idx = i if raw_id is None else int(raw_id)
+        except (TypeError, ValueError):
+            continue
+        name = str(item.get("name") or item.get("label") or "").strip()
+        if idx >= 1 and name:
+            names[idx] = name
+    return names
+
+
+def _cosmos_skip_name(name: str) -> bool:
+    slug = slug_detection_name(name)
+    if slug in _COSMOS_SKIP_NAMES:
+        return True
+    tokens = set(slug.split("_"))
+    return bool(tokens & {"skip", "print", "printed", "drawing", "grid", "robot", "cable"})
+
+
+def call_cosmos_detection(
+    image: np.ndarray,
+    instruction: str,
+    prompt: str | None = None,
+    *,
+    model: str = COSMOS3_NANO_MODEL,
+    api_key: str | None = None,
+    thinking_budget: int = -1,
+) -> list[RawDetection]:
+    """Name classical table blobs with Cosmos. Do not let Nano invent boxes."""
+    import base64
+
+    del thinking_budget  # Cosmos chat has no Gemini-style thinking_budget.
+    from .segment import (
+        _appearance_base_name,
+        _blob_looks_like_print,
+        _blob_looks_like_table_screw,
+        blob_is_robot_clutter,
+        find_table_object_blobs,
+        recover_skip_name,
+    )
+
+    blobs = find_table_object_blobs(image)
+    blobs = _select_cosmos_blobs(blobs, image_h=int(image.shape[0]))
+    print(f"[cosmos] grounded blobs={len(blobs)}", flush=True)
+    if not blobs:
+        return []
+
+    template = prompt if prompt else COSMOS_NAMING_PROMPT
+    prompt_text = (
+        template.format(instruction=instruction)
+        + f"\nThere are {len(blobs)} tiles, numbered 1 to {len(blobs)}."
+        + COSMOS_JSON_ONLY
+    )
+    view = _cosmos_object_sheet(image, blobs)
+    print(
+        f"[cosmos] object sheet {view.shape[1]}x{view.shape[0]} "
+        f"from {image.shape[1]}x{image.shape[0]}",
+        flush=True,
+    )
+    schema = dict(COSMOS_NAMING_JSON_SCHEMA)
+    schema["properties"] = dict(schema["properties"])
+    objects_schema = dict(schema["properties"]["objects"])
+    objects_schema["minItems"] = len(blobs)
+    objects_schema["maxItems"] = len(blobs)
+    item_schema = dict(objects_schema.get("items") or {})
+    item_props = dict(item_schema.get("properties") or {})
+    item_props["name"] = {"type": "string", "enum": list(COSMOS_NAME_ENUM)}
+    item_schema["properties"] = item_props
+    objects_schema["items"] = item_schema
+    schema["properties"]["objects"] = objects_schema
+    image_b64 = base64.b64encode(_jpeg_bytes(view, quality=90)).decode("ascii")
+    messages = [
+        {
+            "role": "system",
+            "content": "You are a perception JSON emitter. Output only one JSON object.",
+        },
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"},
+                },
+                {"type": "text", "text": prompt_text},
+            ],
+        },
+    ]
+    last_error: Exception | None = None
+    text = ""
+    names: dict[int, str] = {}
+    for attempt in range(2):
+        t0 = time.monotonic()
+        try:
+            text = call_nvidia_chat_completions(
+                model=model,
+                messages=messages,
+                api_key=api_key,
+                max_tokens=384,
+                extra_body={"guided_json": schema},
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "tabletop_blob_names",
+                        "schema": schema,
+                    },
+                },
+            )
+            print(
+                f"[cosmos] name attempt={attempt + 1} {time.monotonic() - t0:.1f}s "
+                f"chars={len(text)}",
+                flush=True,
+            )
+        except Exception as exc:  # noqa: BLE001
+            last_error = exc
+            print(f"[cosmos] request failed: {exc}", flush=True)
+            if attempt == 0:
+                print("[cosmos] retrying once", flush=True)
+                continue
+            print(f"[cosmos] naming failed, using appearance names: {last_error}", flush=True)
+            names = {}
+            break
+        try:
+            names = _parse_cosmos_names(text)
+            break
+        except (json.JSONDecodeError, ValueError) as exc:
+            last_error = exc
+            head = text[:160].replace("\n", " ")
+            print(f"[cosmos] parse failed: {exc}; head={head!r}", flush=True)
+            if attempt == 0:
+                print("[cosmos] retrying once", flush=True)
+                continue
+            print("[cosmos] naming parse failed, using appearance names", flush=True)
+            names = {}
+
+    enum_names = {slug_detection_name(n) for n in COSMOS_NAME_ENUM} - {"skip"}
+    out: list[RawDetection] = []
+    for i, blob in enumerate(blobs, start=1):
+        appear = _appearance_base_name(blob)
+        cosmos_name = names.get(i)
+        if _blob_looks_like_print(blob) or blob_is_robot_clutter(blob, image_h=image.shape[0]):
+            print(f"[cosmos] skip blob {i} robot/print appear={appear}", flush=True)
+            continue
+        screw = _blob_looks_like_table_screw(blob, image_hw=image.shape[:2])
+        if screw:
+            name = "screw"
+            if cosmos_name and slug_detection_name(cosmos_name) != "screw":
+                print(
+                    f"[cosmos] blob {i} {cosmos_name!r}→screw (geometry)",
+                    flush=True,
+                )
+        elif cosmos_name and _cosmos_skip_name(cosmos_name):
+            recovered = recover_skip_name(blob, image_hw=image.shape[:2])
+            if recovered:
+                print(
+                    f"[cosmos] blob {i} skip→{recovered} (recovered {appear})",
+                    flush=True,
+                )
+                name = recovered
+            else:
+                print(f"[cosmos] skip blob {i} cosmos={cosmos_name!r} appear={appear}", flush=True)
+                continue
+        elif cosmos_name:
+            slug = slug_detection_name(cosmos_name)
+            if slug == "red_pen" and appear == "screw":
+                name = "screw"
+                print(f"[cosmos] blob {i} red_pen→screw (compact)", flush=True)
+            elif slug == "black_bar" or (appear == "screw" and slug in {"skip", "black_bar"}):
+                name = "screw"
+                print(f"[cosmos] blob {i} {slug}→screw", flush=True)
+            elif slug in enum_names:
+                name = slug
+            else:
+                print(f"[cosmos] blob {i} off-vocab {cosmos_name!r} → {appear}", flush=True)
+                name = appear
+        else:
+            name = appear
+            print(f"[cosmos] blob {i} unnamed → {name}", flush=True)
+        print(
+            f"[cosmos] blob {i} {name} gp={tuple(round(c) for c in blob['grasp_point_px'])}",
+            flush=True,
+        )
+        out.append(_blob_to_raw_detection(blob, name, image.shape[:2]))
+    return out
+
+
 def call_detection_vlm(
     image: np.ndarray,
     instruction: str,
@@ -304,10 +700,19 @@ def call_detection_vlm(
     api_key: str | None = None,
     thinking_budget: int = -1,
 ) -> list[RawDetection]:
-    """Dispatch perception VLM: Gemini Robotics-ER (default) or GPT-6 Astra."""
+    """Dispatch perception VLM: Gemini Robotics-ER, GPT-6 Astra, or Cosmos 3 Nano."""
     backend, api_model = resolve_base_model(model)
     if backend == "gpt-6":
         return call_gpt6_detection(
+            image,
+            instruction,
+            prompt=prompt,
+            model=api_model,
+            api_key=api_key,
+            thinking_budget=thinking_budget,
+        )
+    if backend == "cosmos":
+        return call_cosmos_detection(
             image,
             instruction,
             prompt=prompt,
@@ -339,13 +744,22 @@ def call_gemini_robotics_er(
 
     On malformed JSON: retry the API once, then raise.
     """
-    from google import genai
-    from google.genai import types
+    try:
+        from google import genai
+        from google.genai import types
+    except ImportError as exc:
+        raise ImportError(
+            "Missing Gemini SDK (`google.genai`). Install with: uv pip install google-genai"
+        ) from exc
 
     template = prompt if prompt else DEFAULT_DETECTION_PROMPT
     prompt_text = template.format(instruction=instruction)
     key = api_key or os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
-    client = genai.Client(api_key=key) if key else genai.Client()
+    if not key:
+        raise RuntimeError(
+            "No Gemini API key. Export GOOGLE_API_KEY or GEMINI_API_KEY, then rerun."
+        )
+    client = genai.Client(api_key=key)
     image_bytes = _png_bytes(image)
 
     contents = [
@@ -473,4 +887,29 @@ def parse_vlm_detections(
                 "polygon_px": polygon_px,
             }
         )
-    return parsed
+    return uniquify_detection_names(parsed)
+
+
+def slug_detection_name(name: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "_", str(name or "").strip().lower()).strip("_")
+    return slug or "object"
+
+
+def uniquify_detection_names(detections: list[ParsedDetection]) -> list[ParsedDetection]:
+    """Make names unique snake_case so pick lists are usable."""
+    used: set[str] = set()
+    out: list[ParsedDetection] = []
+    for det in detections:
+        base = slug_detection_name(str(det.get("name") or "object"))
+        name = base
+        n = 2
+        while name in used:
+            name = f"{base}_{n}"
+            n += 1
+        used.add(name)
+        if name != det.get("name"):
+            print(f"[name] {det.get('name')!r} → {name}", flush=True)
+        item = dict(det)
+        item["name"] = name
+        out.append(item)
+    return out

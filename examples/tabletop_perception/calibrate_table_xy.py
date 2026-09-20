@@ -72,18 +72,27 @@ from tabletop_perception.perception import (
     object_top_z_from_calib,
     resolve_object_top_z_m,
 )
-from tabletop_perception.vlm import call_gemini_robotics_er, parse_vlm_detections
+from tabletop_perception.vlm import call_detection_vlm, parse_vlm_detections
 
-_FAR_EDGE_V_MAX = 160.0
+_FAR_EDGE_FRAC = 0.33
 
 
-def _uv_zone(uv: tuple[float, float], image_h: float = 480.0) -> str:
+def _uv_zone(uv: tuple[float, float], image_h: float | None = None) -> str:
+    h = float(image_h) if image_h and float(image_h) > 1.0 else 480.0
     v = float(uv[1])
-    if v <= _FAR_EDGE_V_MAX:
+    band = _FAR_EDGE_FRAC * h
+    if v <= band:
         return "FAR (image top)"
-    if v >= image_h - _FAR_EDGE_V_MAX:
+    if v >= h - band:
         return "NEAR (image bottom)"
     return "MID"
+
+
+def _sample_image_h(sample: dict, default: float | None = None) -> float | None:
+    hw = sample.get("image_hw")
+    if isinstance(hw, (list, tuple)) and hw:
+        return float(hw[0])
+    return default
 
 
 def _samples_path(calib_path: Path, arm: str) -> Path:
@@ -194,7 +203,10 @@ def _pick_detection(dets: list[dict], object_name: str | None) -> dict | None:
     else:
         print("Detections:")
         for i, d in enumerate(dets):
-            print(f"  [{i}] {d['name']} grasp_px={d['grasp_point_px']}")
+            print(
+                f"  [{i}] {d['name']} grasp_px={d['grasp_point_px']} "
+                f"long_axis_px={d.get('long_axis_px')}"
+            )
 
     while True:
         sys.stdout.flush()
@@ -269,6 +281,13 @@ def main() -> int:
         "For xarm2 default is to keep global affine and fit a residual.",
     )
     p.add_argument("--instruction", type=str, default="detect all graspable objects on the table")
+    p.add_argument(
+        "--model",
+        "--vlm",
+        dest="model",
+        default="gemini",
+        help="Base VLM: gemini, gpt-6, or cosmos / cosmos3-nano.",
+    )
     p.add_argument("--no-write", action="store_true")
     args = p.parse_args()
     if args.n_points < 1:
@@ -345,12 +364,16 @@ def main() -> int:
             uv = tuple(float(v) for v in s["uv"])
             print(
                 f"  prev[{i}] {s.get('name')} uv=({uv[0]:.0f},{uv[1]:.0f}) "
-                f"{_uv_zone(uv)}"
+                f"{_uv_zone(uv, _sample_image_h(s))}"
             )
-        n_far = sum(1 for s in samples if _uv_zone(tuple(s["uv"])) == "FAR (image top)")
+        n_far = sum(
+            1
+            for s in samples
+            if _uv_zone(tuple(s["uv"]), _sample_image_h(s)) == "FAR (image top)"
+        )
         if n_far < 2:
             print(
-                f"Far-edge coverage is thin ({n_far} point(s) with v≤{_FAR_EDGE_V_MAX:.0f}). "
+                f"Far-edge coverage is thin ({n_far} point(s) in the top third of the image). "
                 "Put the new samples near the image TOP."
             )
 
@@ -409,13 +432,15 @@ def main() -> int:
                     width=int(cam_cfg["width"]),
                     height=int(cam_cfg["height"]),
                     fps=int(cam_cfg["fps"]),
+                    fourcc=cam_cfg.get("fourcc") or "MJPG",
                 )
-                print(f"图像 {image.shape}，正在调用 VLM（SSH 下可能要等几秒）…")
+                print(f"图像 {image.shape[1]}x{image.shape[0]}，正在调用 VLM（SSH 下可能要等几秒）…")
                 sys.stdout.flush()
-                raw = call_gemini_robotics_er(image, args.instruction)
+                raw = call_detection_vlm(image, args.instruction, model=args.model)
                 dets = parse_vlm_detections(raw, image_hw=(image.shape[0], image.shape[1]))
                 det = _pick_detection(dets, args.object)
             uv = tuple(float(v) for v in det["grasp_point_px"])
+            image_h = float(image.shape[0])
             z_top = resolve_object_top_z_m(det["name"], z_heights, z_default)
             raw_t = to_table(uv, k, t_ct, z_plane=z_top)
             if use_global and global_affine is not None:
@@ -433,7 +458,7 @@ def main() -> int:
             cmd_x += xy_off[0]
             cmd_y += xy_off[1]
             print(
-                f"  detected={det['name']} uv={uv} zone={_uv_zone(uv)} "
+                f"  detected={det['name']} uv={uv} zone={_uv_zone(uv, image_h)} "
                 f"z_h={z_top:.3f}m "
                 f"pred_table=({pred_t[0]:.3f},{pred_t[1]:.3f}) "
                 f"cmd_base_mm=({cmd_x:.1f},{cmd_y:.1f})"
@@ -474,6 +499,7 @@ def main() -> int:
                     "arm": args.arm,
                     "name": det["name"],
                     "uv": list(uv),
+                    "image_hw": [int(image.shape[0]), int(image.shape[1])],
                     "z_plane": z_top,
                     "raw_table_xy": list(raw_t),
                     "pred_table_xy": list(pred_t),
@@ -520,8 +546,14 @@ def main() -> int:
     print(f"b = {b.tolist()}")
     print("=====================================")
 
-    n_far = sum(1 for s in samples if _uv_zone(tuple(s["uv"])) == "FAR (image top)")
-    n_near = sum(1 for s in samples if _uv_zone(tuple(s["uv"])) == "NEAR (image bottom)")
+    n_far = sum(
+        1 for s in samples if _uv_zone(tuple(s["uv"]), _sample_image_h(s)) == "FAR (image top)"
+    )
+    n_near = sum(
+        1
+        for s in samples
+        if _uv_zone(tuple(s["uv"]), _sample_image_h(s)) == "NEAR (image bottom)"
+    )
     print(
         f"Coverage: n={len(samples)}  far/top={n_far}  mid="
         f"{len(samples) - n_far - n_near}  near/bottom={n_near}"

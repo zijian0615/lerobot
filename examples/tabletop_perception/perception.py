@@ -282,7 +282,8 @@ class Perception:
         prompt_text = self.prompt if self.prompt is not None else ""
         raw = self.vlm_caller(image, instruction, prompt_text)
         detections = parse_vlm_detections(raw, image_hw=(height, width))
-        detections = refine_parsed_detections(image, detections)
+        snap_blobs = "cosmos" in str(self.model).lower()
+        detections = refine_parsed_detections(image, detections, snap_blobs=snap_blobs)
         self.last_detections = detections
 
         a = b = None

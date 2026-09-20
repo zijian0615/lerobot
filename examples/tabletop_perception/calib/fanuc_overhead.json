@@ -1,0 +1,205 @@
+{
+  "_comment": "Fanuc overhead. 1920x1080 MJPG. Affine CLEARED until recalib after camera tilt. Default controller 172.30.109.22:16001.",
+  "camera": {
+    "index_or_path": "/dev/video0",
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "fourcc": "MJPG"
+  },
+  "K": [
+    [
+      2100.0,
+      0.0,
+      960.0
+    ],
+    [
+      0.0,
+      1575.0,
+      540.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "T_cam_table": [
+    [
+      1.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "grasp_height_m": 0.0,
+  "object_top_z_m_default": 0.0,
+  "object_top_z_m": {
+    "_comment": "Visible top-face height (m) for pixel projection. Not gripper z.",
+    "box": 0.05,
+    "screw": 0.01,
+    "container": 0.03
+  },
+  "grasp_height_offset_m": {
+    "screw": 0.0
+  },
+  "footprint_buffer_m": 0.02,
+  "table_polygon_xy": [
+    [
+      -0.45,
+      -0.35
+    ],
+    [
+      0.45,
+      -0.35
+    ],
+    [
+      0.45,
+      0.35
+    ],
+    [
+      -0.45,
+      0.35
+    ]
+  ],
+  "arm_workspaces_xy": {
+    "fanuc": {
+      "_role": "Fanuc RMI @ 172.30.109.22",
+      "type": "semicircle",
+      "center": [
+        0.0,
+        0.0
+      ],
+      "radius": 0.75,
+      "opening": "+x",
+      "n_arc": 48
+    }
+  },
+  "robot": {
+    "host": "172.30.109.22",
+    "port": 16001,
+    "group": 1,
+    "utool": 1,
+    "uframe": 0,
+    "speed": 250,
+    "term_type": "CNT",
+    "term_value": 100
+  },
+  "robots": {
+    "fanuc": {
+      "host": "172.30.109.22",
+      "port": 16001,
+      "group": 1,
+      "utool": 1,
+      "uframe": 0,
+      "speed": 250,
+      "term_type": "CNT",
+      "term_value": 100
+    }
+  },
+  "execution": {
+    "arm_name": "fanuc",
+    "table_base_xy_m": [
+      0.0,
+      0.0
+    ],
+    "table_z_base_m": -0.32,
+    "_height_note": "2026-09-20: UF Z=-320 mm is table contact and the grasp Z. tip_z_uf = table_z_base_m + grasp_height_m. Approach is +80 mm (UF Z=-240 mm). Do not command Z below -320 mm.",
+    "flip_x": false,
+    "flip_y": false,
+    "xy_offset_base_mm": [
+      0.0,
+      0.0
+    ],
+    "topdown_wpr_deg": [
+      178.206,
+      -1.585,
+      9.606
+    ],
+    "move_speed_mm_s": 80.0,
+    "solver_margin_m": 0.03,
+    "approach_offset_m": 0.08,
+    "lift_offset_m": 0.08,
+    "use_object_yaw": false,
+    "grasp_yaw_offset_rad": 0.0
+  },
+  "execution_by_arm": {
+    "fanuc": {
+      "table_base_xy_m": [
+        0.0,
+        0.0
+      ],
+      "table_z_base_m": -0.32,
+      "_height_note": "2026-09-20: UF Z=-320 mm is table contact and the grasp Z.",
+      "flip_x": false,
+      "flip_y": false,
+      "xy_offset_base_mm": [
+        0.0,
+        0.0
+      ],
+      "topdown_wpr_deg": [
+        178.206,
+        -1.585,
+        9.606
+      ],
+      "use_object_yaw": false,
+      "grasp_yaw_offset_rad": 0.0,
+      "move_speed_mm_s": 80.0,
+      "solver_margin_m": 0.03,
+      "approach_offset_m": 0.08,
+      "lift_offset_m": 0.08,
+      "table_xy_affine": {
+        "_comment": "true_table = A @ pred_table + b (metres). pred = to_table(uv).",
+        "A": [
+          [
+            -0.020725,
+            -1.297946
+          ],
+          [
+            1.632559,
+            0.027401
+          ]
+        ],
+        "b": [
+          0.307374,
+          0.050587
+        ]
+      }
+    }
+  },
+  "table_xy_affine": {
+    "_comment": "true_table = A @ pred_table + b (metres). pred = to_table(uv).",
+    "A": [
+      [
+        -0.020725,
+        -1.297946
+      ],
+      [
+        1.632559,
+        0.027401
+      ]
+    ],
+    "b": [
+      0.307374,
+      0.050587
+    ]
+  }
+}

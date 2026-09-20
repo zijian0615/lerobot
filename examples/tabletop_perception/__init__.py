@@ -16,11 +16,12 @@
 
 from .perception import Perception, run_perception
 from .visualize import visualize_table_plane
-from .vlm import call_gemini_robotics_er, parse_vlm_detections
+from .vlm import call_detection_vlm, call_gemini_robotics_er, parse_vlm_detections
 
 __all__ = [
     "Perception",
     "run_perception",
+    "call_detection_vlm",
     "call_gemini_robotics_er",
     "parse_vlm_detections",
     "visualize_table_plane",
