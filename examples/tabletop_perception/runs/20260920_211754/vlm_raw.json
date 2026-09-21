@@ -1,0 +1,194 @@
+[
+  {
+    "name": "real 3d object",
+    "box_2d": [
+      2.0,
+      61.00000000000001,
+      73.00000000000001,
+      100.0
+    ],
+    "grasp_point": [
+      56.0,
+      93.0
+    ],
+    "blocked_by": null,
+    "long_axis": null,
+    "polygon": null
+  },
+  {
+    "name": "real 3d object",
+    "box_2d": [
+      12.0,
+      107.00000000000001,
+      82.0,
+      154.0
+    ],
+    "grasp_point": [
+      51.0,
+      142.0
+    ],
+    "blocked_by": null,
+    "long_axis": null,
+    "polygon": null
+  },
+  {
+    "name": "real 3d object",
+    "box_2d": [
+      99.0,
+      169.00000000000003,
+      163.0,
+      203.0
+    ],
+    "grasp_point": [
+      114.0,
+      190.0
+    ],
+    "blocked_by": null,
+    "long_axis": null,
+    "polygon": null
+  },
+  {
+    "name": "real 3d object",
+    "box_2d": [
+      92.0,
+      173.00000000000003,
+      162.0,
+      227.0
+    ],
+    "grasp_point": [
+      123.0,
+      214.00000000000003
+    ],
+    "blocked_by": null,
+    "long_axis": null,
+    "polygon": null
+  },
+  {
+    "name": "real 3d object",
+    "box_2d": [
+      86.0,
+      220.00000000000003,
+      155.0,
+      272.00000000000006
+    ],
+    "grasp_point": [
+      116.00000000000001,
+      256.0
+    ],
+    "blocked_by": null,
+    "long_axis": null,
+    "polygon": null
+  },
+  {
+    "name": "real 3d object",
+    "box_2d": [
+      81.0,
+      259.0,
+      147.0,
+      313.0
+    ],
+    "grasp_point": [
+      110.00000000000001,
+      293.0
+    ],
+    "blocked_by": null,
+    "long_axis": null,
+    "polygon": null
+  },
+  {
+    "name": "real 3d object",
+    "box_2d": [
+      78.0,
+      303.0,
+      143.0,
+      357.00000000000006
+    ],
+    "grasp_point": [
+      106.99999999999999,
+      333.0
+    ],
+    "blocked_by": null,
+    "long_axis": null,
+    "polygon": null
+  },
+  {
+    "name": "real 3d object",
+    "box_2d": [
+      73.00000000000001,
+      356.0,
+      136.0,
+      412.00000000000006
+    ],
+    "grasp_point": [
+      106.99999999999999,
+      394.00000000000006
+    ],
+    "blocked_by": null,
+    "long_axis": null,
+    "polygon": null
+  },
+  {
+    "name": "real 3d object",
+    "box_2d": [
+      70.0,
+      412.00000000000006,
+      131.0,
+      468.00000000000006
+    ],
+    "grasp_point": [
+      103.0,
+      442.99999999999994
+    ],
+    "blocked_by": null,
+    "long_axis": null,
+    "polygon": null
+  },
+  {
+    "name": "real 3d object",
+    "box_2d": [
+      66.00000000000001,
+      468.00000000000006,
+      125.0,
+      524.0
+    ],
+    "grasp_point": [
+      97.0,
+      503.0
+    ],
+    "blocked_by": null,
+    "long_axis": null,
+    "polygon": null
+  },
+  {
+    "name": "real 3d object",
+    "box_2d": [
+      62.00000000000001,
+      524.0,
+      119.00000000000001,
+      582.0000000000001
+    ],
+    "grasp_point": [
+      94.00000000000001,
+      556.0000000000001
+    ],
+    "blocked_by": null,
+    "long_axis": null,
+    "polygon": null
+  },
+  {
+    "name": "real 3d object",
+    "box_2d": [
+      60.0,
+      582.0000000000001,
+      115.0,
+      639.0
+    ],
+    "grasp_point": [
+      95.0,
+      616.0
+    ],
+    "blocked_by": null,
+    "long_axis": null,
+    "polygon": null
+  }
+]

@@ -53,13 +53,24 @@
   "grasp_height_m": 0.0,
   "object_top_z_m_default": 0.0,
   "object_top_z_m": {
-    "_comment": "Visible top-face height (m) for pixel projection. Not gripper z.",
+    "_comment": "Fanuc camera only. Visible top-face height (m) for pixel projection. Not gripper z. Not shared with xArm.",
     "box": 0.05,
     "screw": 0.01,
     "container": 0.03
   },
   "grasp_height_offset_m": {
+    "_comment": "Fanuc root fallback. Prefer execution_by_arm.fanuc.",
     "screw": 0.0
+  },
+  "place_height_offset_m": {
+    "_comment": "Fanuc root fallback. Prefer execution_by_arm.fanuc. Container Place = table+100mm (UF Z=-235).",
+    "container": 0.10,
+    "yellow_container": 0.10,
+    "square_wooden_box": 0.10,
+    "wooden_box": 0.10,
+    "wooden_block": 0.10,
+    "cube": 0.10,
+    "box": 0.10
   },
   "footprint_buffer_m": 0.02,
   "table_polygon_xy": [
@@ -121,8 +132,8 @@
       0.0,
       0.0
     ],
-    "table_z_base_m": -0.32,
-    "_height_note": "2026-09-20: UF Z=-320 mm is table contact and the grasp Z. tip_z_uf = table_z_base_m + grasp_height_m. Approach is +80 mm (UF Z=-240 mm). Do not command Z below -320 mm.",
+    "table_z_base_m": -0.335,
+    "_height_note": "2026-09-20: UF Z=-335 mm is table contact and the grasp Z. tip_z_uf = table_z_base_m + grasp_height_m. Approach is +80 mm (UF Z=-255 mm). Place onto container releases at table+100 mm (UF Z=-235). Do not command Z below -335 mm. Heights are Fanuc-only; do not reuse xArm tables.",
     "flip_x": false,
     "flip_y": false,
     "xy_offset_base_mm": [
@@ -147,8 +158,28 @@
         0.0,
         0.0
       ],
-      "table_z_base_m": -0.32,
-      "_height_note": "2026-09-20: UF Z=-320 mm is table contact and the grasp Z.",
+      "table_z_base_m": -0.335,
+      "_height_note": "2026-09-20: UF Z=-335 mm is table contact and the grasp Z. Place onto container releases at table+100 mm (UF Z=-235). Independent of xArm height tables.",
+      "grasp_height_m": 0.0,
+      "object_top_z_m_default": 0.0,
+      "object_top_z_m": {
+        "box": 0.05,
+        "screw": 0.01,
+        "container": 0.03
+      },
+      "grasp_height_offset_m": {
+        "screw": 0.0
+      },
+      "place_height_offset_m": {
+        "_comment": "Fanuc Place: dest matching container → z = support.grasp_z + 0.10 m = UF Z -235 mm.",
+        "container": 0.10,
+        "yellow_container": 0.10,
+        "square_wooden_box": 0.10,
+        "wooden_box": 0.10,
+        "wooden_block": 0.10,
+        "cube": 0.10,
+        "box": 0.10
+      },
       "flip_x": false,
       "flip_y": false,
       "xy_offset_base_mm": [

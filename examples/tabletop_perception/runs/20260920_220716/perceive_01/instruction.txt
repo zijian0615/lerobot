@@ -1,0 +1,1 @@
+detect all graspable objects on the table

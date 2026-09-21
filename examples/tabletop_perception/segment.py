@@ -187,10 +187,11 @@ def _strong_robot_mask(image_rgb: np.ndarray) -> np.ndarray:
 
 def _blob_looks_like_cable(blob: dict) -> bool:
     """Gripper loom: saturated dark rubber, not a metal screw."""
-    _h, s, v = (float(x) for x in blob["mean_hsv"])
-    if s >= 110.0 and v <= 80.0:
-        return True
     if float(blob.get("cable_frac") or 0.0) > 0.20:
+        return True
+    _h, s, v = (float(x) for x in blob["mean_hsv"])
+    # Warm table light makes screws look red/saturated. A cable is longer.
+    if s >= 110.0 and v <= 80.0 and _blob_long_side_px(blob) > 50.0:
         return True
     return False
 
@@ -208,11 +209,12 @@ def blob_is_robot_clutter(blob: dict, image_h: float | None = None) -> bool:
     cable_dist = blob.get("cable_dist")
     on_yellow = 12.0 <= hh <= 40.0 and ss > 80.0
     # Screws on the yellow print sit next to the loom; gripper steel does not look yellow.
+    # 20 px was too close: flange / cable nubs were exempted and became screws.
     if (
         fill >= 0.40
         and v < 110.0
         and long_side <= 80.0
-        and (on_yellow or (cable_dist is not None and float(cable_dist) >= 20.0))
+        and (on_yellow or (cable_dist is not None and float(cable_dist) >= 55.0))
     ):
         return False
     if cable_dist is None:
@@ -357,6 +359,21 @@ def find_table_object_blobs(image_rgb: np.ndarray) -> list[dict]:
     return _nms_blobs(near + far, min_dist=dist)
 
 
+def find_table_screws(image_rgb: np.ndarray) -> list[dict]:
+    """Tiny dark screws only. DINO/YOLO keep cups, frames, and cans."""
+    hw = image_rgb.shape[:2]
+    screws: list[dict] = []
+    for blob in find_table_object_blobs(image_rgb):
+        if not _blob_looks_like_table_screw(blob, image_hw=hw):
+            continue
+        item = dict(blob)
+        item["hint"] = "screw"
+        item["score"] = 1.0
+        item["source"] = "dark_cc"
+        screws.append(item)
+    return screws
+
+
 def _blob_looks_like_print(blob: dict) -> bool:
     """Drop table graphics (yellow target, hollow printed grid)."""
     fill = float(blob.get("fill_ratio") or 0.0)
@@ -401,15 +418,25 @@ def _blob_looks_like_table_screw(
     _h, _s, v = (float(x) for x in blob["mean_hsv"])
     long_side = _blob_long_side_px(blob)
     gy = float(blob["grasp_point_px"][1])
-    on_table = gy > 0.50 * image_h
-    if v > 115.0 or aspect >= 4.5:
+    cable_dist = float(blob.get("cable_dist") or 1e6)
+    # Overhead table fills most of the frame. Top 28% is already wiped;
+    # 0.50 rejected real screws sitting on the upper printed sheet.
+    on_table = gy > 0.36 * image_h
+    if v > 110.0 or aspect >= 4.5:
+        return False
+    if cable_dist < 55.0:
         return False
     if (220.0 * s * s) <= area <= (550.0 * s * s) and fill >= 0.42 and v < 90.0:
         return True
     if not on_table:
         return False
+    # Print-sheet ticks are ~15–18 px. Real screws are longer and darker.
     # Thin screws leave a lot of white table in the bbox, so fill can be low.
-    return (36.0 * s) <= area <= (180.0 * s * s) and long_side <= (32.0 * s) and v < 110.0
+    return (
+        (36.0 * s) <= area <= (80.0 * s * s)
+        and (11.0 * s) <= long_side <= (22.0 * s)
+        and v < 110.0
+    )
 
 
 def recover_skip_name(blob: dict, image_hw: tuple[int, int] | None = None) -> str | None:
@@ -429,7 +456,7 @@ def recover_skip_name(blob: dict, image_hw: tuple[int, int] | None = None) -> st
     if image_hw is not None:
         near = gy > 0.55 * float(image_hw[0])
     if appear == "screw":
-        if image_hw is not None and gy < 0.50 * float(image_hw[0]):
+        if image_hw is not None and gy < 0.36 * float(image_hw[0]):
             return None
         return "screw"
     if appear == "red_pen":

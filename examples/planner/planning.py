@@ -72,7 +72,21 @@ _PLACE_REGION_NAMES = frozenset(
 )
 
 
-_SURFACE_NAME_KEYS = ("board", "tray", "stand", "mat", "container", "region", "grid")
+_SURFACE_NAME_KEYS = (
+    "board",
+    "tray",
+    "stand",
+    "mat",
+    "container",
+    "region",
+    "grid",
+    "box",
+    "block",
+    "cube",
+    "bin",
+    "bowl",
+    "wooden",
+)
 
 
 def _alias_object_name(name: str, object_names: set[str]) -> str:

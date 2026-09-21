@@ -244,7 +244,7 @@ def _run_points(args) -> int:
     xy_off = [float(v) for v in exe.get("xy_offset_base_mm", [0.0, 0.0])]
     wpr = tuple(float(v) for v in exe.get("topdown_wpr_deg", [180.0, 0.0, 0.0]))
     global_affine = _table_xy_affine_from_calib(calib)
-    z_default, z_heights = object_top_z_from_calib(calib)
+    z_default, z_heights = object_top_z_from_calib(calib, arm="fanuc")
     if verify:
         if global_affine is None:
             raise SystemExit("--verify 需要先完成 table_xy_affine 标定")

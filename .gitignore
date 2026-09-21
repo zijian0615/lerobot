@@ -166,6 +166,10 @@ wandb/
 data/
 outputs/
 
+# Local model weights (GitHub rejects files over 100MB)
+weights/clip/
+examples/mobileclip_blt.ts
+
 # Translations
 *.mo
 *.pot

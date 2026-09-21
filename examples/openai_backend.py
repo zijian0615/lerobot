@@ -36,53 +36,33 @@ GPT6_JSON_ONLY = (
     "instruction. Return only the JSON document requested above."
 )
 COSMOS_JSON_ONLY = (
-    "\n\nDo not reason out loud. Do not write analysis, captions, or "
-    "step-by-step thoughts. Do not use <think> or markdown fences. "
-    "Reply with a single JSON object only. The first character must be `{` "
-    "and the last character must be `}`."
+    "\n\nThink about the pixel location of each part. After </think>, "
+    "return a json list. No markdown fences."
 )
 COSMOS_DETECTION_JSON_SCHEMA: dict[str, Any] = {
-    "type": "object",
-    "properties": {
-        "objects": {
-            "type": "array",
-            "maxItems": 6,
-            "items": {
-                "type": "object",
-                "properties": {
-                    "name": {"type": "string"},
-                    "box_2d": {
-                        "type": "array",
-                        "items": {"type": "number"},
-                        "minItems": 4,
-                        "maxItems": 4,
-                    },
-                    "grasp_point": {
-                        "type": "array",
-                        "items": {"type": "number"},
-                        "minItems": 2,
-                        "maxItems": 2,
-                    },
-                    "long_axis": {},
-                    "blocked_by": {},
-                },
-                "required": ["name", "box_2d", "grasp_point"],
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "label": {"type": "string"},
+            "bbox_2d": {
+                "type": "array",
+                "items": {"type": "number"},
+                "minItems": 4,
+                "maxItems": 4,
             },
-        }
+            "point_2d": {
+                "type": "array",
+                "items": {"type": "number"},
+                "minItems": 2,
+                "maxItems": 2,
+            },
+        },
+        "required": ["label", "bbox_2d"],
     },
-    "required": ["objects"],
 }
 
-# Name numbered close-up tiles. Do not ask Nano to invent boxes.
-COSMOS_NAME_ENUM = [
-    "skip",
-    "red_pen",
-    "screw",
-    "vial",
-    "black_frame",
-    "black_block",
-    "purple_screwdriver",
-]
+# Name numbered close-up tiles. Open vocabulary — detector owns the boxes.
 COSMOS_NAMING_JSON_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
@@ -92,7 +72,7 @@ COSMOS_NAMING_JSON_SCHEMA: dict[str, Any] = {
                 "type": "object",
                 "properties": {
                     "id": {"type": "integer"},
-                    "name": {"type": "string", "enum": list(COSMOS_NAME_ENUM)},
+                    "name": {"type": "string"},
                 },
                 "required": ["id", "name"],
             },

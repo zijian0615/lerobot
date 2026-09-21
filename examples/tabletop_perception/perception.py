@@ -90,10 +90,24 @@ def resolve_object_top_z_m(
     return float(default_m)
 
 
-def object_top_z_from_calib(calib: dict) -> tuple[float, dict[str, float]]:
-    """Load ``(default_m, {name: height_m})`` from a calib dict."""
-    default_m = float(calib.get("object_top_z_m_default", 0.0))
-    raw = dict(calib.get("object_top_z_m") or {})
+def object_top_z_from_calib(
+    calib: dict, arm: str | None = None
+) -> tuple[float, dict[str, float]]:
+    """Load ``(default_m, {name: height_m})`` from a calib dict.
+
+    If ``arm`` is set and ``execution_by_arm[arm]`` has its own
+    ``object_top_z_m`` table, that table is used alone (not merged with
+    the root table) so Fanuc / xArm heights stay independent.
+    """
+    exe: dict = {}
+    if arm:
+        exe = dict((calib.get("execution_by_arm") or {}).get(arm) or {})
+    if exe.get("object_top_z_m") is not None or "object_top_z_m_default" in exe:
+        default_m = float(exe.get("object_top_z_m_default", calib.get("object_top_z_m_default", 0.0)))
+        raw = dict(exe.get("object_top_z_m") or {})
+    else:
+        default_m = float(calib.get("object_top_z_m_default", 0.0))
+        raw = dict(calib.get("object_top_z_m") or {})
     heights = {
         str(k): float(v)
         for k, v in raw.items()
@@ -282,8 +296,7 @@ class Perception:
         prompt_text = self.prompt if self.prompt is not None else ""
         raw = self.vlm_caller(image, instruction, prompt_text)
         detections = parse_vlm_detections(raw, image_hw=(height, width))
-        snap_blobs = "cosmos" in str(self.model).lower()
-        detections = refine_parsed_detections(image, detections, snap_blobs=snap_blobs)
+        detections = refine_parsed_detections(image, detections, snap_blobs=False)
         self.last_detections = detections
 
         a = b = None

@@ -160,14 +160,18 @@ def _capture_from_camera(
     fps: int,
     fourcc: str | None = "MJPG",
 ) -> np.ndarray:
+    from lerobot.cameras.configs import Cv2Backends
     from lerobot.cameras.opencv import OpenCVCamera, OpenCVCameraConfig
 
+    # OpenCV 5 + backend=ANY often fails to set MJPG, so UVC stays at 640x480 YUYV
+    # and 1920x1080 is rejected. Force V4L2 on Linux.
     cfg = OpenCVCameraConfig(
         index_or_path=index_or_path,
         width=width,
         height=height,
         fps=fps,
         fourcc=fourcc,
+        backend=Cv2Backends.V4L2,
     )
     cam = OpenCVCamera(cfg)
     cam.connect()

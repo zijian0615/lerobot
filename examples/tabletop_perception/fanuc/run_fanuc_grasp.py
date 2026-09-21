@@ -14,13 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Conservative one-shot Fanuc grasp: perceive → confirm → approach → down → close → lift."""
+"""Fanuc task grasp: read the instruction, perceive, pick the match, then move."""
 
 from __future__ import annotations
 
 import argparse
 import json
 import math
+import re
 import sys
 import time
 from datetime import datetime
@@ -35,7 +36,6 @@ if str(_EXAMPLES) not in sys.path:
     sys.path.insert(0, str(_EXAMPLES))
 
 from tabletop_perception.calibrate_table_xy import (  # noqa: E402
-    _pick_detection,
     _samples_path,
     _table_to_base_xy,
     _uv_zone,
@@ -71,7 +71,7 @@ from tabletop_perception.vlm import call_detection_vlm, parse_vlm_detections  # 
 
 DEFAULT_RUNS = Path(__file__).resolve().parents[1] / "runs"
 
-_TABLE_CONTACT_Z_MM = -320.0
+_TABLE_CONTACT_Z_MM = -335.0
 _Z_FLOOR_MM = _TABLE_CONTACT_Z_MM
 
 
@@ -107,16 +107,72 @@ def _set_gripper(robot, tcp: dict[str, float], wpr: tuple[float, float, float], 
     time.sleep(0.6)
 
 
-def _workspace_from_samples(samples_file: Path, margin_mm: float = 50.0) -> tuple[float, float, float, float] | None:
+def _sample_xy_mm(samples_file: Path) -> list[tuple[float, float]]:
     if not samples_file.exists():
-        return None
+        return []
     samples = list(json.loads(samples_file.read_text()).get("samples") or [])
-    pts = [s.get("true_base_mm") for s in samples if s.get("true_base_mm")]
+    return [
+        (float(p[0]), float(p[1]))
+        for s in samples
+        if (p := s.get("true_base_mm")) and len(p) >= 2
+    ]
+
+
+def _convex_hull(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    pts = sorted(set(points))
+    if len(pts) <= 2:
+        return pts
+
+    def cross(o: tuple[float, float], a: tuple[float, float], b: tuple[float, float]) -> float:
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+    lower: list[tuple[float, float]] = []
+    for p in pts:
+        while len(lower) >= 2 and cross(lower[-2], lower[-1], p) <= 0.0:
+            lower.pop()
+        lower.append(p)
+    upper: list[tuple[float, float]] = []
+    for p in reversed(pts):
+        while len(upper) >= 2 and cross(upper[-2], upper[-1], p) <= 0.0:
+            upper.pop()
+        upper.append(p)
+    return lower[:-1] + upper[:-1]
+
+
+def _point_in_hull(x: float, y: float, hull: list[tuple[float, float]]) -> bool:
+    if len(hull) < 3:
+        return True
+    inside = False
+    n = len(hull)
+    for i in range(n):
+        x1, y1 = hull[i]
+        x2, y2 = hull[(i + 1) % n]
+        if (y1 > y) != (y2 > y) and x < (x2 - x1) * (y - y1) / (y2 - y1 + 1e-12) + x1:
+            inside = not inside
+    return inside
+
+
+def _workspace_from_samples(samples_file: Path, margin_mm: float = 15.0) -> tuple[float, float, float, float] | None:
+    pts = _sample_xy_mm(samples_file)
     if len(pts) < 2:
         return None
-    xs = [float(p[0]) for p in pts]
-    ys = [float(p[1]) for p in pts]
+    xs = [p[0] for p in pts]
+    ys = [p[1] for p in pts]
     return (min(xs) - margin_mm, max(xs) + margin_mm, min(ys) - margin_mm, max(ys) + margin_mm)
+
+
+def _reach_from_samples(samples_file: Path) -> dict[str, Any] | None:
+    pts = _sample_xy_mm(samples_file)
+    if len(pts) < 3:
+        return None
+    xs = [p[0] for p in pts]
+    ys = [p[1] for p in pts]
+    return {
+        "pts": pts,
+        "hull": _convex_hull(pts),
+        "centroid": (sum(xs) / len(xs), sum(ys) / len(ys)),
+        "box": (min(xs) - 15.0, max(xs) + 15.0, min(ys) - 15.0, max(ys) + 15.0),
+    }
 
 
 def _inside_workspace(x_mm: float, y_mm: float, box: tuple[float, float, float, float] | None) -> bool:
@@ -142,6 +198,77 @@ _R_SINGULAR_LO_DEG = 70.0
 _R_SINGULAR_HI_DEG = 100.0
 _R_ABS_LIMIT_DEG = 155.0
 _MIN_YAW_PATH_MM = 40.0
+_TASK_STOP = frozenset(
+    {
+        "a",
+        "an",
+        "the",
+        "all",
+        "and",
+        "or",
+        "on",
+        "in",
+        "of",
+        "to",
+        "for",
+        "with",
+        "from",
+        "detect",
+        "list",
+        "pick",
+        "grasp",
+        "graspable",
+        "objects",
+        "object",
+        "table",
+        "tabletop",
+        "please",
+        "then",
+        "up",
+    }
+)
+
+
+def _instruction_keys(instruction: str, extra: str | None = None) -> list[str]:
+    text = f"{instruction or ''} {extra or ''}"
+    tokens = re.findall(r"[a-zA-Z][a-zA-Z0-9_-]+", text.lower())
+    keys: list[str] = []
+    for tok in tokens:
+        slug = tok.replace("-", "_")
+        if slug in _TASK_STOP or len(slug) < 3 or slug in keys:
+            continue
+        keys.append(slug)
+    return keys
+
+
+def _select_task_detection(
+    dets: list[dict[str, Any]],
+    instruction: str,
+    object_name: str | None = None,
+) -> dict[str, Any]:
+    """Choose one detection from the task prompt. No interactive index."""
+    if not dets:
+        raise SystemExit("没有检测到物体，无法执行任务。")
+    keys = _instruction_keys(instruction, object_name)
+    scored: list[tuple[int, dict[str, Any]]] = []
+    for det in dets:
+        name = str(det.get("name") or "").lower().replace(" ", "_")
+        score = sum(1 for key in keys if key in name or name in key)
+        if score:
+            scored.append((score, det))
+    pool = [det for _score, det in sorted(scored, key=lambda item: -item[0])] if scored else list(dets)
+    chosen = pool[0]
+    print("Detections:")
+    for i, det in enumerate(dets):
+        mark = " ←" if det is chosen else ""
+        print(f"  [{i}] {det['name']} grasp_px={det.get('grasp_point_px')}{mark}")
+    if scored:
+        print(f"按指令 {instruction!r} 选中 {chosen['name']}")
+    elif keys:
+        print(f"指令关键词 {keys} 没有命中，回退到 {chosen['name']}")
+    else:
+        print(f"指令没有具体物体名，使用 {chosen['name']}")
+    return chosen
 
 
 def _r_in_bad_pocket(r: float) -> bool:
@@ -192,12 +319,42 @@ def _yaw_via_xy(
     x0: float,
     y0: float,
     workspace: tuple[float, float, float, float] | None,
+    reach: dict[str, Any] | None = None,
 ) -> tuple[float, float] | None:
-    for dx, dy in ((40.0, 0.0), (-40.0, 0.0), (0.0, 40.0), (0.0, -40.0)):
-        vx, vy = x0 + dx, y0 + dy
+    """40 mm jog for wrist change. Prefer inward; never leave the calib hull."""
+    candidates: list[tuple[float, float]] = []
+    if reach is not None:
+        cx, cy = reach["centroid"]
+        dist = math.hypot(cx - x0, cy - y0)
+        if dist > 1.0:
+            candidates.append((x0 + 40.0 * (cx - x0) / dist, y0 + 40.0 * (cy - y0) / dist))
+    candidates.extend(
+        ((x0 + 40.0, y0), (x0 - 40.0, y0), (x0, y0 + 40.0), (x0, y0 - 40.0))
+    )
+    hull = None if reach is None else reach["hull"]
+    for vx, vy in candidates:
+        if hull is not None and not _point_in_hull(vx, vy, hull):
+            continue
         if _inside_workspace(vx, vy, workspace):
             return vx, vy
     return None
+
+
+def _travel_xy(
+    robot,
+    *,
+    x0: float,
+    y0: float,
+    x1: float,
+    y1: float,
+    z_mm: float,
+    wpr_deg: tuple[float, float, float],
+    speed: float,
+    reach: dict[str, Any] | None,
+) -> None:
+    """Linear XY at fixed WPR. Go straight; hull is only for the short yaw via."""
+    _ = (x0, y0, reach)
+    move_fanuc_xyz(robot, x_mm=x1, y_mm=y1, z_mm=z_mm, wpr_deg=wpr_deg, speed=speed)
 
 
 def _object_table_yaw_rad(
@@ -354,8 +511,8 @@ def main() -> int:
     p.add_argument("--calib", type=Path, default=DEFAULT_CALIB)
     p.add_argument("--camera", type=str, default="/dev/video0")
     p.add_argument("--robot-host", dest="robot_host", type=str, default=None)
-    p.add_argument("--object", type=str, default=None)
-    p.add_argument("--instruction", type=str, default="detect all graspable objects on the table")
+    p.add_argument("--object", type=str, default=None, help="Optional name hint; otherwise taken from the prompt")
+    p.add_argument("--instruction", type=str, default=None, help="Task prompt. If omitted, asked at runtime.")
     p.add_argument("--speed", type=float, default=40.0)
     p.add_argument("--descend-speed", type=float, default=20.0)
     p.add_argument("--yaw-speed", type=float, default=10.0)
@@ -385,16 +542,18 @@ def main() -> int:
     xy_off = [float(v) for v in exe.get("xy_offset_base_mm", [0.0, 0.0])]
     wpr = tuple(float(v) for v in exe.get("topdown_wpr_deg", [180.0, 0.0, 0.0]))
     yaw_offset = float(exe.get("grasp_yaw_offset_rad", 0.0))
-    table_z = float(exe.get("table_z_base_m", -0.320))
+    table_z = float(exe.get("table_z_base_m", -0.335))
     approach = float(exe.get("approach_offset_m", 0.08))
     lift = float(exe.get("lift_offset_m", 0.08))
-    grasp_h = float(calib["grasp_height_m"])
+    grasp_h = float(exe.get("grasp_height_m", calib.get("grasp_height_m", 0.0)))
     grasp_off = {
         str(key): float(val)
-        for key, val in dict(calib.get("grasp_height_offset_m") or {}).items()
+        for key, val in dict(
+            exe.get("grasp_height_offset_m") or calib.get("grasp_height_offset_m") or {}
+        ).items()
         if not str(key).startswith("_")
     }
-    z_default, z_heights = object_top_z_from_calib(calib)
+    z_default, z_heights = object_top_z_from_calib(calib, arm="fanuc")
     table_polygon = _polygon_from_xy(calib["table_polygon_xy"])
     arm_workspaces = {
         name: _workspace_from_spec(spec) for name, spec in calib["arm_workspaces_xy"].items()
@@ -413,6 +572,13 @@ def main() -> int:
     print(f"taught WPR={wpr}  yaw_offset={math.degrees(yaw_offset):.1f}°", flush=True)
     print("示教器请保持可急停。输入 go 后才会运动。")
 
+    instruction = (args.instruction or "").strip()
+    if not instruction:
+        instruction = input("任务指令：").strip()
+    if not instruction:
+        raise SystemExit("需要任务指令，例如：pick the red pen")
+    print(f"task={instruction!r}", flush=True)
+
     robot = _connect_fanuc(calib, args.robot_host)
     try:
         tcp = _read_tcp(robot)
@@ -421,60 +587,52 @@ def main() -> int:
             f"WPR=({tcp['w_deg']:.1f}, {tcp['p_deg']:.1f}, {tcp['r_deg']:.1f})"
         )
 
-        det = None
-        while det is None:
-            print("摆好物体后，按 Enter 拍照。")
-            input(">>> 按 Enter 拍照：")
-            image = _capture_from_camera(
-                camera_path,
-                width=int(cam_cfg["width"]),
-                height=int(cam_cfg["height"]),
-                fps=int(cam_cfg["fps"]),
-                fourcc=cam_cfg.get("fourcc") or "MJPG",
-            )
-            print(f"图像 {image.shape[1]}x{image.shape[0]}，正在调用 VLM ({args.model})…")
-            raw = call_detection_vlm(image, args.instruction, model=args.model)
-            dets = parse_vlm_detections(raw, image_hw=(image.shape[0], image.shape[1]))
-            perception_once = Perception(
-                footprint_buffer_m=footprint_buffer,
-                prompt=None,
-                vlm_caller=lambda _img, _ins, _p: raw,
-                table_xy_affine=affine,
-                grasp_height_offsets_m=grasp_off,
-                object_top_z_m=z_heights,
-                object_top_z_m_default=z_default,
-                model=str(args.model),
-            )
-            symbolic_view, geometric_view = perception_once(
-                image=image,
-                K=k,
-                T_cam_table=t_ct,
-                grasp_height=grasp_h,
-                instruction=args.instruction,
-                arm_workspaces=arm_workspaces,
-                table_polygon=table_polygon,
-            )
-            dets = perception_once.last_detections or dets
-            perceive_n += 1
-            perceive_dir = stamp_dir / f"perceive_{perceive_n:02d}"
-            _dump_perceive_dir(
-                perceive_dir,
-                image=image,
-                instruction=args.instruction,
-                raw=list(raw),
-                detections=dets,
-                symbolic=symbolic_view,
-                geometric=geometric_view,
-            )
-            _mirror_latest(perceive_dir, stamp_dir)
-            print(f"Wrote perception logs → {perceive_dir}", flush=True)
-            for i, d in enumerate(dets):
-                print(
-                    f"[yaw] det[{i}] name={d.get('name')} "
-                    f"grasp={d.get('grasp_point_px')} long_axis_px={d.get('long_axis_px')}",
-                    flush=True,
-                )
-            det = _pick_detection(dets, args.object)
+        print("按 Enter 拍照并执行任务。")
+        input(">>> 按 Enter 拍照：")
+        image = _capture_from_camera(
+            camera_path,
+            width=int(cam_cfg["width"]),
+            height=int(cam_cfg["height"]),
+            fps=int(cam_cfg["fps"]),
+            fourcc=cam_cfg.get("fourcc") or "MJPG",
+        )
+        print(f"图像 {image.shape[1]}x{image.shape[0]}，正在调用 VLM ({args.model})…")
+        raw = call_detection_vlm(image, instruction, model=args.model)
+        dets = parse_vlm_detections(raw, image_hw=(image.shape[0], image.shape[1]))
+        perception_once = Perception(
+            footprint_buffer_m=footprint_buffer,
+            prompt=None,
+            vlm_caller=lambda _img, _ins, _p: raw,
+            table_xy_affine=affine,
+            grasp_height_offsets_m=grasp_off,
+            object_top_z_m=z_heights,
+            object_top_z_m_default=z_default,
+            model=str(args.model),
+        )
+        symbolic_view, geometric_view = perception_once(
+            image=image,
+            K=k,
+            T_cam_table=t_ct,
+            grasp_height=grasp_h,
+            instruction=instruction,
+            arm_workspaces=arm_workspaces,
+            table_polygon=table_polygon,
+        )
+        dets = perception_once.last_detections or dets
+        perceive_n += 1
+        perceive_dir = stamp_dir / f"perceive_{perceive_n:02d}"
+        _dump_perceive_dir(
+            perceive_dir,
+            image=image,
+            instruction=instruction,
+            raw=list(raw),
+            detections=dets,
+            symbolic=symbolic_view,
+            geometric=geometric_view,
+        )
+        _mirror_latest(perceive_dir, stamp_dir)
+        print(f"Wrote perception logs → {perceive_dir}", flush=True)
+        det = _select_task_detection(dets, instruction, args.object)
 
         uv = tuple(float(v) for v in det["grasp_point_px"])
         z_top = resolve_object_top_z_m(det["name"], z_heights, z_default)
@@ -500,7 +658,9 @@ def main() -> int:
             current_r_deg=tcp["r_deg"],
         )
 
-        workspace = _workspace_from_samples(_samples_path(args.calib, "fanuc"))
+        samples_path = _samples_path(args.calib, "fanuc")
+        workspace = _workspace_from_samples(samples_path)
+        reach = _reach_from_samples(samples_path)
         print()
         print("========== GRASP PLAN ==========")
         print(f"  object={det['name']} uv={uv} zone={_uv_zone(uv, image.shape[0])}")
@@ -537,6 +697,7 @@ def main() -> int:
             "travel_z_mm": approach_z,
             "grasp_z_mm": grasp_z,
             "lift_z_mm": lift_z,
+            "instruction": instruction,
             "vlm": args.model,
             "perceive_dir": str(stamp_dir / f"perceive_{perceive_n:02d}"),
         }
@@ -573,29 +734,102 @@ def main() -> int:
         path_mm = math.hypot(cmd_x - tcp["x_mm"], cmd_y - tcp["y_mm"])
         delta_r = _wrap_signed_deg(face_wpr[2] - tcp["r_deg"])
         travel_speed = args.yaw_speed if abs(delta_r) > 15.0 and path_mm < 80.0 else args.speed
-        waypoints: list[tuple[float, float]] = []
-        if abs(delta_r) > 5.0 and path_mm < _MIN_YAW_PATH_MM:
-            via = _yaw_via_xy(tcp["x_mm"], tcp["y_mm"], workspace)
+        # Do not slerp a large wrist change along a long Cartesian line.
+        # Fanuc LinearMotion interpolates orientation, which SystemFaults
+        # even when start/end R are both reachable (e.g. R=-90 → 21 over 300 mm).
+        if abs(delta_r) > 15.0:
+            via = _yaw_via_xy(tcp["x_mm"], tcp["y_mm"], workspace, reach)
             if via is not None:
-                waypoints.append(via)
                 print(
-                    f"[yaw] path {path_mm:.0f} mm too short for ΔR={delta_r:.1f}°, "
-                    f"via=({via[0]:.1f},{via[1]:.1f})",
+                    f"3/6 先短移转腕 → ({via[0]:.1f}, {via[1]:.1f}) "
+                    f"R={tcp['r_deg']:.1f}→{face_wpr[2]:.1f}，再平移到目标",
                     flush=True,
                 )
-        waypoints.append((cmd_x, cmd_y))
-        print(
-            f"3/6 平移中连续转腕 → ({cmd_x:.1f}, {cmd_y:.1f}) Z={travel_z:.1f} "
-            f"R={tcp['r_deg']:.1f}→{face_wpr[2]:.1f} @ {travel_speed:.0f} mm/s"
-        )
-        for wx, wy in waypoints:
-            move_fanuc_xyz(
+                move_fanuc_xyz(
+                    robot,
+                    x_mm=via[0],
+                    y_mm=via[1],
+                    z_mm=travel_z,
+                    wpr_deg=face_wpr,
+                    speed=args.yaw_speed,
+                )
+            else:
+                print(
+                    f"3/6 无绕行点，先保持 R={tcp['r_deg']:.1f} 平移，到点后再转腕",
+                    flush=True,
+                )
+                _travel_xy(
+                    robot,
+                    x0=tcp["x_mm"],
+                    y0=tcp["y_mm"],
+                    x1=cmd_x,
+                    y1=cmd_y,
+                    z_mm=travel_z,
+                    wpr_deg=(tcp["w_deg"], tcp["p_deg"], tcp["r_deg"]),
+                    speed=args.speed,
+                    reach=reach,
+                )
+                via = _yaw_via_xy(cmd_x, cmd_y, workspace, reach)
+                if via is None:
+                    raise RuntimeError("no workspace via for yaw; refuse in-place wrist flip")
+                move_fanuc_xyz(
+                    robot,
+                    x_mm=via[0],
+                    y_mm=via[1],
+                    z_mm=travel_z,
+                    wpr_deg=face_wpr,
+                    speed=args.yaw_speed,
+                )
+            after = _read_tcp(robot)
+            print(
+                f"    再平移 → ({cmd_x:.1f}, {cmd_y:.1f}) Z={travel_z:.1f} "
+                f"R={face_wpr[2]:.1f} @ {args.speed:.0f} mm/s",
+                flush=True,
+            )
+            _travel_xy(
                 robot,
-                x_mm=wx,
-                y_mm=wy,
+                x0=after["x_mm"],
+                y0=after["y_mm"],
+                x1=cmd_x,
+                y1=cmd_y,
+                z_mm=travel_z,
+                wpr_deg=face_wpr,
+                speed=args.speed,
+                reach=reach,
+            )
+        else:
+            start_x, start_y = tcp["x_mm"], tcp["y_mm"]
+            if abs(delta_r) > 5.0 and path_mm < _MIN_YAW_PATH_MM:
+                via = _yaw_via_xy(start_x, start_y, workspace, reach)
+                if via is not None:
+                    print(
+                        f"[yaw] path {path_mm:.0f} mm too short for ΔR={delta_r:.1f}°, "
+                        f"via=({via[0]:.1f},{via[1]:.1f})",
+                        flush=True,
+                    )
+                    move_fanuc_xyz(
+                        robot,
+                        x_mm=via[0],
+                        y_mm=via[1],
+                        z_mm=travel_z,
+                        wpr_deg=face_wpr,
+                        speed=travel_speed,
+                    )
+                    start_x, start_y = via
+            print(
+                f"3/6 平移 → ({cmd_x:.1f}, {cmd_y:.1f}) Z={travel_z:.1f} "
+                f"R={tcp['r_deg']:.1f}→{face_wpr[2]:.1f} @ {travel_speed:.0f} mm/s"
+            )
+            _travel_xy(
+                robot,
+                x0=start_x,
+                y0=start_y,
+                x1=cmd_x,
+                y1=cmd_y,
                 z_mm=travel_z,
                 wpr_deg=face_wpr,
                 speed=travel_speed,
+                reach=reach,
             )
         after_xy = _read_tcp(robot)
         print(

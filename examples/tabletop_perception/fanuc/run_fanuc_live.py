@@ -58,6 +58,7 @@ from tabletop_perception.perception import Perception, object_top_z_from_calib  
 from tabletop_perception.run_xarm_live import (  # noqa: E402
     _capture_from_camera,
     _draw_image_overlay,
+    _execution_cfg_for_arm,
     _load_calib,
     _load_image,
     _mock_detections_for_scene,
@@ -169,13 +170,16 @@ def main(argv: list[str] | None = None) -> int:
     arm_workspaces = {
         name: _workspace_from_spec(spec) for name, spec in calib["arm_workspaces_xy"].items()
     }
-    grasp_height = float(calib["grasp_height_m"])
+    exe = _execution_cfg_for_arm(calib, "fanuc")
+    grasp_height = float(exe.get("grasp_height_m", calib.get("grasp_height_m", 0.0)))
     grasp_height_offsets = {
         str(key): float(val)
-        for key, val in dict(calib.get("grasp_height_offset_m") or {}).items()
+        for key, val in dict(
+            exe.get("grasp_height_offset_m") or calib.get("grasp_height_offset_m") or {}
+        ).items()
         if not str(key).startswith("_")
     }
-    object_top_z_default, object_top_z = object_top_z_from_calib(calib)
+    object_top_z_default, object_top_z = object_top_z_from_calib(calib, arm="fanuc")
     footprint_buffer = float(calib.get("footprint_buffer_m", 0.02))
 
     prompt = None

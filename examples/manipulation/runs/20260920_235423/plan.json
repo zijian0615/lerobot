@@ -1,0 +1,23 @@
+[
+  {
+    "step": 1,
+    "arm": "fanuc",
+    "primitive": "Grasp",
+    "args": {
+      "object": "screw"
+    },
+    "depends_on": []
+  },
+  {
+    "step": 2,
+    "arm": "fanuc",
+    "primitive": "Place",
+    "args": {
+      "object": "screw",
+      "destination": "yellow_container"
+    },
+    "depends_on": [
+      1
+    ]
+  }
+]

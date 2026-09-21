@@ -30,8 +30,6 @@ from PIL import Image
 
 from openai_backend import (
     COSMOS3_NANO_MODEL,
-    COSMOS_JSON_ONLY,
-    COSMOS_NAME_ENUM,
     COSMOS_NAMING_JSON_SCHEMA,
     GPT6_ASTRA_MODEL,
     GPT6_JSON_ONLY,
@@ -176,6 +174,11 @@ def _aabb_from_polygon(polygon: Any) -> list[float] | None:
 
 def _coerce_box_2d(name: str, item: dict[str, Any]) -> list[float]:
     box = item.get("box_2d")
+    bbox = item.get("bbox_2d")
+    if box is None and isinstance(bbox, (list, tuple)) and len(bbox) == 4:
+        # Official Cosmos xyxy → internal [ymin, xmin, ymax, xmax].
+        x1, y1, x2, y2 = (float(c) for c in bbox)
+        box = [y1, x1, y2, x2]
     if box is None and all(k in item for k in ("y", "x", "y2", "x2")):
         box = [item["y"], item["x"], item["y2"], item["x2"]]
     if isinstance(box, (list, tuple)) and len(box) == 4:
@@ -200,6 +203,10 @@ def _coerce_raw_detection(item: dict[str, Any]) -> RawDetection:
     box = _coerce_box_2d(name, item)
 
     grasp = item.get("grasp_point")
+    if grasp is None and isinstance(item.get("point_2d"), (list, tuple)):
+        # Official Cosmos [x, y] → internal [y, x].
+        px, py = item["point_2d"][:2]
+        grasp = [py, px]
     if grasp is None and "point" in item:
         grasp = item["point"]
     if not isinstance(grasp, (list, tuple)) or len(grasp) != 2:
@@ -394,39 +401,246 @@ _COSMOS_SKIP_NAMES = frozenset(
         "yellow_diamond",
     }
 )
+_COSMOS_PLACEHOLDER_NAMES = frozenset(
+    {
+        "object",
+        "objects",
+        "item",
+        "thing",
+        "target",
+        "detection",
+        "label",
+        "name",
+        "object_name",
+        "specific_name",
+        "real_3d_object",
+        "3d_object",
+        "graspable",
+        "graspable_object",
+    }
+)
+_COSMOS_PLACEHOLDER_TOKENS = frozenset(
+    {
+        "real",
+        "3d",
+        "object",
+        "objects",
+        "graspable",
+        "item",
+        "thing",
+        "target",
+        "all",
+        "instance",
+    }
+)
 
 
-_COSMOS_MAX_BLOBS = 12
+# Nano's native vision cap is 720p 16:9 (1280x720). Capture stays 1080p.
+_COSMOS_VIEW_W = 1280
+_COSMOS_VIEW_H = 720
+
+
+def _letterbox_cosmos_view(image: np.ndarray) -> tuple[np.ndarray, dict[str, float]]:
+    """Fit ``image`` into a 1280x720 canvas. Return (view, affine meta)."""
+    orig_h, orig_w = int(image.shape[0]), int(image.shape[1])
+    tw, th = _COSMOS_VIEW_W, _COSMOS_VIEW_H
+    scale = min(tw / max(orig_w, 1), th / max(orig_h, 1))
+    nw = max(1, int(round(orig_w * scale)))
+    nh = max(1, int(round(orig_h * scale)))
+    resized = Image.fromarray(image).resize((nw, nh), Image.Resampling.LANCZOS)
+    canvas = Image.new("RGB", (tw, th), (0, 0, 0))
+    ox = (tw - nw) // 2
+    oy = (th - nh) // 2
+    canvas.paste(resized, (ox, oy))
+    return np.asarray(canvas), {
+        "scale": float(scale),
+        "ox": float(ox),
+        "oy": float(oy),
+        "tw": float(tw),
+        "th": float(th),
+        "orig_w": float(orig_w),
+        "orig_h": float(orig_h),
+    }
+
+
+def _canvas_xy_to_orig_norm(
+    x_n: float, y_n: float, meta: dict[str, float]
+) -> tuple[float, float]:
+    """Map a 0-1000 (x, y) on the 720p canvas to 0-1000 on the original frame."""
+    x_c = float(x_n) / 1000.0 * meta["tw"]
+    y_c = float(y_n) / 1000.0 * meta["th"]
+    scale = max(float(meta["scale"]), 1e-6)
+    x_o = (x_c - meta["ox"]) / scale
+    y_o = (y_c - meta["oy"]) / scale
+    x_o = min(max(x_o, 0.0), meta["orig_w"] - 1e-3)
+    y_o = min(max(y_o, 0.0), meta["orig_h"] - 1e-3)
+    return x_o / meta["orig_w"] * 1000.0, y_o / meta["orig_h"] * 1000.0
+
+
+def _remap_cosmos_item(item: dict[str, Any], meta: dict[str, float]) -> dict[str, Any]:
+    """Convert official ``bbox_2d``/``point_2d`` (xy on 720p) to internal yx 0-1000."""
+    out = dict(item)
+    if isinstance(item.get("bbox_2d"), (list, tuple)) and len(item["bbox_2d"]) == 4:
+        x1, y1, x2, y2 = (float(v) for v in item["bbox_2d"])
+        xa, ya = _canvas_xy_to_orig_norm(x1, y1, meta)
+        xb, yb = _canvas_xy_to_orig_norm(x2, y2, meta)
+        out["box_2d"] = [min(ya, yb), min(xa, xb), max(ya, yb), max(xa, xb)]
+    elif isinstance(item.get("box_2d"), (list, tuple)) and len(item["box_2d"]) == 4:
+        ymin, xmin, ymax, xmax = (float(v) for v in item["box_2d"])
+        xa, ya = _canvas_xy_to_orig_norm(xmin, ymin, meta)
+        xb, yb = _canvas_xy_to_orig_norm(xmax, ymax, meta)
+        out["box_2d"] = [min(ya, yb), min(xa, xb), max(ya, yb), max(xa, xb)]
+
+    if isinstance(item.get("point_2d"), (list, tuple)) and len(item["point_2d"]) == 2:
+        x, y = (float(v) for v in item["point_2d"])
+        xn, yn = _canvas_xy_to_orig_norm(x, y, meta)
+        out["grasp_point"] = [yn, xn]
+    elif isinstance(item.get("grasp_point"), (list, tuple)) and len(item["grasp_point"]) == 2:
+        gy, gx = (float(v) for v in item["grasp_point"])
+        xn, yn = _canvas_xy_to_orig_norm(gx, gy, meta)
+        out["grasp_point"] = [yn, xn]
+
+    axis = item.get("long_axis")
+    if isinstance(axis, (list, tuple)) and len(axis) == 2:
+        remapped: list[list[float]] = []
+        for pt in axis:
+            if not isinstance(pt, (list, tuple)) or len(pt) != 2:
+                remapped = []
+                break
+            yn, xn = float(pt[0]), float(pt[1])
+            xo, yo = _canvas_xy_to_orig_norm(xn, yn, meta)
+            remapped.append([yo, xo])
+        if remapped:
+            out["long_axis"] = remapped
+    out.pop("bbox_2d", None)
+    out.pop("point_2d", None)
+    return out
+
+
+def _cosmos_item_name(item: dict[str, Any]) -> str:
+    """Nano often returns bbox_2d with no label. Keep the box; name it ``part``."""
+    for key in ("name", "label", "category", "class_name", "class", "type", "caption"):
+        value = item.get(key)
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text and text.lower() not in {"null", "none", "n/a", ""}:
+            return text
+    return "part"
+
+
+_KEEP_HINT_TOKENS = frozenset(
+    {
+        "container",
+        "cup",
+        "mug",
+        "bottle",
+        "can",
+        "pen",
+        "frame",
+        "block",
+        "box",
+        "bowl",
+        "bin",
+        "tray",
+        "spray",
+    }
+)
+
+
+_GENERIC_SURFACE_NAMES = frozenset(
+    {
+        "wooden_block",
+        "block",
+        "cube",
+        "box",
+        "wooden_box",
+        "square_wooden_box",
+        "wood_block",
+        "wood_box",
+    }
+)
+
+
+def _prefer_detector_container_name(cosmos_name: str, keep: str) -> bool:
+    """DINO said container; Cosmos renamed it cube/block. Keep the hint."""
+    keep_toks = set(keep.split("_"))
+    if not keep_toks & {"container", "bin", "bowl", "tray"}:
+        return False
+    slug = slug_detection_name(cosmos_name)
+    return slug in _GENERIC_SURFACE_NAMES or slug.split("_")[-1] in {
+        "block",
+        "cube",
+        "box",
+    }
+
+
+def _hint_keep_name(hint: str) -> str | None:
+    """Keep a detector box when Cosmos says skip, if the hint is a real part."""
+    slug = slug_detection_name(hint)
+    if slug == "screw" or slug.startswith("screw_"):
+        return "screw"
+    tokens = [t for t in slug.split("_") if t and t not in {"part", "object", "objects"}]
+    if not tokens or not any(t in _KEEP_HINT_TOKENS for t in tokens):
+        return None
+    cleaned: list[str] = []
+    for tok in tokens:
+        if cleaned and tok == cleaned[-1]:
+            continue
+        cleaned.append(tok)
+    return "_".join(cleaned) or None
+
+
+def _cosmos_skip_name(name: str) -> bool:
+    slug = slug_detection_name(name)
+    if slug in _COSMOS_SKIP_NAMES or slug in _COSMOS_PLACEHOLDER_NAMES:
+        return True
+    tokens = [t for t in slug.split("_") if t]
+    if tokens and set(tokens) <= _COSMOS_PLACEHOLDER_TOKENS:
+        return True
+    return bool(set(tokens) & {"skip", "print", "printed", "drawing", "grid", "robot", "cable"})
+
+
+def _drop_cosmos_top_strip(dets: list[RawDetection]) -> list[RawDetection]:
+    """Drop a padded row of boxes glued to the top of the frame (quota fill)."""
+    top: list[RawDetection] = []
+    rest: list[RawDetection] = []
+    for det in dets:
+        ymax = float(det["box_2d"][2])
+        (rest if ymax >= 200.0 else top).append(det)
+    if len(top) >= 4 and len(top) >= len(rest):
+        print(f"[cosmos] drop {len(top)} top-strip boxes (quota fill)", flush=True)
+        return rest
+    return dets
+
+
+def _cosmos_box_is_blank(
+    image: np.ndarray, box_yx: list[float], *, mean_min: float = 225.0, std_max: float = 10.0
+) -> bool:
+    """True when the box sits on uniform bright table, not on a real part."""
+    if image.ndim != 3 or len(box_yx) != 4:
+        return False
+    height, width = int(image.shape[0]), int(image.shape[1])
+    ymin, xmin, ymax, xmax = (float(v) for v in box_yx)
+    y0 = int(min(ymin, ymax) / 1000.0 * height)
+    y1 = int(max(ymin, ymax) / 1000.0 * height)
+    x0 = int(min(xmin, xmax) / 1000.0 * width)
+    x1 = int(max(xmin, xmax) / 1000.0 * width)
+    y0, y1 = max(0, y0), min(height, max(y1, y0 + 1))
+    x0, x1 = max(0, x0), min(width, max(x1, x0 + 1))
+    crop = image[y0:y1, x0:x1]
+    if crop.size == 0:
+        return True
+    gray = crop.mean(axis=2)
+    return float(gray.mean()) >= mean_min and float(gray.std()) <= std_max
+
+
+_COSMOS_MAX_BOXES = 16
 _COSMOS_TILE_PX = 256
 
 
-def _select_cosmos_blobs(
-    blobs: list[dict],
-    limit: int = _COSMOS_MAX_BLOBS,
-    *,
-    image_h: int = 480,
-) -> list[dict]:
-    """Largest blobs, plus leftover NEAR-band screws that would otherwise be dropped."""
-    ranked = sorted(blobs, key=lambda b: -float(b.get("area") or 0.0))
-    picked = ranked[: max(1, int(limit))]
-    picked_ids = {id(b) for b in picked}
-    near_y = 0.70 * float(image_h)
-    extra: list[dict] = []
-    for blob in ranked:
-        if id(blob) in picked_ids:
-            continue
-        if float(blob["grasp_point_px"][1]) < near_y:
-            continue
-        if float(blob.get("area") or 0.0) < 36.0 * (float(image_h) / 480.0):
-            continue
-        extra.append(blob)
-        if len(picked) + len(extra) >= int(limit):
-            break
-    return picked + extra
-
-
 def _cosmos_object_sheet(image: np.ndarray, blobs: list[dict]) -> np.ndarray:
-    """One close-up tile per blob so Nano sees the object, not a tiny box on the table."""
+    """One close-up tile per detector box so Nano names the object, not a scene."""
     import cv2
 
     n = max(len(blobs), 1)
@@ -439,7 +653,7 @@ def _cosmos_object_sheet(image: np.ndarray, blobs: list[dict]) -> np.ndarray:
         r, c = divmod(i, cols)
         x0, y0, x1, y1 = (float(v) for v in blob["box_2d_px"])
         bw, bh = max(x1 - x0, 8.0), max(y1 - y0, 8.0)
-        margin = int(max(6.0, 0.12 * max(bw, bh)))
+        margin = int(max(8.0, 0.18 * max(bw, bh)))
         xa = max(0, int(math.floor(x0)) - margin)
         ya = max(0, int(math.floor(y0)) - margin)
         xb = min(width, int(math.ceil(x1)) + margin)
@@ -517,14 +731,6 @@ def _parse_cosmos_names(text: str) -> dict[int, str]:
     return names
 
 
-def _cosmos_skip_name(name: str) -> bool:
-    slug = slug_detection_name(name)
-    if slug in _COSMOS_SKIP_NAMES:
-        return True
-    tokens = set(slug.split("_"))
-    return bool(tokens & {"skip", "print", "printed", "drawing", "grid", "robot", "cable"})
-
-
 def call_cosmos_detection(
     image: np.ndarray,
     instruction: str,
@@ -534,22 +740,13 @@ def call_cosmos_detection(
     api_key: str | None = None,
     thinking_budget: int = -1,
 ) -> list[RawDetection]:
-    """Name classical table blobs with Cosmos. Do not let Nano invent boxes."""
+    """DINO/YOLO large boxes + dark-CC screws; Cosmos names crops. No invented boxes."""
     import base64
 
     del thinking_budget  # Cosmos chat has no Gemini-style thinking_budget.
-    from .segment import (
-        _appearance_base_name,
-        _blob_looks_like_print,
-        _blob_looks_like_table_screw,
-        blob_is_robot_clutter,
-        find_table_object_blobs,
-        recover_skip_name,
-    )
+    from .detector import detect_table_objects
 
-    blobs = find_table_object_blobs(image)
-    blobs = _select_cosmos_blobs(blobs, image_h=int(image.shape[0]))
-    print(f"[cosmos] grounded blobs={len(blobs)}", flush=True)
+    blobs = detect_table_objects(image, instruction, max_dets=_COSMOS_MAX_BOXES)
     if not blobs:
         return []
 
@@ -557,12 +754,13 @@ def call_cosmos_detection(
     prompt_text = (
         template.format(instruction=instruction)
         + f"\nThere are {len(blobs)} tiles, numbered 1 to {len(blobs)}."
-        + COSMOS_JSON_ONLY
+        + "\nAfter </think>, return one JSON object "
+        + '{"objects":[{"id":1,"name":"..."}]} with no markdown fences.'
     )
     view = _cosmos_object_sheet(image, blobs)
     print(
-        f"[cosmos] object sheet {view.shape[1]}x{view.shape[0]} "
-        f"from {image.shape[1]}x{image.shape[0]}",
+        f"[cosmos] name sheet {view.shape[1]}x{view.shape[0]} "
+        f"from {len(blobs)} detector boxes on {image.shape[1]}x{image.shape[0]}",
         flush=True,
     )
     schema = dict(COSMOS_NAMING_JSON_SCHEMA)
@@ -570,11 +768,6 @@ def call_cosmos_detection(
     objects_schema = dict(schema["properties"]["objects"])
     objects_schema["minItems"] = len(blobs)
     objects_schema["maxItems"] = len(blobs)
-    item_schema = dict(objects_schema.get("items") or {})
-    item_props = dict(item_schema.get("properties") or {})
-    item_props["name"] = {"type": "string", "enum": list(COSMOS_NAME_ENUM)}
-    item_schema["properties"] = item_props
-    objects_schema["items"] = item_schema
     schema["properties"]["objects"] = objects_schema
     image_b64 = base64.b64encode(_jpeg_bytes(view, quality=90)).decode("ascii")
     messages = [
@@ -603,12 +796,12 @@ def call_cosmos_detection(
                 model=model,
                 messages=messages,
                 api_key=api_key,
-                max_tokens=384,
+                max_tokens=512,
                 extra_body={"guided_json": schema},
                 response_format={
                     "type": "json_schema",
                     "json_schema": {
-                        "name": "tabletop_blob_names",
+                        "name": "tabletop_box_names",
                         "schema": schema,
                     },
                 },
@@ -624,7 +817,7 @@ def call_cosmos_detection(
             if attempt == 0:
                 print("[cosmos] retrying once", flush=True)
                 continue
-            print(f"[cosmos] naming failed, using appearance names: {last_error}", flush=True)
+            print(f"[cosmos] naming failed, using detector hints: {last_error}", flush=True)
             names = {}
             break
         try:
@@ -637,54 +830,48 @@ def call_cosmos_detection(
             if attempt == 0:
                 print("[cosmos] retrying once", flush=True)
                 continue
-            print("[cosmos] naming parse failed, using appearance names", flush=True)
+            print("[cosmos] naming parse failed, using detector hints", flush=True)
             names = {}
 
-    enum_names = {slug_detection_name(n) for n in COSMOS_NAME_ENUM} - {"skip"}
     out: list[RawDetection] = []
     for i, blob in enumerate(blobs, start=1):
-        appear = _appearance_base_name(blob)
+        hint = str(blob.get("hint") or "part")
         cosmos_name = names.get(i)
-        if _blob_looks_like_print(blob) or blob_is_robot_clutter(blob, image_h=image.shape[0]):
-            print(f"[cosmos] skip blob {i} robot/print appear={appear}", flush=True)
-            continue
-        screw = _blob_looks_like_table_screw(blob, image_hw=image.shape[:2])
-        if screw:
-            name = "screw"
-            if cosmos_name and slug_detection_name(cosmos_name) != "screw":
+        keep = _hint_keep_name(hint)
+        if cosmos_name and _cosmos_skip_name(cosmos_name):
+            if keep:
                 print(
-                    f"[cosmos] blob {i} {cosmos_name!r}→screw (geometry)",
+                    f"[cosmos] keep tile {i} as {keep} (cosmos skipped {cosmos_name!r} hint={hint!r})",
                     flush=True,
                 )
-        elif cosmos_name and _cosmos_skip_name(cosmos_name):
-            recovered = recover_skip_name(blob, image_hw=image.shape[:2])
-            if recovered:
-                print(
-                    f"[cosmos] blob {i} skip→{recovered} (recovered {appear})",
-                    flush=True,
-                )
-                name = recovered
+                name = keep
             else:
-                print(f"[cosmos] skip blob {i} cosmos={cosmos_name!r} appear={appear}", flush=True)
+                print(
+                    f"[cosmos] skip tile {i} cosmos={cosmos_name!r} hint={hint}",
+                    flush=True,
+                )
                 continue
         elif cosmos_name:
-            slug = slug_detection_name(cosmos_name)
-            if slug == "red_pen" and appear == "screw":
-                name = "screw"
-                print(f"[cosmos] blob {i} red_pen→screw (compact)", flush=True)
-            elif slug == "black_bar" or (appear == "screw" and slug in {"skip", "black_bar"}):
-                name = "screw"
-                print(f"[cosmos] blob {i} {slug}→screw", flush=True)
-            elif slug in enum_names:
-                name = slug
-            else:
-                print(f"[cosmos] blob {i} off-vocab {cosmos_name!r} → {appear}", flush=True)
-                name = appear
+            name = slug_detection_name(cosmos_name)
+            if name in _COSMOS_PLACEHOLDER_NAMES:
+                name = keep or slug_detection_name(hint)
+            elif keep and _prefer_detector_container_name(name, keep):
+                print(
+                    f"[cosmos] keep tile {i} as {keep} (cosmos={name!r} hint={hint!r})",
+                    flush=True,
+                )
+                name = keep
         else:
-            name = appear
-            print(f"[cosmos] blob {i} unnamed → {name}", flush=True)
+            name = keep or slug_detection_name(hint) or "part"
+            print(f"[cosmos] tile {i} unnamed → {name}", flush=True)
+        if _cosmos_skip_name(name) and not keep:
+            print(f"[cosmos] skip tile {i} name={name!r}", flush=True)
+            continue
+        if keep and (_cosmos_skip_name(name) or not name):
+            name = keep
         print(
-            f"[cosmos] blob {i} {name} gp={tuple(round(c) for c in blob['grasp_point_px'])}",
+            f"[cosmos] tile {i} {name} hint={hint} "
+            f"gp={tuple(round(c) for c in blob['grasp_point_px'])}",
             flush=True,
         )
         out.append(_blob_to_raw_detection(blob, name, image.shape[:2]))

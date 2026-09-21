@@ -101,42 +101,30 @@ Return a single JSON object, no markdown fencing, no explanation:
 """.strip()
 
 
-# Cosmos Nano is weak at tiny objects in a full-arm frame. We send a table
-# crop (robot painted out). Keep this short, no filled example it can copy.
+# Official Cosmos 3 Reasoner 2D grounding on a 720p (16:9) full frame.
+# Do not list class names or a count — Nano copies them into a fake grid.
 COSMOS_DETECTION_PROMPT = """
-This image is a crop of a white table. The yellow robot was removed.
+Think about where each pickable part actually is in this image, then locate it.
 Task: "{instruction}"
 
-List only real 3D objects sitting on the table (tools, blocks, frames, rods).
-Ignore printed drawings, grid outlines, text, yellow circle, cables, and empty table.
-Do not invent an object. If a region is only a drawing, skip it.
-Name from visible color and shape (lowercase snake_case). Do not use names
-that appear only as examples in any prompt.
+Ignore the robot arm, gripper, cables, printed drawings, grid lines, text, and empty table.
+A box must sit on the part's own pixels. If you are not sure of a location, omit that part.
+Do not invent a row or grid of boxes on empty table.
 
-Coordinates are 0-1000 on THIS cropped image, origin at the top-left.
-- box_2d: [ymin, xmin, ymax, xmax] tight on the object pixels
-- grasp_point: [y, x] on the object, not on white table
-- long_axis: [[y1, x1], [y2, x2]] along the longest edge; null if round
-- blocked_by: null unless something sits on the object
-No polygon. No markdown. At most 6 objects.
+label: required lowercase snake_case from the color and shape you see.
+Never omit label. Never use object, item, or thing as the label.
+bbox_2d: [x1, y1, x2, y2] (left, top, right, bottom), 0-1000, origin top-left.
+point_2d: [x, y] on that part, not on the table.
 
-{{"objects":[{{"name":"...","box_2d":[ymin,xmin,ymax,xmax],"blocked_by":null,"grasp_point":[y,x],"long_axis":[[y1,x1],[y2,x2]]}}]}}
+Return a json list.
 """.strip()
 
-# Close-up tile sheet. Geometry comes from classical blobs, not the VLM.
+# Close-up tiles from a classical/open-vocab detector. Geometry is not from Cosmos.
 COSMOS_NAMING_PROMPT = """
-Each numbered tile is a close-up of ONE region from a white table.
+Each numbered tile is a close-up of ONE detector region.
 Task: "{instruction}"
 
-Name the real 3D object in that tile. Allowed names only:
-red_pen, screw, vial, black_frame, black_block, purple_screwdriver, skip.
-
-black_frame = hollow black plastic square on the table (you can see through the middle).
-black_block = solid black rectangle/plate, no hole.
-screw = short metal screw or bolt on the table, including tiny ones near the yellow diamond.
-red_pen = red pen.
-vial = small bottle or cap.
-skip = cables, yellow robot, printed grid/lines, or unrecognizable junk.
-A short dark stick on the table is a screw, never skip.
+Name the real 3D object in that tile. lowercase snake_case from color and shape.
+Use skip for the robot, cables, printed drawings, empty table, or junk.
 Do not invent extra ids. One name per tile.
 """.strip()
