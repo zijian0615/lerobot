@@ -26,13 +26,32 @@ Need to build the image
         -v /work \
         -v ~/.openclaw:/home/openclaw/.openclaw \
         -w /work \
-        oc-iamge
+        oc-image
+
+ docker run -it --rm --name openclaw -e OPENCLAW_GATEWAY_TOKEN=gateway_token -e GEMINI_API_KEY=api_key --cap-drop ALL -v $PWD:/work -v ~/.openclaw:/home/openclaw/.openclaw -w /work oc-image
+
+ docker run -it --rm --name openclaw -e OPENCLAW_GATEWAY_TOKEN=1ee17a617aac33bb2c7ef8158d975599d914ffbd1b475571facd19b083c9873g -e GEMINI_API_KEY=geminikey --cap-drop ALL -v $PWD:/work -v ~/.openclaw:/home/openclaw/.openclaw -w /work oc-image
 
 
- 
+token for the gateway
+1ee17a617aac33bb2c7ef8158d975599d914ffbd1b475571facd19b083c9873g
 
-    docker run -it --rm --name openclaw -e OPENCLAW_GATEWAY_TOKEN=idk -e GEMINI_API_KEY=gemini --cap-drop ALL -v $PWD:/work -v ~/.openclaw:/home/openclaw/.openclaw -w /work oc-image
+will use C:/users/user as home 
+    needs a .openclaw with openclaw.json in that location
 
+To get the openclaw.json config file:
+    update the dockerfile so that the container is running as root
+        comment out where user is changed
+    add option to the docker run command:
+        --entrypoint bash
+    then in the contianer, run:
+        openclaw onboard --classic
+
+Onboarding:
+    Quickstart
+    Google API
+    Default 
+    *fails* 
 
 
 

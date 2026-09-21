@@ -1,40 +1,95 @@
 {
-  "gateway": {
-    "mode": "local",
-    "bind": "loopback",
-    "port": 18789,
-    "auth": {
-      "mode": "token"
-    },
-    "controlUi": {
-      "enabled": true
-    }
-  },
-  "agents": {
-    "defaults": {
-      "workspace": "~/.openclaw/workspace",
-      "model": {
-        "primary": "google/gemini-3.1-pro-preview"
-      }
-    },
-    "list": [
-      {
-        "id": "default",
-        "name": "OpenClaw Assistant",
-        "workspace": "~/.openclaw/workspace"
-      }
-    ]
-  },
-  "cron": {
-    "enabled": false
+  "wizard": {
+    "securityAcknowledgedAt": "2026-09-21T21:49:18.429Z",
+    "accessMode": "full",
+    "lastRunAt": "2026-09-21T21:49:41.463Z",
+    "lastRunVersion": "2026.9.5",
+    "lastRunCommand": "onboard",
+    "lastRunMode": "local"
   },
   "plugins": {
     "entries": {
+      "anthropic": {
+        "config": {
+          "sessionCatalog": {
+            "enabled": false
+          }
+        }
+      },
+      "codex": {
+        "config": {
+          "sessionCatalog": {
+            "enabled": false
+          }
+        }
+      },
       "google": {
         "enabled": true
       }
     }
   },
-  "channels": {
+  "meta": {
+    "migrations": {
+      "modelPolicyAllowlist": true,
+      "utilityModelSeparation": true
+    },
+    "lastTouchedVersion": "2026.9.5"
+  },
+  "agents": {
+    "defaults": {
+      "models": {
+        "google/gemini-3.1-pro-preview": {
+          "agentRuntime": {
+            "id": "openclaw"
+          }
+        }
+      },
+      "model": "google/gemini-3.1-pro-preview@google:setup-98b207f8-7959-4d40-a5b4-51dfe044cdd3",
+      "workspace": "/root/.openclaw/workspace"
+    },
+    "entries": {
+      "main": {
+        "name": "main",
+        "workspace": "/root/.openclaw/workspace",
+        "agentDir": "/root/.openclaw/agents/main/agent",
+        "identity": {
+          "name": "The SIDC Agent",
+          "emoji": "⚡️",
+          "theme": "Sharp, capable, and strictly business—no unnecessary fluff, just getting things done."
+        }
+      }
+    }
+  },
+  "auth": {
+    "profiles": {
+      "google:setup-98b207f8-7959-4d40-a5b4-51dfe044cdd3": {
+        "provider": "google",
+        "mode": "api_key"
+      }
+    }
+  },
+  "gateway": {
+    "mode": "local",
+    "auth": {
+      "mode": "token",
+      "token": "***"
+    },
+    "port": 18789,
+    "bind": "loopback",
+    "tailscale": {
+      "mode": "off"
+    }
+  },
+  "tools": {
+    "profile": "full"
+  },
+  "hooks": {
+    "internal": {
+      "entries": {
+        "session-memory": {
+          "enabled": true
+        }
+      }
+    }
   }
 }
