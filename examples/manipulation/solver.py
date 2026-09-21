@@ -340,7 +340,24 @@ def _alias_destination(dest: str, known: set[str]) -> str:
     surfaces = [
         str(name)
         for name in known
-        if any(k in str(name).lower() for k in ("board", "tray", "stand", "mat", "container", "region", "grid"))
+        if any(
+            k in str(name).lower()
+            for k in (
+                "board",
+                "tray",
+                "stand",
+                "mat",
+                "container",
+                "region",
+                "grid",
+                "box",
+                "block",
+                "cube",
+                "bin",
+                "bowl",
+                "wooden",
+            )
+        )
         and "screw" not in str(name).lower()
     ]
     if len(surfaces) == 1:

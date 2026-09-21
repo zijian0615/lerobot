@@ -1,0 +1,14 @@
+{
+  "camera": "/dev/video0",
+  "fourcc": "MJPG",
+  "requested": [
+    1920,
+    1080
+  ],
+  "actual_hw": [
+    1080,
+    1920
+  ],
+  "dtype": "uint8",
+  "path": "/home/gb2_8634/lerobot/examples/tabletop_perception/runs/20260920_185406/capture_rgb_1920x1080.png"
+}

@@ -1,0 +1,7 @@
+.venv-twin/
+__pycache__/
+.pytest_cache/
+
+# the repo root ignores *.xml and *.stl; the model itself must be tracked (STL goes through Git LFS)
+!*.xml
+!assets/*.stl

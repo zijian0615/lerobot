@@ -1,0 +1,12 @@
+{
+  "objects": [
+    {
+      "name": "screw",
+      "blocked_by": null,
+      "in_workspace": [
+        "fanuc"
+      ],
+      "preferred_arm": "fanuc"
+    }
+  ]
+}

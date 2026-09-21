@@ -84,6 +84,10 @@ def make_robot_from_config(config: RobotConfig) -> Robot:
         from .xarm import XArmRobot
 
         return XArmRobot(config)
+    elif config.type == "fanuc":
+        from .fanuc import Fanuc
+
+        return Fanuc(config)
     else:
         try:
             return cast(Robot, make_device_from_device_class(config))

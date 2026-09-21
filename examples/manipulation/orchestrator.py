@@ -82,6 +82,7 @@ class ManipulationLoop:
         lookahead: bool = True,
         overlap_guard: OverlapGuard | None = None,
         on_phase: Callable[[str, str], None] | None = None,
+        recover: bool = True,
     ) -> None:
         self.perceive = perceive
         self.plan_fn = plan_fn
@@ -91,6 +92,7 @@ class ManipulationLoop:
         self.lookahead = lookahead
         self.overlap_guard = overlap_guard
         self.on_phase = on_phase
+        self.recover = bool(recover)
 
     def _phase(self, phase: str, detail: str = "") -> None:
         if self.on_phase is not None:
@@ -139,6 +141,20 @@ class ManipulationLoop:
             )
             if result["status"] == "success":
                 continue
+
+            if not self.recover:
+                reason = str(result.get("reason") or "step_failed")
+                logger.info("step failed; recovery disabled → stop")
+                self._phase("failed", reason)
+                return LoopResult(
+                    status="fail",
+                    reason=reason,
+                    plan=plan,
+                    bound=bound,
+                    results=results,
+                    symbolic_view=symbolic_view,
+                    geometric_view=geometric_view,
+                )
 
             # ---- recovery (one retry) ----
             recovered = self._recover(
@@ -437,6 +453,7 @@ def run_manipulation(
     lookahead: bool = True,
     overlap_guard: OverlapGuard | None = None,
     on_phase: Callable[[str, str], None] | None = None,
+    recover: bool = True,
 ) -> LoopResult:
     return ManipulationLoop(
         perceive=perceive,
@@ -447,4 +464,5 @@ def run_manipulation(
         lookahead=lookahead,
         overlap_guard=overlap_guard,
         on_phase=on_phase,
+        recover=recover,
     ).run(instruction)

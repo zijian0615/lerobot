@@ -24,6 +24,7 @@ from typing import Any, TypedDict
 
 from openai_backend import (
     GPT6_JSON_ONLY,
+    call_nvidia_chat_completions,
     call_openai_responses,
     reasoning_effort_from_thinking_budget,
     resolve_base_model,
@@ -71,7 +72,21 @@ _PLACE_REGION_NAMES = frozenset(
 )
 
 
-_SURFACE_NAME_KEYS = ("board", "tray", "stand", "mat", "container", "region", "grid")
+_SURFACE_NAME_KEYS = (
+    "board",
+    "tray",
+    "stand",
+    "mat",
+    "container",
+    "region",
+    "grid",
+    "box",
+    "block",
+    "cube",
+    "bin",
+    "bowl",
+    "wooden",
+)
 
 
 def _alias_object_name(name: str, object_names: set[str]) -> str:
@@ -570,6 +585,14 @@ def call_planner_decision(
                     reasoning_effort=reasoning_effort_from_thinking_budget(
                         thinking_budget
                     ),
+                )
+            elif backend == "cosmos":
+                text = call_nvidia_chat_completions(
+                    model=api_model,
+                    messages=[
+                        {"role": "user", "content": prompt_text + GPT6_JSON_ONLY}
+                    ],
+                    api_key=api_key,
                 )
             else:
                 from google import genai

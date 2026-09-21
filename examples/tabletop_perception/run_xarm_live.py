@@ -66,7 +66,7 @@ def _table_xy_affine_from_calib(
 ) -> tuple[np.ndarray, np.ndarray] | None:
     """Optional ``true = A @ raw_table_xy + b`` correction from calib JSON."""
     cfg = calib.get("table_xy_affine")
-    if not cfg:
+    if not isinstance(cfg, dict) or "A" not in cfg or "b" not in cfg:
         return None
     a = np.asarray(cfg["A"], dtype=float).reshape(2, 2)
     b = np.asarray(cfg["b"], dtype=float).reshape(2)
@@ -158,14 +158,20 @@ def _capture_from_camera(
     width: int,
     height: int,
     fps: int,
+    fourcc: str | None = "MJPG",
 ) -> np.ndarray:
+    from lerobot.cameras.configs import Cv2Backends
     from lerobot.cameras.opencv import OpenCVCamera, OpenCVCameraConfig
 
+    # OpenCV 5 + backend=ANY often fails to set MJPG, so UVC stays at 640x480 YUYV
+    # and 1920x1080 is rejected. Force V4L2 on Linux.
     cfg = OpenCVCameraConfig(
         index_or_path=index_or_path,
         width=width,
         height=height,
         fps=fps,
+        fourcc=fourcc,
+        backend=Cv2Backends.V4L2,
     )
     cam = OpenCVCamera(cfg)
     cam.connect()
@@ -360,7 +366,7 @@ def build_argparser() -> argparse.ArgumentParser:
         "--vlm",
         dest="model",
         default="gemini",
-        help="Base VLM: gemini (default) or gpt-6 (OpenAI gpt-6-astra, needs OPENAI_API_KEY).",
+        help="Base VLM: gemini, gpt-6, or cosmos / cosmos3-nano.",
     )
     return p
 
@@ -439,6 +445,7 @@ def main(argv: list[str] | None = None) -> int:
                 width=int(cam_cfg["width"]),
                 height=int(cam_cfg["height"]),
                 fps=int(cam_cfg["fps"]),
+                fourcc=cam_cfg.get("fourcc") or "MJPG",
             )
         print(f"Image shape: {image.shape}")
 

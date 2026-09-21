@@ -54,6 +54,13 @@ SCENE
 INSTRUCTION
 "{instruction}"
 
+MODE
+Default is one-shot: this response's plan MUST complete the whole
+INSTRUCTION. Do not emit only the next Grasp+Place and stop.
+Rule 9 (one turn) applies ONLY when the instruction is a game / wait for
+a human / fill-the-board, or INTERACTION SO FAR is present below.
+Pick / place / put / "all … into …" is always one-shot, never Rule 9.
+
 RULES
 1. If an object is blocked_by another object, the blocker must be moved
    out of the way first, using Grasp then Place to "free_space".
@@ -77,9 +84,10 @@ RULES
      each arm objects whose preferred_arm matches it (objects nearer that
      arm / on its side of the table). Do not send an arm across the table
      to grab something another arm prefers if both can work in parallel.
-7. When the instruction says ALL of a class (e.g. all screws), include a
-   Grasp+Place for every matching object still on the table (not already
-   inside the destination).
+7. When the instruction says ALL / every of a class (e.g. all screws),
+   include a Grasp+Place for EVERY matching SCENE object still on the
+   table (name equals the class stem, or stem + "_" + number; skip names
+   already in_container / _in_box). Omitting any member is incorrect.
 8. If the instruction names a part of a destination (left / right / far
    top / near bottom, a quadrant, or one of N equal slots), set
    args.region. Geometry clips the destination footprint — do not output
@@ -93,8 +101,9 @@ RULES
    Example: "left side of the stand" → destination "stand", region "left"
    Example: "second quarter of the stand" → destination "stand", region "2/4"
    Example: "the 7th of 10 equal parts of the stand" → region "7/10"
-9. Interactive / multi-turn tasks (games, fill-the-board, handoffs):
-   decide the robot's NEXT action only (typically one Grasp + one Place).
+9. Interactive / multi-turn ONLY (games, fill-the-board, human handoffs).
+   Ignore this rule for pick-and-place. When it applies, decide the
+   robot's NEXT action only (typically one Grasp + one Place).
    Set status:
      "act"   — execute the plan now
      "wait"  — only if a HUMAN / external player must move, and they
@@ -120,17 +129,25 @@ RULES
 
 {history_block}{feedback_block}
 
-Return a single JSON object, no markdown fencing, no explanation:
+Return a single JSON object, no markdown fencing, no explanation.
+
+One-shot example (INSTRUCTION: pick all screws and put them into the
+yellow container). List every matching object, not just the first:
 
 {{
   "status": "act",
-  "reason": "robot places one black screw",
+  "reason": "place every table screw into yellow_container",
   "plan": [
     {{"step": 1, "arm": "arm1", "primitive": "Grasp",
-     "args": {{"object": "bottle"}}, "depends_on": []}},
+     "args": {{"object": "screw"}}, "depends_on": []}},
     {{"step": 2, "arm": "arm1", "primitive": "Place",
-     "args": {{"object": "bottle", "destination": "tray", "region": "left"}},
-     "depends_on": [1]}}
+     "args": {{"object": "screw", "destination": "yellow_container"}},
+     "depends_on": [1]}},
+    {{"step": 3, "arm": "arm1", "primitive": "Grasp",
+     "args": {{"object": "screw_2"}}, "depends_on": [2]}},
+    {{"step": 4, "arm": "arm1", "primitive": "Place",
+     "args": {{"object": "screw_2", "destination": "yellow_container"}},
+     "depends_on": [3]}}
   ]
 }}
 """.strip()

@@ -1,0 +1,10 @@
+{
+  "objects": [
+    {
+      "name": "spray_can",
+      "blocked_by": null,
+      "in_workspace": [],
+      "preferred_arm": null
+    }
+  ]
+}

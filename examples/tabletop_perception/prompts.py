@@ -99,3 +99,32 @@ Return a single JSON object, no markdown fencing, no explanation:
   ]
 }}
 """.strip()
+
+
+# Official Cosmos 3 Reasoner 2D grounding on a 720p (16:9) full frame.
+# Do not list class names or a count — Nano copies them into a fake grid.
+COSMOS_DETECTION_PROMPT = """
+Think about where each pickable part actually is in this image, then locate it.
+Task: "{instruction}"
+
+Ignore the robot arm, gripper, cables, printed drawings, grid lines, text, and empty table.
+A box must sit on the part's own pixels. If you are not sure of a location, omit that part.
+Do not invent a row or grid of boxes on empty table.
+
+label: required lowercase snake_case from the color and shape you see.
+Never omit label. Never use object, item, or thing as the label.
+bbox_2d: [x1, y1, x2, y2] (left, top, right, bottom), 0-1000, origin top-left.
+point_2d: [x, y] on that part, not on the table.
+
+Return a json list.
+""".strip()
+
+# Close-up tiles from a classical/open-vocab detector. Geometry is not from Cosmos.
+COSMOS_NAMING_PROMPT = """
+Each numbered tile is a close-up of ONE detector region.
+Task: "{instruction}"
+
+Name the real 3D object in that tile. lowercase snake_case from color and shape.
+Use skip for the robot, cables, printed drawings, empty table, or junk.
+Do not invent extra ids. One name per tile.
+""".strip()

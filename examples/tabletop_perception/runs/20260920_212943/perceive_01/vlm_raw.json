@@ -1,0 +1,50 @@
+[
+  {
+    "name": "blue cube",
+    "box_2d": [
+      656.0,
+      106.00000000000001,
+      721.0000000000001,
+      172.0
+    ],
+    "grasp_point": [
+      686.0,
+      115.00000000000001
+    ],
+    "blocked_by": null,
+    "long_axis": null,
+    "polygon": null
+  },
+  {
+    "name": "part",
+    "box_2d": [
+      838.0000000000001,
+      691.0000000000001,
+      903.0,
+      744.0
+    ],
+    "grasp_point": [
+      886.0,
+      714.0000000000001
+    ],
+    "blocked_by": null,
+    "long_axis": null,
+    "polygon": null
+  },
+  {
+    "name": "part",
+    "box_2d": [
+      925.0,
+      731.0,
+      982.0,
+      781.0000000000001
+    ],
+    "grasp_point": [
+      957.0,
+      762.0000000000001
+    ],
+    "blocked_by": null,
+    "long_axis": null,
+    "polygon": null
+  }
+]

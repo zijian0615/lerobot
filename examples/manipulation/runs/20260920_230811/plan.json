@@ -1,0 +1,46 @@
+[
+  {
+    "step": 1,
+    "arm": "fanuc",
+    "primitive": "Grasp",
+    "args": {
+      "object": "bottom_left_screw"
+    },
+    "depends_on": []
+  },
+  {
+    "step": 2,
+    "arm": "fanuc",
+    "primitive": "Place",
+    "args": {
+      "object": "bottom_left_screw",
+      "destination": "yellow_container"
+    },
+    "depends_on": [
+      1
+    ]
+  },
+  {
+    "step": 3,
+    "arm": "fanuc",
+    "primitive": "Grasp",
+    "args": {
+      "object": "top_right_screw"
+    },
+    "depends_on": [
+      2
+    ]
+  },
+  {
+    "step": 4,
+    "arm": "fanuc",
+    "primitive": "Place",
+    "args": {
+      "object": "top_right_screw",
+      "destination": "yellow_container"
+    },
+    "depends_on": [
+      3
+    ]
+  }
+]

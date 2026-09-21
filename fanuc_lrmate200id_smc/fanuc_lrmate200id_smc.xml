@@ -1,0 +1,162 @@
+<mujoco model="fanuc_lrmate200id_smc">
+  <!--
+    FANUC LR Mate 200iD + SMC-style 2-finger parallel gripper.
+
+    ARM: kinematics, joint limits and meshes are taken from the ROS-Industrial package
+         fanuc_lrmate200id_support (BSD) -- urdf/lrmate200id_macro.xacro. Meshes are in metres.
+         Link masses are estimates (arm total ~13 kg + base; real robot is 25 kg incl. base/cabling).
+    GRIPPER: PLACEHOLDER geometry (no SMC CAD was available). Body/finger dimensions are marked
+         "GRIPPER PARAMETERS" below -- replace them, or swap in real meshes, once the SMC model
+         (e.g. LEHZ / LEHF / MHZ2 series) and its stroke are known.
+    Frames: base_link at the world origin, +X forward. At q = 0 the upper arm points up and the
+         forearm/tool point along +X (FANUC zero pose). "tool0" follows the ROS-I tool0 convention:
+         +Z = approach direction (out of the flange), gripper fingers open along tool Y.
+  -->
+  <compiler angle="radian" meshdir="assets" autolimits="true"/>
+  <option integrator="implicitfast" timestep="0.002"/>
+
+  <default>
+    <default class="fanuc">
+      <joint damping="5" armature="0.5"/>
+      <position kp="1500" kv="150" forcerange="-300 300"/>
+      <default class="wrist">
+        <joint damping="1" armature="0.05"/>
+        <position kp="400" kv="40" forcerange="-100 100"/>
+      </default>
+      <default class="wrist6">
+        <joint damping="0.5" armature="0.02"/>
+        <position kp="200" kv="20" forcerange="-50 50"/>
+      </default>
+      <default class="visual">
+        <geom type="mesh" contype="0" conaffinity="0" group="2" density="0"/>
+      </default>
+      <default class="collision">
+        <geom type="mesh" group="3" contype="1" conaffinity="1"/>
+      </default>
+      <default class="finger">
+        <!-- armature = motor + lead-screw inertia reflected to the finger; also keeps grasp contacts stiff -->
+        <joint type="slide" armature="1.0" damping="5" range="0 0.010"/>
+        <geom friction="1.5 0.05 0.001" condim="4" solimp="0.95 0.99 0.001" solref="0.004 1"/>
+      </default>
+    </default>
+  </default>
+
+  <asset>
+    <material name="fanuc_yellow" rgba="0.96 0.76 0.05 1"/>
+    <material name="fanuc_gray" rgba="0.28 0.28 0.28 1"/>
+    <material name="fanuc_black" rgba="0.08 0.08 0.08 1"/>
+    <material name="smc_body" rgba="0.72 0.75 0.78 1"/>
+    <material name="smc_finger" rgba="0.35 0.37 0.40 1"/>
+
+    <mesh name="base_link" file="base_link.stl"/>
+    <mesh name="link_1" file="link_1.stl"/>
+    <mesh name="link_2" file="link_2.stl"/>
+    <mesh name="link_2_collision" file="link_2_collision.stl"/>
+    <mesh name="link_3" file="link_3.stl"/>
+    <mesh name="link_4" file="link_4.stl"/>
+    <mesh name="link_5" file="link_5.stl"/>
+    <mesh name="link_6" file="link_6.stl"/>
+  </asset>
+
+  <worldbody>
+    <body name="base_link" childclass="fanuc">
+      <geom class="visual" mesh="base_link" material="fanuc_gray"/>
+      <geom class="collision" mesh="base_link" mass="8"/>
+
+      <body name="link_1" pos="0 0 0.330" gravcomp="1">
+        <joint name="joint_1" axis="0 0 1" range="-2.967060 2.967060"/>
+        <geom class="visual" mesh="link_1" material="fanuc_yellow"/>
+        <geom class="collision" mesh="link_1" mass="4.5"/>
+
+        <body name="link_2" pos="0.050 0 0" gravcomp="1">
+          <joint name="joint_2" axis="0 1 0" range="-1.745329 2.530727"/>
+          <geom class="visual" mesh="link_2" material="fanuc_yellow"/>
+          <geom class="collision" mesh="link_2_collision" mass="4.0"/>
+
+          <body name="link_3" pos="0 0 0.330" gravcomp="1">
+            <joint name="joint_3" axis="0 -1 0" range="-1.221730 3.577925"/>
+            <geom class="visual" mesh="link_3" material="fanuc_yellow"/>
+            <geom class="collision" mesh="link_3" mass="2.4"/>
+
+            <body name="link_4" pos="0 0 0.035" gravcomp="1">
+              <joint name="joint_4" axis="-1 0 0" range="-3.316126 3.316126" class="wrist"/>
+              <geom class="visual" mesh="link_4" material="fanuc_yellow"/>
+              <geom class="collision" mesh="link_4" mass="1.4"/>
+
+              <body name="link_5" pos="0.335 0 0" gravcomp="1">
+                <joint name="joint_5" axis="0 -1 0" range="-2.181662 2.181662" class="wrist"/>
+                <geom class="visual" mesh="link_5" material="fanuc_yellow"/>
+                <geom class="collision" mesh="link_5" mass="0.5"/>
+
+                <body name="link_6" pos="0.080 0 0" gravcomp="1">
+                  <joint name="joint_6" axis="-1 0 0" range="-6.283185 6.283185" class="wrist6"/>
+                  <geom class="visual" mesh="link_6" material="fanuc_black"/>
+                  <geom class="collision" mesh="link_6" mass="0.05"/>
+                  <site name="flange" pos="0 0 0" size="0.003" group="1"/>
+
+                  <!-- ROS-I tool0: z = flange normal (link_6 +X), x = link_6 +Z, y = link_6 -Y -->
+                  <body name="tool0" pos="0 0 0" xyaxes="0 0 1  0 -1 0" gravcomp="1">
+                    <!--
+                      ===== GRIPPER PARAMETERS (placeholder SMC-style 2-finger parallel gripper) =====
+                      adapter plate : dia 56 mm, 10 mm thick                    z = 0 .. 0.010
+                      gripper body  : 48 (x) x 72 (y) x 55 (z) mm               z = 0.010 .. 0.065
+                      fingers       : 20 (x) x 8 (y) x 40 (z) mm, slide along tool Y, 10 mm per side
+                                      (20 mm total stroke; closed pad gap 2 mm, open gap 22 mm)
+                      TCP           : 95 mm from the flange (mid finger pad)
+                    -->
+                    <geom name="adapter" class="collision" type="cylinder" size="0.028 0.005" pos="0 0 0.005"
+                          mass="0.05" material="smc_finger" group="2"/>
+                    <geom name="gripper_body" class="collision" type="box" size="0.024 0.036 0.0275"
+                          pos="0 0 0.0375" mass="0.35" material="smc_body" group="2"/>
+                    <site name="tcp" pos="0 0 0.095" size="0.004" rgba="1 0 0 0.6" group="1"/>
+
+                    <body name="finger_l" pos="0 0.005 0.065" gravcomp="1" childclass="finger">
+                      <joint name="finger_l" axis="0 1 0"/>
+                      <geom name="finger_l_geom" type="box" size="0.010 0.004 0.020" pos="0 0 0.020"
+                            mass="0.03" material="smc_finger" group="2"/>
+                    </body>
+                    <body name="finger_r" pos="0 -0.005 0.065" gravcomp="1" childclass="finger">
+                      <joint name="finger_r" axis="0 -1 0"/>
+                      <geom name="finger_r_geom" type="box" size="0.010 0.004 0.020" pos="0 0 0.020"
+                            mass="0.03" material="smc_finger" group="2"/>
+                    </body>
+                  </body>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+
+  <!-- both fingers move symmetrically: finger_l == finger_r, driven by one actuator on their mean -->
+  <tendon>
+    <fixed name="split">
+      <joint joint="finger_l" coef="0.5"/>
+      <joint joint="finger_r" coef="0.5"/>
+    </fixed>
+  </tendon>
+
+  <equality>
+    <joint joint1="finger_l" joint2="finger_r" polycoef="0 1 0 0 0" solref="0.004 1"/>
+  </equality>
+
+  <actuator>
+    <position class="fanuc" name="joint_1" joint="joint_1" ctrlrange="-2.967060 2.967060"/>
+    <position class="fanuc" name="joint_2" joint="joint_2" ctrlrange="-1.745329 2.530727"/>
+    <position class="fanuc" name="joint_3" joint="joint_3" ctrlrange="-1.221730 3.577925"/>
+    <position class="wrist" name="joint_4" joint="joint_4" ctrlrange="-3.316126 3.316126"/>
+    <position class="wrist" name="joint_5" joint="joint_5" ctrlrange="-2.181662 2.181662"/>
+    <position class="wrist6" name="joint_6" joint="joint_6" ctrlrange="-6.283185 6.283185"/>
+    <!-- gripper: ctrl = finger travel per side [m]; 0 = closed, 0.010 = open. Force is total on the tendon. -->
+    <position name="gripper" tendon="split" kp="6000" kv="100" ctrlrange="0 0.010" forcerange="-100 100"/>
+  </actuator>
+
+  <keyframe>
+    <!-- FANUC zero pose, gripper open -->
+    <key name="home" qpos="0 0 0 0 0 0 0.01 0.01" ctrl="0 0 0 0 0 0 0.01"/>
+    <!-- tool pointing straight down, TCP at about (0.50, 0, 0.20) m -->
+    <key name="ready" qpos="0 0.62 -0.2 0 -0.7508 0 0.01 0.01" ctrl="0 0.62 -0.2 0 -0.7508 0 0.01"/>
+  </keyframe>
+</mujoco>

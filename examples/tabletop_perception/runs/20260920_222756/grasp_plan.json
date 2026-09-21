@@ -1,0 +1,40 @@
+{
+  "object": "screw",
+  "uv": [
+    1289.0885988331847,
+    740.2845841985562
+  ],
+  "zone": "NEAR (image bottom)",
+  "pred_table_m": [
+    0.4675612196659843,
+    0.30041549098444553
+  ],
+  "target_uf_xy_mm": [
+    467.5612196659843,
+    300.4154909844455
+  ],
+  "workspace_mm": [
+    285.45,
+    515.45,
+    -231.198,
+    253.80200000000002
+  ],
+  "inside_workspace": false,
+  "taught_wpr_deg": [
+    178.206,
+    -1.585,
+    9.606
+  ],
+  "grasp_wpr_deg": [
+    178.206,
+    -1.585,
+    24.723423496549373
+  ],
+  "yaw_note": "long-axis yaw=15.1\u00b0 \u2192 R=24.7\u00b0 (perp. long edge, offset=0\u00b0)",
+  "travel_z_mm": -255.0,
+  "grasp_z_mm": -335.0,
+  "lift_z_mm": -255.0,
+  "instruction": "pick all screws and put into the yellow container",
+  "vlm": "cosmos",
+  "perceive_dir": "/home/gb2_8634/lerobot/examples/tabletop_perception/runs/20260920_222756/perceive_01"
+}

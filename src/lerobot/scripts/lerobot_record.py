@@ -123,6 +123,7 @@ from lerobot.robots import (  # noqa: F401
     bi_rebot_b601_follower,
     bi_so_follower,
     earthrover_mini_plus,
+    fanuc,
     hope_jr,
     koch_follower,
     make_robot_from_config,
