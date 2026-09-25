@@ -45,4 +45,23 @@ class FanucConfig(RobotConfig):
     gripper_open_value: str = "ON"
     gripper_close_value: str = "ON"
 
+    # Optional MuJoCo twin: publish J1..J6 over UDP. Empty host disables it.
+    # Twin must listen with `--source udp` (do not open a second RMI session).
+    twin_udp_host: str | None = "127.0.0.1"
+    twin_udp_port: int = 5005
+
+    # Isaac Sim twin only (fanuc_lrmate200id_smc/twin/isaac_rmi_sim.py): between episodes, reset_episode() asks the
+    # simulated controller to put the arm home and lay out the task objects again. Never enable on the real robot.
+    sim_reset: bool = False
+
+    # Quest / phone teleop workspace in the active user frame (mm).
+    # Z min stays just above the calibrated table contact (UF Z=-335 mm).
+    phone_ee_x_min_mm: float = -450.0
+    phone_ee_y_min_mm: float = -450.0
+    phone_ee_z_min_mm: float = -330.0
+    phone_ee_x_max_mm: float = 450.0
+    phone_ee_y_max_mm: float = 450.0
+    phone_ee_z_max_mm: float = 250.0
+    phone_max_ee_step_mm: float = 15.0
+
     cameras: dict[str, CameraConfig] = field(default_factory=dict)

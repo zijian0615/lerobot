@@ -2,9 +2,9 @@
 
     python mock_rmi_server.py --port 16001        # then:  twin.py --source rmi --host 127.0.0.1
 
-It speaks the subset the twin uses (FRC_Connect, FRC_Initialize, FRC_ReadJointAngles, FRC_ReadCartesianPosition),
-follows the message format of fanuc_replay_live.py, and records anything it should never receive
-(motion instructions, FRC_Abort). NOTE: it encodes OUR assumptions about the protocol, it is not FANUC's.
+It speaks the subset the twin uses (FRC_Connect, FRC_Initialize, FRC_ReadJointAngles,
+FRC_ReadCartesianPosition, FRC_Abort, FRC_Disconnect), follows the message format of
+fanuc_replay_live.py, and records motion instructions it should never receive.
 """
 import argparse
 import json
@@ -33,6 +33,10 @@ class MockRmiController:
     def _listen(self, port):
         s = socket.socket()
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+        except (AttributeError, OSError):
+            pass
         s.bind((self.host, port))
         s.listen(4)
         s.settimeout(0.2)
@@ -78,7 +82,10 @@ class MockRmiController:
 
     @staticmethod
     def _send(conn, obj):
-        conn.sendall((json.dumps(obj) + "\r\n").encode())
+        try:
+            conn.sendall((json.dumps(obj) + "\r\n").encode())
+        except OSError:
+            pass
 
     def _serve_connect(self, conn):
         with conn:
@@ -102,9 +109,14 @@ class MockRmiController:
                     if msg is None:
                         continue
                     cmd = msg.get("Command")
-                    if "Instruction" in msg or cmd == "FRC_Abort":
+                    if "Instruction" in msg:
                         self.forbidden.append(msg)
                         self._send(conn, {"Command": cmd, "ErrorID": 0})
+                    elif cmd == "FRC_Abort":
+                        self._send(conn, {"Command": cmd, "ErrorID": 0})
+                    elif msg.get("Communication") == "FRC_Disconnect":
+                        self._send(conn, {"Communication": "FRC_Disconnect", "ErrorID": 0})
+                        return
                     elif cmd == "FRC_Initialize":
                         self._send(conn, {"Command": cmd, "ErrorID": 0, "GroupMask": msg.get("GroupMask", 1)})
                     elif cmd == "FRC_ReadJointAngles":

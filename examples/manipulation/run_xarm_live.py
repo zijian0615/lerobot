@@ -585,6 +585,14 @@ def main(argv: list[str] | None = None) -> int:
     else:
         logger.info("Skipping robot (--no-robot).")
 
+    if ui is not None and robots:
+        def _ui_go_home() -> None:
+            for name, robot in robots.items():
+                logger.info("UI go home arm=%s", name)
+                robot.move_to_home(speed_deg_s=20.0)
+
+        ui.set_go_home(_ui_go_home)
+
     table_xy_affine = _table_xy_affine_from_calib(calib)
     object_top_z_default, object_top_z = object_top_z_from_calib(calib)
     if table_xy_affine is not None:

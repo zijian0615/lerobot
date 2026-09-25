@@ -1,0 +1,1 @@
+pick all black cubes and put them into the blue container

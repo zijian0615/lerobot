@@ -38,6 +38,21 @@ lerobot-record \\
     --display_data=true
 ```
 
+Example recording with Quest 3 (Android WebXR) on FANUC:
+
+```shell
+lerobot-record \\
+    --robot.type=fanuc \\
+    --robot.host=172.30.109.22 \\
+    --teleop.type=phone \\
+    --teleop.phone_os=android \\
+    --dataset.repo_id=<my_username>/fanuc_quest \\
+    --dataset.single_task="Pick the object" \\
+    --dataset.num_episodes=20 \\
+    --dataset.fps=10 \\
+    --dataset.episode_time_s=60
+```
+
 Example recording with bimanual so100:
 ```shell
 lerobot-record \\
@@ -134,6 +149,8 @@ from lerobot.robots import (  # noqa: F401
     so_follower,
     unitree_g1 as unitree_g1_robot,
 )
+from lerobot.robots.fanuc import make_phone_fanuc_processors
+from lerobot.robots.xarm import make_phone_xarm_processors
 from lerobot.teleoperators import (  # noqa: F401
     Teleoperator,
     TeleoperatorConfig,
@@ -152,6 +169,7 @@ from lerobot.teleoperators import (  # noqa: F401
     unitree_g1,
 )
 from lerobot.teleoperators.keyboard import KeyboardTeleop
+from lerobot.teleoperators.telegrip import make_telegrip_processors
 from lerobot.utils.constants import ACTION, OBS_STR
 from lerobot.utils.feature_utils import build_dataset_frame, combine_feature_dicts
 from lerobot.utils.import_utils import register_third_party_plugins
@@ -317,6 +335,18 @@ def record_loop(
                 )
             continue
 
+        # Quest grip released (and phone B1 released) yields an empty pose.
+        # Sending that to FANUC raises; hold position and do not write a frame.
+        if not robot_action_to_send:
+            if no_action_count == 0:
+                logging.info("Waiting for a teleop pose. Hold the Quest grip to move and record.")
+            no_action_count += 1
+            dt_s = time.perf_counter() - start_loop_t
+            precise_sleep(max(control_interval - dt_s, 0.0))
+            start_episode_t = time.perf_counter() - timestamp
+            continue
+        no_action_count = 0
+
         # Send action to robot
         # Action can eventually be clipped using `max_relative_target`,
         # so action actually sent is saved in the dataset. action = postprocessor.process(action)
@@ -373,7 +403,16 @@ def record(
         or robot_action_processor is None
         or robot_observation_processor is None
     ):
-        _t, _r, _o = make_default_processors()
+        phone_robot = cfg.teleop is not None and cfg.teleop.type == "phone"
+        telegrip_fanuc = cfg.teleop is not None and cfg.teleop.type == "telegrip" and cfg.robot.type == "fanuc"
+        if telegrip_fanuc:
+            _t, _r, _o = make_telegrip_processors(robot, cfg.teleop)
+        elif phone_robot and cfg.robot.type == "fanuc":
+            _t, _r, _o = make_phone_fanuc_processors(robot, cfg.teleop)
+        elif phone_robot and cfg.robot.type == "xarm":
+            _t, _r, _o = make_phone_xarm_processors(robot, cfg.teleop)
+        else:
+            _t, _r, _o = make_default_processors()
         teleop_action_processor = teleop_action_processor or _t
         robot_action_processor = robot_action_processor or _r
         robot_observation_processor = robot_observation_processor or _o
@@ -474,6 +513,13 @@ def record(
                     (recorded_episodes < cfg.dataset.num_episodes - 1) or events["rerecord_episode"]
                 ):
                     log_say("Reset the environment", cfg.play_sounds)
+                    # Isaac Sim twin (FanucConfig.sim_reset): the simulator resets the scene itself. Forget the
+                    # teleop's latched origin so the next grip starts from the reset arm.
+                    reset_episode = getattr(robot, "reset_episode", None)
+                    if callable(reset_episode) and reset_episode() is not None:
+                        for processor in (teleop_action_processor, robot_action_processor):
+                            if hasattr(processor, "reset"):
+                                processor.reset()
 
                     record_loop(
                         robot=robot,

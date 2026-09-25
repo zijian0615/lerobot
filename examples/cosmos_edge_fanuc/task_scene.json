@@ -1,0 +1,14 @@
+{
+  "_comment": "Sim task: put the black cube in, or lay the pen on, the blue or orange bin. Assets are scanner/objects/<name>/<name>.usda (origin at the bottom centre, z up). Each episode picks one item and one bin at random and scatters all four in 'workspace' (table frame, metres).",
+  "items": {
+    "black_cube": {"phrase": "the black cube", "verb": "put {item} in {bin}", "place": "drop"},
+    "pen": {"phrase": "the pen", "verb": "lay {item} on {bin}", "place": "lay"}
+  },
+  "bins": {
+    "blue_bin": {"phrase": "the blue bin"},
+    "orange_bin": {"phrase": "the orange bin"}
+  },
+  "workspace": {"x": [0.25, 0.50], "y": [-0.30, 0.30], "radius": [0.27, 0.50]},
+  "clearance_m": 0.015,
+  "footprint_radius_m": {"black_cube": 0.02, "pen": 0.068, "blue_bin": 0.045, "orange_bin": 0.045}
+}

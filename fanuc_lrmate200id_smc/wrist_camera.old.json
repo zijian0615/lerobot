@@ -1,0 +1,11 @@
+{
+ "image_hw": [720, 1280],
+ "hfov_deg": 92.0,
+ "eye_tool": [0.03, -0.05, 0.04],
+ "target_tool": [0.0, 0.02, 0.28],
+ "up_tool": [0.0, -1.0, 0.0],
+ "focal_mm": 12.0,
+ "horizontal_aperture": 24.8527,
+ "vertical_aperture": 13.9796,
+ "note": "Innomaker 1280x720, about 92 deg horizontal. Looks past the fingers onto the table. With the arm folded over the base, the housing sits on the left of the frame."
+}

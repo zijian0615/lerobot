@@ -14,7 +14,7 @@ from typing import NamedTuple, Optional
 
 import numpy as np
 
-from joint_map import model_to_fanuc
+from joint_map import J3_MODES, model_to_fanuc
 
 
 class JointSample(NamedTuple):
@@ -110,6 +110,8 @@ class RmiJointSource(_ThreadedSource):
         self.host, self.port, self.group = host, port, group
         self.period, self.init, self.timeout = 1.0 / rate_hz, init, timeout
         self.first_raw = None        # first joint response, printed by twin.py to help verify field names
+        self._sess_sock = None
+        self._sess_ls = None
 
     def _frc_connect(self):
         with socket.create_connection((self.host, self.port), timeout=self.timeout) as s:
@@ -131,7 +133,34 @@ class RmiJointSource(_ThreadedSource):
             resp = ls.read_json()
             if resp.get("ErrorID", -1) != 0:
                 raise RmiError(f"FRC_Initialize failed: {resp}")
+        self._sess_sock, self._sess_ls = sock, ls
         return sock, ls
+
+    def _end_session(self, sock, ls):
+        """FANUC requires FRC_Abort or FRC_Disconnect before dropping TCP, else RMI_MOVE stays selected."""
+        if sock is None:
+            return
+        try:
+            if self.init and ls is not None:
+                try:
+                    ls.send_json({"Command": "FRC_Abort"})
+                except OSError:
+                    pass
+                try:
+                    ls.send_json({"Communication": "FRC_Disconnect"})
+                except OSError:
+                    pass
+                try:
+                    sock.shutdown(socket.SHUT_RDWR)
+                except OSError:
+                    pass
+        finally:
+            try:
+                sock.close()
+            except OSError:
+                pass
+            if self._sess_sock is sock:
+                self._sess_sock = self._sess_ls = None
 
     def _request(self, ls, command, **kw):
         ls.send_json({"Command": command, "Group": self.group, **kw})
@@ -143,7 +172,7 @@ class RmiJointSource(_ThreadedSource):
     def _run(self):
         backoff = 1.0
         while not self._stop.is_set():
-            sock = None
+            sock = ls = None
             try:
                 sock, ls = self._open()
                 self._status = "connected"
@@ -160,8 +189,14 @@ class RmiJointSource(_ThreadedSource):
                 self._stop.wait(backoff)
                 backoff = min(backoff * 2, 5.0)
             finally:
-                if sock is not None:
-                    sock.close()                      # never send FRC_Abort: that would stop the robot program
+                self._end_session(sock, ls)
+
+    def close(self):
+        self._stop.set()
+        sock, ls = self._sess_sock, self._sess_ls
+        if sock is not None:
+            self._end_session(sock, ls)
+        super().close()
 
     def read_cartesian_once(self):
         """One-off  (joints_deg, (X, Y, Z, W, P, R))  read for --check-cartesian. Uses its own short session."""
@@ -174,7 +209,7 @@ class RmiJointSource(_ThreadedSource):
             p = {k.upper(): v for k, v in c["Position"].items()}
             return j, tuple(float(p[k]) for k in "XYZWPR")
         finally:
-            sock.close()
+            self._end_session(sock, ls)
 
 
 class UdpJointSource(_ThreadedSource):
@@ -238,3 +273,23 @@ class DemoSource:
 
     def close(self):
         pass
+
+
+def add_source_args(ap):
+    """Command-line options shared by twin.py and omni_twin.py."""
+    ap.add_argument("--source", choices=["rmi", "udp", "demo"], default="rmi")
+    ap.add_argument("--host", default="172.30.109.22")
+    ap.add_argument("--port", type=int, default=16001, help="RMI main port (FRC_Connect)")
+    ap.add_argument("--group", type=int, default=1)
+    ap.add_argument("--rate", type=float, default=30.0, help="RMI polling rate [Hz]")
+    ap.add_argument("--no-init", action="store_true", help="skip FRC_Initialize (try if init disturbs another RMI client)")
+    ap.add_argument("--udp-port", type=int, default=5005)
+    ap.add_argument("--j3-mode", choices=list(J3_MODES), default="coupled")
+
+
+def make_source(a):
+    if a.source == "demo":
+        return DemoSource(a.j3_mode).start()
+    if a.source == "udp":
+        return UdpJointSource(a.udp_port).start()
+    return RmiJointSource(a.host, a.port, a.group, a.rate, init=not a.no_init).start()

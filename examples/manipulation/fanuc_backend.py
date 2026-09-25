@@ -30,7 +30,6 @@ from tabletop_perception.fanuc.run_fanuc_grasp import (
     _travel_xy,
     _workspace_from_samples,
     _wrap_signed_deg,
-    _yaw_via_xy,
 )
 
 
@@ -62,6 +61,7 @@ class FanucMotionBackend:
         self.taught_wpr = tuple(float(v) for v in exe.get("topdown_wpr_deg", [180.0, 0.0, 0.0]))
         self.use_object_yaw = bool(exe.get("use_object_yaw", True))
         self.yaw_offset = float(exe.get("grasp_yaw_offset_rad", 0.0))
+        self.approach_z_mm = (self.table_z_base_m + float(exe.get("approach_offset_m", 0.08))) * 1000.0
         samples = samples_file or (
             Path(__file__).resolve().parents[1]
             / "tabletop_perception"
@@ -71,6 +71,13 @@ class FanucMotionBackend:
         self.workspace = _workspace_from_samples(samples)
         self.reach = _reach_from_samples(samples)
         self._gripper_closed = False
+        self.home_tcp = dict(_read_tcp(self.robot))
+        print(
+            "home TCP = "
+            f"({self.home_tcp['x_mm']:.1f}, {self.home_tcp['y_mm']:.1f}, {self.home_tcp['z_mm']:.1f}) "
+            f"WPR=({self.home_tcp['w_deg']:.1f}, {self.home_tcp['p_deg']:.1f}, {self.home_tcp['r_deg']:.1f})",
+            flush=True,
+        )
 
     def _xy_mm(self, x_t: float, y_t: float) -> tuple[float, float]:
         x = (x_t - self.base_xy[0]) * 1000.0
@@ -118,6 +125,70 @@ class FanucMotionBackend:
         yaw = math.radians(_wrap_signed_deg(tcp["r_deg"] - self.taught_wpr[2]))
         return (x_t, y_t, z_t, yaw)
 
+    def go_home(self) -> None:
+        """Lift from the current TCP, then return to the home captured at connect."""
+        recover = getattr(self.robot, "recover_after_fault", None)
+        if recover is not None:
+            print("go home: Abort/Reset after fault, then move", flush=True)
+            recover()
+            seq = getattr(self.robot, "seq_id", None)
+            if seq is not None:
+                print(f"go home: RMI SequenceID reset to {seq}", flush=True)
+        home = self.home_tcp
+        if not home:
+            self.home_tcp = dict(_read_tcp(self.robot))
+            home = self.home_tcp
+        tcp = _read_tcp(self.robot)
+        hold = (tcp["w_deg"], tcp["p_deg"], tcp["r_deg"])
+        home_wpr = (home["w_deg"], home["p_deg"], home["r_deg"])
+        travel_z = max(float(tcp["z_mm"]), float(home["z_mm"]), float(self.approach_z_mm))
+        print(
+            f"go home → ({home['x_mm']:.1f}, {home['y_mm']:.1f}, {home['z_mm']:.1f}) "
+            f"travel_z={travel_z:.1f}",
+            flush=True,
+        )
+        if abs(tcp["z_mm"] - travel_z) > 1.0:
+            move_fanuc_xyz(
+                self.robot,
+                x_mm=tcp["x_mm"],
+                y_mm=tcp["y_mm"],
+                z_mm=travel_z,
+                wpr_deg=hold,
+                speed=self.speed,
+            )
+            tcp = _read_tcp(self.robot)
+            hold = (tcp["w_deg"], tcp["p_deg"], tcp["r_deg"])
+        if math.hypot(home["x_mm"] - tcp["x_mm"], home["y_mm"] - tcp["y_mm"]) > 1.0:
+            _travel_xy(
+                self.robot,
+                x0=tcp["x_mm"],
+                y0=tcp["y_mm"],
+                x1=home["x_mm"],
+                y1=home["y_mm"],
+                z_mm=travel_z,
+                wpr_deg=hold,
+                speed=self.speed,
+                reach=self.reach,
+            )
+            tcp = _read_tcp(self.robot)
+            hold = (tcp["w_deg"], tcp["p_deg"], tcp["r_deg"])
+        delta_r = _wrap_signed_deg(home_wpr[2] - hold[2])
+        if abs(delta_r) > 2.0:
+            print(
+                f"go home: skip in-place ΔR={delta_r:.1f}° "
+                f"(hold R={hold[2]:.1f}, home R={home_wpr[2]:.1f})",
+                flush=True,
+            )
+        if abs(tcp["z_mm"] - home["z_mm"]) > 1.0:
+            move_fanuc_xyz(
+                self.robot,
+                x_mm=home["x_mm"],
+                y_mm=home["y_mm"],
+                z_mm=home["z_mm"],
+                wpr_deg=hold,
+                speed=min(self.speed, 20.0),
+            )
+
     def move_to_pose(self, pose_table: tuple[float, float, float, float]) -> None:
         x_t, y_t, z_t, yaw_t = (float(v) for v in pose_table)
         cmd_x, cmd_y = self._xy_mm(x_t, y_t)
@@ -141,30 +212,28 @@ class FanucMotionBackend:
                 speed=self.speed,
             )
             tcp = _read_tcp(self.robot)
-        delta_r = _wrap_signed_deg(face_wpr[2] - tcp["r_deg"])
-        if abs(delta_r) > 15.0:
-            via = _yaw_via_xy(tcp["x_mm"], tcp["y_mm"], self.workspace, self.reach)
-            if via is not None:
-                move_fanuc_xyz(
-                    self.robot,
-                    x_mm=via[0],
-                    y_mm=via[1],
-                    z_mm=travel_z,
-                    wpr_deg=face_wpr,
-                    speed=self.yaw_speed,
+            hold = (tcp["w_deg"], tcp["p_deg"], tcp["r_deg"])
+        # Long XY keeps the current wrist. New R rides the Z descend that
+        # already follows, so we do not add a slow extra yaw hop.
+        if math.hypot(cmd_x - tcp["x_mm"], cmd_y - tcp["y_mm"]) > 1.0:
+            delta_r = _wrap_signed_deg(face_wpr[2] - hold[2])
+            if abs(delta_r) > 2.0:
+                print(
+                    f"[yaw] hold R={hold[2]:.1f}° on XY; ΔR={delta_r:.1f}° on Z/settle",
+                    flush=True,
                 )
-                tcp = _read_tcp(self.robot)
-        _travel_xy(
-            self.robot,
-            x0=tcp["x_mm"],
-            y0=tcp["y_mm"],
-            x1=cmd_x,
-            y1=cmd_y,
-            z_mm=travel_z,
-            wpr_deg=face_wpr,
-            speed=self.speed,
-            reach=self.reach,
-        )
+            _travel_xy(
+                self.robot,
+                x0=tcp["x_mm"],
+                y0=tcp["y_mm"],
+                x1=cmd_x,
+                y1=cmd_y,
+                z_mm=travel_z,
+                wpr_deg=hold,
+                speed=self.speed,
+                reach=self.reach,
+            )
+            tcp = _read_tcp(self.robot)
         if abs(travel_z - cmd_z) > 1.0:
             move_fanuc_xyz(
                 self.robot,
@@ -173,6 +242,15 @@ class FanucMotionBackend:
                 z_mm=cmd_z,
                 wpr_deg=face_wpr,
                 speed=min(self.speed, 20.0),
+            )
+        elif abs(_wrap_signed_deg(face_wpr[2] - tcp["r_deg"])) > 2.0:
+            move_fanuc_xyz(
+                self.robot,
+                x_mm=cmd_x,
+                y_mm=cmd_y,
+                z_mm=cmd_z,
+                wpr_deg=face_wpr,
+                speed=self.yaw_speed,
             )
 
     def gripper(self, cmd: str) -> None:

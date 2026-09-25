@@ -16,5 +16,6 @@
 
 from .config_fanuc import FanucConfig
 from .fanuc import Fanuc
+from .phone_processor import make_phone_fanuc_processors
 
-__all__ = ["Fanuc", "FanucConfig"]
+__all__ = ["Fanuc", "FanucConfig", "make_phone_fanuc_processors"]

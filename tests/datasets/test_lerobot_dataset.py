@@ -398,6 +398,16 @@ def test_download_without_root_uses_hub_cache(
 # ── Write-only mode (via create()) ──────────────────────────────────
 
 
+def test_create_expands_user_in_root(tmp_path, monkeypatch):
+    """A root starting with ~ is stored under the home directory, not a literal tilde folder."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    dataset = LeRobotDataset.create(
+        repo_id=DUMMY_REPO_ID, fps=DEFAULT_FPS, features=SIMPLE_FEATURES, root="~/fanuc_teleop"
+    )
+    assert dataset.root == tmp_path / "fanuc_teleop"
+    assert (tmp_path / "fanuc_teleop" / "meta" / "info.json").is_file()
+
+
 def test_create_sets_writer_no_reader(tmp_path):
     """create() sets writer to a DatasetWriter and reader to None."""
     dataset = LeRobotDataset.create(

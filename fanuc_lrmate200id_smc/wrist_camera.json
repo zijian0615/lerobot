@@ -1,0 +1,96 @@
+{
+ "_comment": "Innomaker wrist camera on a long bracket beside the gripper, rigid to tool0 (rotates with J6). Calibrated by twin/calib_wrist.py against the aligned table scan from static poses; accuracy about 1-2 cm on the table (scan-to-robot alignment). T_tool_cam: OpenCV camera in tool0.",
+ "image_hw": [
+  720,
+  1280
+ ],
+ "K": [
+  [
+   672.2640897925996,
+   0.0,
+   639.4999999000004
+  ],
+  [
+   0.0,
+   672.2640897925996,
+   359.5000000999609
+  ],
+  [
+   0.0,
+   0.0,
+   1.0
+  ]
+ ],
+ "dist": [
+  -0.06843337225424721,
+  0.012342141267927598,
+  0.0,
+  0.0,
+  0.0
+ ],
+ "T_tool_cam": [
+  [
+   0.0052067609759450795,
+   -0.9038694188879657,
+   -0.4277767679985327,
+   0.13229396782293365
+  ],
+  [
+   0.9972889067127652,
+   -0.026706550080971184,
+   0.06856819036863956,
+   0.054216592444895836
+  ],
+  [
+   -0.07340113206073039,
+   -0.42697404345217954,
+   0.9012798899511177,
+   0.19954834527687973
+  ],
+  [
+   0.0,
+   0.0,
+   0.0,
+   1.0
+  ]
+ ],
+ "hfov_deg": 87.18315264099127,
+ "eye_tool": [
+  0.13229396782293365,
+  0.054216592444895836,
+  0.19954834527687973
+ ],
+ "target_tool": [
+  0.003960937423373834,
+  0.0747870495554877,
+  0.469932312262215
+ ],
+ "up_tool": [
+  0.9038694188879657,
+  0.026706550080971184,
+  0.42697404345217954
+ ],
+ "focal_mm": 11.005698438753067,
+ "horizontal_aperture": 20.955,
+ "vertical_aperture": 11.787187499999998,
+ "calibration": {
+  "poses": [
+   "pose_01",
+   "pose_02",
+   "pose_03",
+   "pose_04",
+   "pose_05",
+   "pose_06"
+  ],
+  "correlation": [
+   0.4841,
+   0.1582,
+   0.2491,
+   0.366,
+   0.2766,
+   0.3727
+  ],
+  "poses_dir": "/home/gb2_8634/lerobot/examples/cosmos_edge_fanuc/scanner/wrist_calib",
+  "scan": "/home/gb2_8634/lerobot/examples/cosmos_edge_fanuc/scanner/scan_204107"
+ }
+}

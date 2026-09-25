@@ -361,6 +361,11 @@ def make_telegrip_processors(
     RobotProcessorPipeline[tuple[RobotActionType, RobotObservation], RobotActionType],
     RobotProcessorPipeline[RobotObservation, RobotObservation],
 ]:
+    if robot.name == "fanuc":
+        from lerobot.robots.fanuc.telegrip_processor import make_telegrip_fanuc_processors
+
+        return make_telegrip_fanuc_processors(robot, teleop_config)
+
     if not teleop_config.urdf_path:
         raise ValueError(
             "telegrip teleoperation requires --teleop.urdf_path pointing to the robot URDF "

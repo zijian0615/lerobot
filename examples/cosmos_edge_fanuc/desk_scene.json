@@ -1,0 +1,43 @@
+{
+  "source": "/tmp/video0_cube.jpg",
+  "task": "pick the black cube and put it into the blue bin",
+  "container": {
+    "name": "blue_container",
+    "xy": [
+      0.2911,
+      -0.4104
+    ],
+    "yaw": -0.7854,
+    "size": [
+      0.032,
+      0.032,
+      0.035
+    ],
+    "color": [
+      0.15,
+      0.45,
+      0.85
+    ]
+  },
+  "cubes": [
+    {
+      "name": "black_cube",
+      "xy": [
+        0.4475,
+        0.2026
+      ],
+      "yaw": -0.26,
+      "size": [
+        0.028,
+        0.028,
+        0.02
+      ],
+      "color": [
+        0.06,
+        0.06,
+        0.06
+      ]
+    }
+  ],
+  "xy_from": "pixels (388.4, 517.0) / (1158.3, 703.9) of the source photo, cast with overhead_camera.json (align_scan) onto each object's top"
+}

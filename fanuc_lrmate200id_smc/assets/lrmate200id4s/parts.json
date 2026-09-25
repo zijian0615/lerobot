@@ -1,0 +1,126 @@
+{
+ "source": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.1/Isaac/Robots/Fanuc/lrmate200id4s",
+ "license": "CC BY 4.0",
+ "parts": [
+  {
+   "body": "base_link",
+   "mesh": "base_link_black",
+   "colour": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "triangles": 12562
+  },
+  {
+   "body": "link_1",
+   "mesh": "link_1_yellow",
+   "colour": [
+    1.0,
+    1.0,
+    0.0
+   ],
+   "triangles": 20240
+  },
+  {
+   "body": "link_2",
+   "mesh": "link_2_yellow",
+   "colour": [
+    1.0,
+    1.0,
+    0.0
+   ],
+   "triangles": 19142
+  },
+  {
+   "body": "link_3",
+   "mesh": "link_3_yellow",
+   "colour": [
+    1.0,
+    1.0,
+    0.0
+   ],
+   "triangles": 7374
+  },
+  {
+   "body": "link_4",
+   "mesh": "link_4_black",
+   "colour": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "triangles": 3604
+  },
+  {
+   "body": "link_4",
+   "mesh": "link_4_gray",
+   "colour": [
+    0.506,
+    0.529,
+    0.549
+   ],
+   "triangles": 114
+  },
+  {
+   "body": "link_4",
+   "mesh": "link_4_silver",
+   "colour": [
+    0.733,
+    0.733,
+    0.733
+   ],
+   "triangles": 386
+  },
+  {
+   "body": "link_4",
+   "mesh": "link_4_red",
+   "colour": [
+    0.8,
+    0.0,
+    0.0
+   ],
+   "triangles": 553
+  },
+  {
+   "body": "link_4",
+   "mesh": "link_4_yellow",
+   "colour": [
+    1.0,
+    1.0,
+    0.0
+   ],
+   "triangles": 17313
+  },
+  {
+   "body": "link_5",
+   "mesh": "link_5_black",
+   "colour": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "triangles": 1708
+  },
+  {
+   "body": "link_5",
+   "mesh": "link_5_yellow",
+   "colour": [
+    1.0,
+    1.0,
+    0.0
+   ],
+   "triangles": 4806
+  },
+  {
+   "body": "link_6",
+   "mesh": "link_6_black",
+   "colour": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "triangles": 630
+  }
+ ]
+}
