@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EMS885 xArm Twin</title>
+<style>
+  :root { --bg: #1d1f22; --panel: rgba(20, 22, 25, 0.82); --text: #e6e6e6; --muted: #9aa0a6;
+          --live: #2ecc71; --stale: #f39c12; --none: #e74c3c; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+               font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; overflow: hidden; }
+  #view { position: fixed; inset: 0; }
+  #hud { position: fixed; top: 12px; left: 12px; right: 12px; max-width: 460px; background: var(--panel);
+         border-radius: 10px; padding: 10px 12px; backdrop-filter: blur(4px); }
+  #hud h1 { font-size: 14px; margin: 0 0 6px; font-weight: 600; }
+  .arm { margin-top: 8px; }
+  .arm .name { font-weight: 600; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px;
+         background: var(--none); }
+  .dot.live { background: var(--live); } .dot.stale { background: var(--stale); }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--muted); }
+  .warn { color: var(--stale); }
+  #buttons { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+  button { background: #33373c; color: var(--text); border: 1px solid #4a4f55; border-radius: 6px; padding: 4px 10px;
+           cursor: pointer; font: inherit; }
+  button:hover { background: #3d4248; }
+  #msg { position: fixed; bottom: 12px; left: 12px; color: var(--muted); font-size: 12px; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="view"></div>
+<div id="hud">
+  <h1>EMS885 双 xArm 数字孪生 <span class="mono">(只读)</span></h1>
+  <div class="mono" id="source">连接中…</div>
+  <div id="arms"></div>
+  <div id="buttons">
+    <button data-view="persp">斜视</button>
+    <button data-view="top">俯视（同俯视相机）</button>
+    <button id="scanBtn">隐藏扫描</button>
+  </div>
+</div>
+<div id="msg">加载模型…</div>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { STLLoader } from "three/addons/loaders/STLLoader.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+
+const COLORS = { xarm_white: 0xdcdcd6, gripper_dark: 0x2a2a2c, leaphand_black: 0x1a1a1c };
+const TRAIL = { xarm: 0x1a99ff, xarm2: 0xff5a1a };
+const VIEWS = {
+  persp: { eye: [-0.95, -0.43, 1.05], target: [0.35, -0.43, 0.05] },
+  top:   { eye: [0.2999, -0.45, 1.9], target: [0.30, -0.45, 0.0] },   // image up = +x, right = -y, like the camera
+};
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.getElementById("view").appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1d1f22);
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 50);
+camera.up.set(0, 0, 1);                                   // world is Z-up (Robot1 base frame)
+const controls = new OrbitControls(camera, renderer.domElement);
+function setView(name) {
+  const v = VIEWS[name];
+  camera.position.set(...v.eye);
+  controls.target.set(...v.target);
+  controls.update();
+}
+setView("persp");
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x404048, 1.6));
+const sun = new THREE.DirectionalLight(0xffffff, 1.8);
+sun.position.set(0.8, -1.2, 2.0);
+scene.add(sun);
+
+const msg = document.getElementById("msg");
+const sceneInfo = await (await fetch("/scene.json")).json();
+const chain = sceneInfo.chain;
+
+// ground under the table
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(6, 6), new THREE.MeshStandardMaterial({ color: 0x3a3c40, roughness: 0.95 }));
+ground.position.z = -sceneInfo.table_height_m;
+scene.add(ground);
+scene.add(new THREE.AxesHelper(0.15));                    // world origin = Robot1 base
+
+// robots: body = Group(pos, quat) > Group(joint rotation) > meshes + children  (same as the USD xformOp order)
+const inner = {}, jointObjs = {};
+const stl = new STLLoader();
+const stlCache = {};
+function loadStl(file) {
+  if (!stlCache[file]) stlCache[file] = new Promise((ok, fail) => stl.load("/assets/" + file, ok, undefined, fail));
+  return stlCache[file];
+}
+const pending = [];
+for (const b of chain.bodies) {
+  const g = new THREE.Group();
+  g.position.set(...b.pos);
+  g.quaternion.set(b.quat[1], b.quat[2], b.quat[3], b.quat[0]);
+  const j = new THREE.Group();
+  g.add(j);
+  (b.parent ? inner[b.parent] : scene).add(g);
+  inner[b.name] = j;
+  if (b.joint) jointObjs[b.joint.name] = { obj: j, axis: new THREE.Vector3(...b.joint.axis).normalize() };
+  const mat = new THREE.MeshStandardMaterial({ color: COLORS[b.material] ?? 0xcccccc, roughness: 0.45, metalness: 0.05 });
+  for (const geom of b.geoms) {
+    if (geom.type === "mesh") {
+      pending.push(loadStl(geom.file).then(gm => { gm.computeVertexNormals(); j.add(new THREE.Mesh(gm, mat)); }));
+    } else if (geom.type === "box") {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(...geom.size), mat);
+      m.position.set(...geom.pos);
+      j.add(m);
+    }
+  }
+}
+
+// scan: raw glTF coordinates -> world by T_world_scan (row-major 4x4)
+const scanHolder = new THREE.Group();
+scanHolder.matrixAutoUpdate = false;
+scanHolder.matrix.set(...sceneInfo.T_world_scan.flat());
+scene.add(scanHolder);
+pending.push(new Promise((ok, fail) => new GLTFLoader().load("/scan.glb", gltf => {
+  gltf.scene.traverse(o => {
+    if (o.isMesh) o.material = new THREE.MeshBasicMaterial({ map: o.material.map, side: THREE.DoubleSide });  // photo texture, unlit
+  });
+  scanHolder.add(gltf.scene);
+  ok();
+}, undefined, fail)));
+document.getElementById("scanBtn").onclick = e => {
+  scanHolder.visible = !scanHolder.visible;
+  e.target.textContent = scanHolder.visible ? "隐藏扫描" : "显示扫描";
+};
+
+// TCP trails
+const trails = {};
+for (const arm of Object.keys(chain.arms)) {
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(3 * 400), 3));
+  geo.setDrawRange(0, 0);
+  const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: TRAIL[arm] ?? 0x22cccc }));
+  line.frustumCulled = false;
+  scene.add(line);
+  trails[arm] = line;
+}
+for (const btn of document.querySelectorAll("[data-view]")) btn.onclick = () => setView(btn.dataset.view);
+
+Promise.all(pending).then(() => { msg.textContent = "模型已加载 · 鼠标左键旋转、右键平移、滚轮缩放"; })
+  .catch(e => { msg.textContent = "加载失败: " + e; });
+
+// state polling
+const armsDiv = document.getElementById("arms");
+const LABEL = { xarm: "Robot1 · xArm6 + 夹爪", xarm2: "Robot2 · xArm6 + LeapHand" };
+const STATUS = { live: "实时", stale: "数据过期", none: "无数据" };
+function fmt(v) { return v.map(x => x.toFixed(1)).join(", "); }
+async function poll() {
+  try {
+    const s = await (await fetch("/state", { cache: "no-store" })).json();
+    for (const [name, v] of Object.entries(s.joints)) {
+      const j = jointObjs[name];
+      if (j) j.obj.quaternion.setFromAxisAngle(j.axis, v);
+    }
+    let html = "";
+    for (const [arm, a] of Object.entries(s.arms)) {
+      html += `<div class="arm"><span class="dot ${a.status}"></span><span class="name">${LABEL[arm] ?? arm}</span>
+        <span class="mono"> ${STATUS[a.status] ?? a.status}${a.age_ms !== undefined ? ` · ${a.age_ms} ms` : ""}</span>`;
+      if (a.q_deg) html += `<div class="mono">J(°) ${fmt(a.q_deg)}</div><div class="mono">法兰(mm) ${fmt(a.flange_mm)}</div>`;
+      if (a.limits && a.limits.length) html += `<div class="warn">接近/超出关节限位: ${JSON.stringify(a.limits)}</div>`;
+      html += "</div>";
+      const line = trails[arm];
+      const pts = a.trail;
+      const arr = line.geometry.attributes.position.array;
+      const n = Math.min(pts.length, 400);
+      for (let i = 0; i < n; i++) arr.set(pts[pts.length - n + i], 3 * i);
+      line.geometry.attributes.position.needsUpdate = true;
+      line.geometry.setDrawRange(0, n);
+    }
+    armsDiv.innerHTML = html;
+    document.getElementById("source").textContent = "数据源: " + s.source;
+  } catch (e) {
+    document.getElementById("source").textContent = "与服务器断开，重试中…";
+  }
+  setTimeout(poll, 33);
+}
+poll();
+
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+</script>
+</body>
+</html>
