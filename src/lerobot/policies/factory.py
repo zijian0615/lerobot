@@ -45,6 +45,7 @@ from lerobot.utils.constants import (
 from lerobot.utils.feature_utils import dataset_to_policy_features
 
 from .act.configuration_act import ACTConfig
+from .cosmos3.configuration_cosmos3 import Cosmos3Config
 from .diffusion.configuration_diffusion import DiffusionConfig
 from .eo1.configuration_eo1 import EO1Config
 from .gaussian_actor.configuration_gaussian_actor import GaussianActorConfig
@@ -162,6 +163,10 @@ def get_policy_class(name: str) -> type[PreTrainedPolicy]:
         from .vla_jepa.modeling_vla_jepa import VLAJEPAPolicy
 
         return VLAJEPAPolicy
+    elif name == "cosmos3":
+        from .cosmos3.modeling_cosmos3 import Cosmos3Policy
+
+        return Cosmos3Policy
     else:
         try:
             return _get_policy_cls_from_policy_name(name=name)
@@ -218,6 +223,8 @@ def make_policy_config(policy_type: str, **kwargs) -> PreTrainedConfig:
         return MolmoAct2Config(**kwargs)
     elif policy_type == "vla_jepa":
         return VLAJEPAConfig(**kwargs)
+    elif policy_type == "cosmos3":
+        return Cosmos3Config(**kwargs)
     else:
         try:
             config_cls = PreTrainedConfig.get_choice_class(policy_type)
@@ -444,6 +451,14 @@ def make_pre_post_processors(
         from .vla_jepa.processor_vla_jepa import make_vla_jepa_pre_post_processors
 
         processors = make_vla_jepa_pre_post_processors(
+            config=policy_cfg,
+            dataset_stats=kwargs.get("dataset_stats"),
+        )
+
+    elif isinstance(policy_cfg, Cosmos3Config):
+        from .cosmos3.processor_cosmos3 import make_cosmos3_pre_post_processors
+
+        processors = make_cosmos3_pre_post_processors(
             config=policy_cfg,
             dataset_stats=kwargs.get("dataset_stats"),
         )

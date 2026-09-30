@@ -1,0 +1,47 @@
+{
+  "_comment": "Normalization box for a FANUC Cosmos Edge post-train. Not fitted to demonstrations (none recorded). J1..J6 are FANUC pendant degrees; gripper is 0 open / 1 closed. Do not point a server at so101_lerobot_stats.json.",
+  "domain_name": "fanuc",
+  "domain_id": 23,
+  "action_space": "joint_pos",
+  "demonstrations": 0,
+  "action": {
+    "min": [
+      -170.0,
+      -110.0,
+      -189.0,
+      -190.0,
+      -120.0,
+      -360.0,
+      0.0
+    ],
+    "max": [
+      170.0,
+      120.0,
+      315.0,
+      190.0,
+      120.0,
+      360.0,
+      1.0
+    ]
+  },
+  "observation.state": {
+    "min": [
+      -170.0,
+      -110.0,
+      -189.0,
+      -190.0,
+      -120.0,
+      -360.0,
+      0.0
+    ],
+    "max": [
+      170.0,
+      120.0,
+      315.0,
+      190.0,
+      120.0,
+      360.0,
+      1.0
+    ]
+  }
+}

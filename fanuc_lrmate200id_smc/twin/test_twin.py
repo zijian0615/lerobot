@@ -85,7 +85,7 @@ def test_rmi_end_to_end_tracks_mock_controller_and_is_read_only(model):
         assert ctrl.n_reads > 40                                    # ~50 Hz polling for 2.5 s
         q_expected = fanuc_to_model(ctrl.last_joints, "coupled")
         assert np.abs(data.qpos[:6] - q_expected).max() < 0.1       # within motion during ~2 polls
-        assert ctrl.forbidden == []                                 # never a motion instruction, never FRC_Abort
+        assert ctrl.forbidden == []                                 # never a motion instruction
     finally:
         ctrl.stop()
 
@@ -98,6 +98,7 @@ def test_reconnects_after_controller_restart():
         assert wait_for(lambda: src.count > 5)
         ctrl.stop()
         assert wait_for(lambda: src.status.startswith("error"), 5.0)
+        time.sleep(0.3)
         n = src.count
         ctrl2 = MockRmiController(port=port).start()
         try:

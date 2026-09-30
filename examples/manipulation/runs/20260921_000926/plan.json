@@ -1,0 +1,115 @@
+[
+  {
+    "step": 1,
+    "arm": "fanuc",
+    "primitive": "Grasp",
+    "args": {
+      "object": "screw_top_left"
+    },
+    "depends_on": []
+  },
+  {
+    "step": 2,
+    "arm": "fanuc",
+    "primitive": "Place",
+    "args": {
+      "object": "screw_top_left",
+      "destination": "yellow_container"
+    },
+    "depends_on": [
+      1
+    ]
+  },
+  {
+    "step": 3,
+    "arm": "fanuc",
+    "primitive": "Grasp",
+    "args": {
+      "object": "screw_bottom_left"
+    },
+    "depends_on": [
+      2
+    ]
+  },
+  {
+    "step": 4,
+    "arm": "fanuc",
+    "primitive": "Place",
+    "args": {
+      "object": "screw_bottom_left",
+      "destination": "yellow_container"
+    },
+    "depends_on": [
+      3
+    ]
+  },
+  {
+    "step": 5,
+    "arm": "fanuc",
+    "primitive": "Grasp",
+    "args": {
+      "object": "screw_middle"
+    },
+    "depends_on": [
+      4
+    ]
+  },
+  {
+    "step": 6,
+    "arm": "fanuc",
+    "primitive": "Place",
+    "args": {
+      "object": "screw_middle",
+      "destination": "yellow_container"
+    },
+    "depends_on": [
+      5
+    ]
+  },
+  {
+    "step": 7,
+    "arm": "fanuc",
+    "primitive": "Grasp",
+    "args": {
+      "object": "screw_right"
+    },
+    "depends_on": [
+      6
+    ]
+  },
+  {
+    "step": 8,
+    "arm": "fanuc",
+    "primitive": "Place",
+    "args": {
+      "object": "screw_right",
+      "destination": "yellow_container"
+    },
+    "depends_on": [
+      7
+    ]
+  },
+  {
+    "step": 9,
+    "arm": "fanuc",
+    "primitive": "Grasp",
+    "args": {
+      "object": "screw_bottom_right"
+    },
+    "depends_on": [
+      8
+    ]
+  },
+  {
+    "step": 10,
+    "arm": "fanuc",
+    "primitive": "Place",
+    "args": {
+      "object": "screw_bottom_right",
+      "destination": "yellow_container"
+    },
+    "depends_on": [
+      9
+    ]
+  }
+]

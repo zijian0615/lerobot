@@ -94,7 +94,7 @@ class LeRobotDatasetMetadata:
         """
         self.repo_id = repo_id
         self.revision = revision if revision else CODEBASE_VERSION
-        self._requested_root = Path(root) if root is not None else None
+        self._requested_root = Path(root).expanduser() if root is not None else None
         self.root = self._requested_root if self._requested_root is not None else HF_LEROBOT_HOME / repo_id
         self._pq_writer = None
         self.latest_episode = None
@@ -704,7 +704,7 @@ class LeRobotDatasetMetadata:
         """
         obj = cls.__new__(cls)
         obj.repo_id = repo_id
-        obj._requested_root = Path(root) if root is not None else None
+        obj._requested_root = Path(root).expanduser() if root is not None else None
         obj.root = obj._requested_root if obj._requested_root is not None else HF_LEROBOT_HOME / repo_id
 
         obj.root.mkdir(parents=True, exist_ok=False)

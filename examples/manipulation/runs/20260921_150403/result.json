@@ -1,0 +1,608 @@
+{
+  "status": "fail",
+  "reason": "exception:RuntimeError:Fanuc motion ACK ErrorID=-1 seq=26 last={'Communication': 'FRC_SystemFault', 'SequenceID': 26}",
+  "plan": [
+    {
+      "step": 1,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "args": {
+        "object": "screw"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "args": {
+        "object": "screw",
+        "destination": "yellow_container"
+      },
+      "depends_on": [
+        1
+      ]
+    },
+    {
+      "step": 3,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "args": {
+        "object": "screw_2"
+      },
+      "depends_on": [
+        2
+      ]
+    },
+    {
+      "step": 4,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "args": {
+        "object": "screw_2",
+        "destination": "yellow_container"
+      },
+      "depends_on": [
+        3
+      ]
+    },
+    {
+      "step": 5,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "args": {
+        "object": "screw_3"
+      },
+      "depends_on": [
+        4
+      ]
+    },
+    {
+      "step": 6,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "args": {
+        "object": "screw_3",
+        "destination": "yellow_container"
+      },
+      "depends_on": [
+        5
+      ]
+    },
+    {
+      "step": 7,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "args": {
+        "object": "screw_4"
+      },
+      "depends_on": [
+        6
+      ]
+    },
+    {
+      "step": 8,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "args": {
+        "object": "screw_4",
+        "destination": "yellow_container"
+      },
+      "depends_on": [
+        7
+      ]
+    },
+    {
+      "step": 9,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "args": {
+        "object": "screw_5"
+      },
+      "depends_on": [
+        8
+      ]
+    },
+    {
+      "step": 10,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "args": {
+        "object": "screw_5",
+        "destination": "yellow_container"
+      },
+      "depends_on": [
+        9
+      ]
+    },
+    {
+      "step": 11,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "args": {
+        "object": "screw_6"
+      },
+      "depends_on": [
+        10
+      ]
+    },
+    {
+      "step": 12,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "args": {
+        "object": "screw_6",
+        "destination": "yellow_container"
+      },
+      "depends_on": [
+        11
+      ]
+    },
+    {
+      "step": 13,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "args": {
+        "object": "screw_7"
+      },
+      "depends_on": [
+        12
+      ]
+    },
+    {
+      "step": 14,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "args": {
+        "object": "screw_7",
+        "destination": "yellow_container"
+      },
+      "depends_on": [
+        13
+      ]
+    },
+    {
+      "step": 15,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "args": {
+        "object": "screw_8"
+      },
+      "depends_on": [
+        14
+      ]
+    },
+    {
+      "step": 16,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "args": {
+        "object": "screw_8",
+        "destination": "yellow_container"
+      },
+      "depends_on": [
+        15
+      ]
+    }
+  ],
+  "bound": [
+    {
+      "step": 1,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          0.37496940407133084,
+          0.10971346392030476,
+          0.0,
+          -1.5641003392377293
+        ],
+        "object": "screw"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          0.309742455431746,
+          0.2229654887650794,
+          0.1,
+          -1.5641003392377293
+        ],
+        "object": "screw",
+        "destination": "yellow_container"
+      },
+      "depends_on": [
+        1
+      ]
+    },
+    {
+      "step": 3,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          0.44019479349581947,
+          -0.08656591452567008,
+          0.0,
+          0.09131574681226784
+        ],
+        "object": "screw_2"
+      },
+      "depends_on": [
+        2
+      ]
+    },
+    {
+      "step": 4,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          0.309742455431746,
+          0.2229654887650794,
+          0.1,
+          0.09131574681226784
+        ],
+        "object": "screw_2",
+        "destination": "yellow_container"
+      },
+      "depends_on": [
+        3
+      ]
+    },
+    {
+      "step": 5,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          0.398076327957893,
+          -0.1890078531924981,
+          0.0,
+          0.08523960278461118
+        ],
+        "object": "screw_3"
+      },
+      "depends_on": [
+        4
+      ]
+    },
+    {
+      "step": 6,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          0.309742455431746,
+          0.2229654887650794,
+          0.1,
+          0.08523960278461118
+        ],
+        "object": "screw_3",
+        "destination": "yellow_container"
+      },
+      "depends_on": [
+        5
+      ]
+    },
+    {
+      "step": 7,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          0.3738493195779057,
+          0.16388318981367406,
+          0.0,
+          -0.01856352165248465
+        ],
+        "object": "screw_4"
+      },
+      "depends_on": [
+        6
+      ]
+    },
+    {
+      "step": 8,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          0.309742455431746,
+          0.2229654887650794,
+          0.1,
+          -0.01856352165248465
+        ],
+        "object": "screw_4",
+        "destination": "yellow_container"
+      },
+      "depends_on": [
+        7
+      ]
+    },
+    {
+      "step": 9,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          0.3355310012844398,
+          -0.23297670523088868,
+          0.0,
+          0.09814382156059409
+        ],
+        "object": "screw_5"
+      },
+      "depends_on": [
+        8
+      ]
+    },
+    {
+      "step": 10,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          0.309742455431746,
+          0.2229654887650794,
+          0.1,
+          0.09814382156059409
+        ],
+        "object": "screw_5",
+        "destination": "yellow_container"
+      },
+      "depends_on": [
+        9
+      ]
+    },
+    {
+      "step": 11,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          0.41951294481841633,
+          0.09432994760074345,
+          0.0,
+          -0.01856352165248465
+        ],
+        "object": "screw_6"
+      },
+      "depends_on": [
+        10
+      ]
+    },
+    {
+      "step": 12,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          0.309742455431746,
+          0.2229654887650794,
+          0.1,
+          -0.01856352165248465
+        ],
+        "object": "screw_6",
+        "destination": "yellow_container"
+      },
+      "depends_on": [
+        11
+      ]
+    },
+    {
+      "step": 13,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          0.4270334740969403,
+          -0.017347981816059503,
+          0.0,
+          0.10867895818009554
+        ],
+        "object": "screw_7"
+      },
+      "depends_on": [
+        12
+      ]
+    },
+    {
+      "step": 14,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          0.309742455431746,
+          0.2229654887650794,
+          0.1,
+          0.10867895818009554
+        ],
+        "object": "screw_7",
+        "destination": "yellow_container"
+      },
+      "depends_on": [
+        13
+      ]
+    },
+    {
+      "step": 15,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          0.3908095873869607,
+          -0.1064472062980506,
+          0.0,
+          -0.2584270944966991
+        ],
+        "object": "screw_8"
+      },
+      "depends_on": [
+        14
+      ]
+    },
+    {
+      "step": 16,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          0.309742455431746,
+          0.2229654887650794,
+          0.1,
+          -0.2584270944966991
+        ],
+        "object": "screw_8",
+        "destination": "yellow_container"
+      },
+      "depends_on": [
+        15
+      ]
+    }
+  ],
+  "results": [
+    {
+      "step": 1,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "screw"
+      }
+    },
+    {
+      "step": 2,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          0.309742455431746,
+          0.2229654887650794,
+          0.1,
+          -1.5641003392377293
+        ],
+        "object": "screw",
+        "observed_xy": [
+          0.309742455431746,
+          0.2229654887650794
+        ],
+        "xy_error": 0.0
+      }
+    },
+    {
+      "step": 3,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "screw_2"
+      }
+    },
+    {
+      "step": 4,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          0.309742455431746,
+          0.2229654887650794,
+          0.1,
+          0.09131574681226784
+        ],
+        "object": "screw_2",
+        "observed_xy": [
+          0.309742455431746,
+          0.2229654887650794
+        ],
+        "xy_error": 0.0
+      }
+    },
+    {
+      "step": 5,
+      "status": "fail",
+      "reason": "exception:RuntimeError:Fanuc motion ACK ErrorID=-1 seq=26 last={'Communication': 'FRC_SystemFault', 'SequenceID': 26}",
+      "observed": {}
+    }
+  ],
+  "symbolic_view": {
+    "objects": [
+      {
+        "name": "screw",
+        "blocked_by": null,
+        "in_workspace": [
+          "fanuc"
+        ],
+        "preferred_arm": "fanuc"
+      },
+      {
+        "name": "screw_2",
+        "blocked_by": null,
+        "in_workspace": [
+          "fanuc"
+        ],
+        "preferred_arm": "fanuc"
+      },
+      {
+        "name": "screw_3",
+        "blocked_by": null,
+        "in_workspace": [
+          "fanuc"
+        ],
+        "preferred_arm": "fanuc"
+      },
+      {
+        "name": "screw_4",
+        "blocked_by": null,
+        "in_workspace": [
+          "fanuc"
+        ],
+        "preferred_arm": "fanuc"
+      },
+      {
+        "name": "screw_5",
+        "blocked_by": null,
+        "in_workspace": [
+          "fanuc"
+        ],
+        "preferred_arm": "fanuc"
+      },
+      {
+        "name": "screw_6",
+        "blocked_by": null,
+        "in_workspace": [
+          "fanuc"
+        ],
+        "preferred_arm": "fanuc"
+      },
+      {
+        "name": "screw_7",
+        "blocked_by": null,
+        "in_workspace": [
+          "fanuc"
+        ],
+        "preferred_arm": "fanuc"
+      },
+      {
+        "name": "screw_8",
+        "blocked_by": null,
+        "in_workspace": [
+          "fanuc"
+        ],
+        "preferred_arm": "fanuc"
+      },
+      {
+        "name": "yellow_container",
+        "blocked_by": null,
+        "in_workspace": [
+          "fanuc"
+        ],
+        "preferred_arm": "fanuc"
+      }
+    ]
+  }
+}

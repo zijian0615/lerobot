@@ -1,0 +1,290 @@
+{
+ "version": 1,
+ "root": "/World/fanuc",
+ "bodies": [
+  {
+   "name": "base_link",
+   "parent": null,
+   "path": "/World/fanuc/base_link",
+   "pos": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "quat": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "joint": null
+  },
+  {
+   "name": "link_1",
+   "parent": "base_link",
+   "path": "/World/fanuc/base_link/link_1",
+   "pos": [
+    0.0,
+    0.0,
+    0.33
+   ],
+   "quat": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "joint": {
+    "name": "joint_1",
+    "type": "hinge",
+    "axis": [
+     0.0,
+     0.0,
+     1.0
+    ],
+    "range": [
+     -2.96706,
+     2.96706
+    ]
+   }
+  },
+  {
+   "name": "link_2",
+   "parent": "link_1",
+   "path": "/World/fanuc/base_link/link_1/link_2",
+   "pos": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "quat": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "joint": {
+    "name": "joint_2",
+    "type": "hinge",
+    "axis": [
+     0.0,
+     1.0,
+     0.0
+    ],
+    "range": [
+     -1.919862,
+     2.094395
+    ]
+   }
+  },
+  {
+   "name": "link_3",
+   "parent": "link_2",
+   "path": "/World/fanuc/base_link/link_1/link_2/link_3",
+   "pos": [
+    0.0,
+    0.0,
+    0.26
+   ],
+   "quat": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "joint": {
+    "name": "joint_3",
+    "type": "hinge",
+    "axis": [
+     0.0,
+     -1.0,
+     0.0
+    ],
+    "range": [
+     -1.204277,
+     3.577925
+    ]
+   }
+  },
+  {
+   "name": "link_4",
+   "parent": "link_3",
+   "path": "/World/fanuc/base_link/link_1/link_2/link_3/link_4",
+   "pos": [
+    0.0,
+    0.0,
+    0.02
+   ],
+   "quat": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "joint": {
+    "name": "joint_4",
+    "type": "hinge",
+    "axis": [
+     -1.0,
+     0.0,
+     0.0
+    ],
+    "range": [
+     -3.316126,
+     3.316126
+    ]
+   }
+  },
+  {
+   "name": "link_5",
+   "parent": "link_4",
+   "path": "/World/fanuc/base_link/link_1/link_2/link_3/link_4/link_5",
+   "pos": [
+    0.29,
+    0.0,
+    0.0
+   ],
+   "quat": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "joint": {
+    "name": "joint_5",
+    "type": "hinge",
+    "axis": [
+     0.0,
+     -1.0,
+     0.0
+    ],
+    "range": [
+     -2.094395,
+     2.094395
+    ]
+   }
+  },
+  {
+   "name": "link_6",
+   "parent": "link_5",
+   "path": "/World/fanuc/base_link/link_1/link_2/link_3/link_4/link_5/link_6",
+   "pos": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "quat": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "joint": {
+    "name": "joint_6",
+    "type": "hinge",
+    "axis": [
+     -1.0,
+     0.0,
+     0.0
+    ],
+    "range": [
+     -6.283185,
+     6.283185
+    ]
+   }
+  },
+  {
+   "name": "tool0",
+   "parent": "link_6",
+   "path": "/World/fanuc/base_link/link_1/link_2/link_3/link_4/link_5/link_6/tool0",
+   "pos": [
+    0.07,
+    0.0,
+    0.0
+   ],
+   "quat": [
+    0.0,
+    0.7071067811865475,
+    0.0,
+    0.7071067811865476
+   ],
+   "joint": null
+  },
+  {
+   "name": "finger_l",
+   "parent": "tool0",
+   "path": "/World/fanuc/base_link/link_1/link_2/link_3/link_4/link_5/link_6/tool0/finger_l",
+   "pos": [
+    0.0,
+    0.004,
+    0.158
+   ],
+   "quat": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "joint": {
+    "name": "finger_l",
+    "type": "slide",
+    "axis": [
+     0.0,
+     1.0,
+     0.0
+    ],
+    "range": [
+     0.0,
+     0.01
+    ]
+   }
+  },
+  {
+   "name": "finger_r",
+   "parent": "tool0",
+   "path": "/World/fanuc/base_link/link_1/link_2/link_3/link_4/link_5/link_6/tool0/finger_r",
+   "pos": [
+    0.0,
+    -0.004,
+    0.158
+   ],
+   "quat": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "joint": {
+    "name": "finger_r",
+    "type": "slide",
+    "axis": [
+     0.0,
+     -1.0,
+     0.0
+    ],
+    "range": [
+     0.0,
+     0.01
+    ]
+   }
+  }
+ ],
+ "sites": {
+  "flange": {
+   "body": "link_6",
+   "pos": [
+    0.07,
+    0.0,
+    0.0
+   ]
+  },
+  "tcp": {
+   "body": "tool0",
+   "pos": [
+    0.0,
+    0.0,
+    0.223
+   ]
+  }
+ }
+}

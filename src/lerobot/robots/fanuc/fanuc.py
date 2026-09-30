@@ -29,14 +29,37 @@ from lerobot.types import RobotAction, RobotObservation
 
 from ..robot import Robot
 from .config_fanuc import FanucConfig
-from .pose import decode_fanuc_pose_dict, encode_fanuc_pose_dict
+from .pose import FANUC_RAW_NAMES, controller_degrees, decode_fanuc_pose_dict, raw_fanuc_pose_dict, wrap_w_degrees
 
 logger = logging.getLogger(__name__)
 
+# RMIT-009: Initialize rejected (leftover HOLD / RMI_MOVE still selected). Abort+Reset then retry.
+_FRC_INITIALIZE_REJECTED = 2556937
 # RMI already running / invalid controller state. Abort leftover RMI_MOVE and retry.
 _FRC_INVALID_CONTROLLER_STATE = 2556943
+# Invalid UFrame/UTool, leftover HOLD (RMIT-027), or Abort sent before Initialize.
+_FRC_INVALID_UFRAME_UTOOL = 2556955
+# RMIT-029: SequenceID gap / not the next expected id.
+_FRC_INVALID_SEQUENCE_ID = 2556957
 # Some controllers report this when RMI_MOVE is already initialized.
 _FRC_ALREADY_INITIALIZED = 7015
+
+
+def _joints_deg_from_response(resp: dict[str, Any]) -> tuple[float, ...] | None:
+    """Extract FANUC J1..J6 degrees from an FRC_ReadJointAngles payload."""
+    cand = None
+    for key in ("JointAngle", "JointAngles", "Joint"):
+        value = resp.get(key)
+        if isinstance(value, dict):
+            cand = value
+            break
+    if cand is None:
+        return None
+    up = {str(k).upper(): v for k, v in cand.items()}
+    try:
+        return tuple(float(up[f"J{i}"]) for i in range(1, 7))
+    except (KeyError, TypeError, ValueError):
+        return None
 
 
 class Fanuc(Robot):
@@ -71,6 +94,9 @@ class Fanuc(Robot):
         self._latest_configuration: dict[str, Any] | None = None
         self._motion_configuration: dict[str, Any] | None = None
         self._latest_gripper_state: int | None = None
+        # Last gripper command that reached the controller (j7, 1 = closed). Reported as the gripper state when no
+        # state input is configured, so the recorded observation follows the gripper instead of staying 0.
+        self._commanded_gripper: float | None = None
 
         self._pending_futures: dict[int, Future] = {}
         self._pending_lock = threading.Lock()
@@ -83,9 +109,21 @@ class Fanuc(Robot):
         self._uframe_applied = False
         self._last_ack: dict[str, Any] | None = None
         self._last_unhandled: dict[str, Any] | None = None
+        self._stream_sent_mono: float | None = None
+        self._last_stream_j7: float | None = None
+        self._stream_log_mono: float = 0.0
+        self._stream_log_pose: tuple[float, float, float] | None = None
+        self._command_replies: dict[str, dict[str, Any]] = {}
 
         self.cameras = make_cameras_from_configs(config.cameras)
         self.seq_id = 1
+
+        self._twin_addr: tuple[str, int] | None = None
+        self._twin_sock: socket.socket | None = None
+        host = (config.twin_udp_host or "").strip()
+        if host:
+            self._twin_addr = (host, int(config.twin_udp_port))
+            self._twin_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     # ------------------------------------------------------------------ #
     #  Connection                                                          #
@@ -96,20 +134,32 @@ class Fanuc(Robot):
             logger.warning("Already connected - skipping")
             return
 
-        dynamic_port = self._frc_connect()
-        self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        try:
-            self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
-        except OSError:
-            pass
-        self._sock.settimeout(5.0)
-        self._sock.connect((self._host, dynamic_port))
+        dynamic_port = self._open_tcp_session()
 
         try:
             self._initialize_rmi()
             self._set_uframe_utool(self._uframe, self._utool)
             self._uframe_applied = True
+        except TimeoutError:
+            logger.warning(
+                "RMI handshake timed out; leftover RMI_MOVE from a killed twin is likely. "
+                "Aborting and retrying once."
+            )
+            try:
+                self._send_json({"Command": "FRC_Abort"})
+                self._send_json({"Communication": "FRC_Disconnect"})
+            except Exception:
+                pass
+            self._close_socket()
+            time.sleep(1.0)
+            try:
+                dynamic_port = self._open_tcp_session()
+                self._initialize_rmi()
+                self._set_uframe_utool(self._uframe, self._utool)
+                self._uframe_applied = True
+            except Exception:
+                self._close_socket()
+                raise
         except Exception:
             self._close_socket()
             raise
@@ -168,7 +218,73 @@ class Fanuc(Robot):
             except Exception as exc:
                 logger.warning("Error disconnecting camera: %s", exc)
 
+        if self._twin_sock is not None:
+            try:
+                self._twin_sock.close()
+            except OSError:
+                pass
+            self._twin_sock = None
+
         logger.info("Fanuc disconnected")
+
+    @staticmethod
+    def _status_next_seq(status: dict[str, Any] | None) -> int | None:
+        if not status:
+            return None
+        for key in ("NextSequenceID", "NextSequenceId", "nextSequenceID", "NextSeqID"):
+            raw = status.get(key)
+            if raw is not None:
+                return int(raw)
+        return None
+
+    def recover_after_fault(self) -> None:
+        """Abort leftover motion, RESET the controller, re-init RMI after SystemFault.
+
+        After ``FRC_SystemFault`` the socket still accepts ``FRC_LinearMotion``,
+        but the arm stays in HOLD until Abort+Reset. Abort is only valid once a
+        session already exists — do not send it before the first Initialize.
+        """
+        self._require_connected()
+        self.pause_state_poll()
+        try:
+            with self._pending_lock:
+                for fut in list(self._pending_futures.values()):
+                    if not fut.done():
+                        fut.set_result(-1)
+                self._pending_futures.clear()
+            logger.info("Fanuc recover: FRC_Abort + FRC_Reset + FRC_Initialize")
+            self._clear_leftover_rmi()
+            self._command_replies.pop("FRC_Initialize", None)
+            self._send_json({"Command": "FRC_Initialize", "GroupMask": self._group})
+            time.sleep(0.4)
+            # Initialize resets the controller SequenceID to 1 (RMIT-029 / 2556957
+            # if the PC keeps counting from the pre-Abort value).
+            self.seq_id = 1
+            self._command_replies.pop("FRC_GetStatus", None)
+            self._send_json({"Command": "FRC_GetStatus"})
+            time.sleep(0.3)
+            status = self._command_replies.get("FRC_GetStatus")
+            nxt = self._status_next_seq(status)
+            if nxt is not None:
+                self.seq_id = max(1, nxt)
+            logger.info(
+                "Fanuc recover SequenceID=%s init=%s status=%s",
+                self.seq_id,
+                self._command_replies.get("FRC_Initialize"),
+                status,
+            )
+            self._send_json(
+                {
+                    "Command": "FRC_SetUFrameUTool",
+                    "UFrameNumber": int(self._uframe),
+                    "UToolNumber": int(self._utool),
+                    "Group": int(self._group),
+                }
+            )
+            time.sleep(0.2)
+            self._uframe_applied = True
+        finally:
+            self.resume_state_poll()
 
     def configure(self) -> None:
         if not self._connected or self._sock is None or self._uframe_applied:
@@ -201,6 +317,36 @@ class Fanuc(Robot):
     def send_action(self, action: RobotAction) -> RobotAction:
         """Send a cartesian motion command and return the action that was sent."""
         self._require_connected()
+        if action.get("stream"):
+            now = time.perf_counter()
+            with self._pending_lock:
+                inflight = len(self._pending_futures)
+            age = now - self._stream_sent_mono if self._stream_sent_mono is not None else 0.0
+            # Keep several CNT segments queued so the arm blends through them.
+            # A single in-flight move finishes and stops before the next one arrives.
+            if inflight >= 5:
+                if age < 1.0:
+                    return dict(action)
+                logger.warning(
+                    "Fanuc stream ACK missing (last=%s unhandled=%s); sending the latest target",
+                    self._last_ack,
+                    self._last_unhandled,
+                )
+                with self._pending_lock:
+                    for fut in self._pending_futures.values():
+                        if not fut.done():
+                            fut.cancel()
+                    self._pending_futures.clear()
+            elif inflight >= 1 and age < 0.03:
+                return dict(action)
+            # Pulse the gripper port only when j7 changes. A port write on every
+            # streamed LinearMotion keeps the controller from executing the move.
+            if (
+                "j7" in action
+                and self._last_stream_j7 is not None
+                and float(action["j7"]) == self._last_stream_j7
+            ):
+                action = {key: value for key, value in action.items() if key != "j7"}
         if self._motion_configuration is None:
             self._motion_configuration = self._default_configuration()
         if self._latest_configuration is None:
@@ -208,6 +354,7 @@ class Fanuc(Robot):
 
         action = self._apply_gripper_metadata(dict(action))
         x, y, z, w, p, r = self._pose_from_action(action)
+        w, p, r = controller_degrees(w), controller_degrees(p), controller_degrees(r)
 
         configuration = self._sanitize_configuration(self._latest_configuration)
         if "utool" in action:
@@ -276,8 +423,33 @@ class Fanuc(Robot):
         with self._pending_lock:
             self._pending_futures[seq_id] = fut
         self._send_json(packet)
+        if "j7" in action and "PortNumber" in packet:
+            self._commanded_gripper = float(action["j7"])
+        if action.get("stream"):
+            now = time.perf_counter()
+            self._stream_sent_mono = now
+            if "j7" in action:
+                self._last_stream_j7 = float(action["j7"])
+            moved = self._stream_log_pose is None or max(
+                abs(x - self._stream_log_pose[0]),
+                abs(y - self._stream_log_pose[1]),
+                abs(z - self._stream_log_pose[2]),
+            ) >= 5.0
+            if moved or now - self._stream_log_mono >= 0.5:
+                self._stream_log_mono = now
+                self._stream_log_pose = (x, y, z)
+                logger.info(
+                    "FRC_LinearMotion seq=%s xyz=(%.1f, %.1f, %.1f) wpr=(%.1f, %.1f, %.1f)",
+                    seq_id,
+                    x,
+                    y,
+                    z,
+                    w,
+                    p,
+                    r,
+                )
 
-        sent = encode_fanuc_pose_dict({"j0": x, "j1": y, "j2": z, "j3": w, "j4": p, "j5": r})
+        sent = raw_fanuc_pose_dict({"j0": x, "j1": y, "j2": z, "j3": w, "j4": p, "j5": r})
         if "j7" in action:
             sent["j7"] = float(action["j7"])
         for key in ("speed", "term_type", "term_value", "lcb_type", "lcb_value", "port_type", "port_number", "port_value"):
@@ -285,6 +457,36 @@ class Fanuc(Robot):
                 sent[key] = action[key]
         sent["sequence_id"] = seq_id
         return sent
+
+    def reset_episode(self, timeout_s: float = 20.0) -> dict[str, Any] | None:
+        """Isaac Sim twin only (config.sim_reset): ask the simulated controller for a fresh scene between episodes.
+
+        The sim drops its motion queue, so pending acks and the streaming state are cleared here too. No-op unless
+        `sim_reset` is set, so the real controller never receives the sim-only command.
+        """
+        if not self.config.sim_reset:
+            return None
+        self._require_connected()
+        with self._pending_lock:
+            for fut in self._pending_futures.values():
+                if not fut.done():
+                    fut.cancel()
+            self._pending_futures.clear()
+        self._stream_sent_mono = None
+        self._last_stream_j7 = None
+        self._commanded_gripper = 0.0
+        self._command_replies.pop("SIM_Reset", None)
+        self._send_json({"Command": "SIM_Reset"})
+        deadline = time.time() + timeout_s
+        while time.time() < deadline:
+            reply = self._command_replies.get("SIM_Reset")
+            if reply is not None:
+                if int(reply.get("ErrorID", -1)) != 0:
+                    raise RuntimeError(f"SIM_Reset failed: {reply}")
+                logger.info("Sim scene reset: %s", reply.get("Layout"))
+                return reply
+            time.sleep(0.02)
+        raise TimeoutError("SIM_Reset: no reply from the simulated controller")
 
     def get_observation(self) -> RobotObservation:
         self._require_connected()
@@ -300,18 +502,21 @@ class Fanuc(Robot):
                 time.sleep(0.01)
 
         x, y, z, w, p, r = self._latest_pose
+        if self._latest_gripper_state is not None:
+            gripper = float(self._latest_gripper_state)
+        elif self._commanded_gripper is not None:
+            gripper = float(self._commanded_gripper)
+        else:
+            gripper = 0.0
         obs: RobotObservation = {
             "j0": float(x),
             "j1": float(y),
             "j2": float(z),
-            "j7": (
-                float(self._latest_gripper_state) if self._latest_gripper_state is not None else 0.0
-            ),
+            "j3": wrap_w_degrees(w),
+            "j4": float(p),
+            "j5": float(r),
+            "j7": gripper,
         }
-        obs.update(encode_fanuc_pose_dict({"j3": float(w), "j4": float(p), "j5": float(r)}))
-        obs["j3"] = float(w)
-        obs["j4"] = float(p)
-        obs["j5"] = float(r)
 
         for cam_name, camera in self.cameras.items():
             obs[cam_name] = camera.read()
@@ -370,25 +575,20 @@ class Fanuc(Robot):
                     f"Timed out waiting for Fanuc ACK seq={sequence_id} last={self._last_unhandled}"
                 )
         if err_id not in (0, None):
+            extra = ""
+            if int(err_id) == _FRC_INVALID_SEQUENCE_ID:
+                extra = (
+                    f" (RMIT-029 invalid SequenceID; controller expected a reset id, "
+                    f"PC sent {sequence_id}, next PC seq={self.seq_id})"
+                )
             raise RuntimeError(
-                f"Fanuc motion ACK ErrorID={err_id} seq={sequence_id} last={self._last_ack}"
+                f"Fanuc motion ACK ErrorID={err_id} seq={sequence_id} last={self._last_ack}{extra}"
             )
         return int(err_id or 0)
 
     @property
     def observation_features(self) -> dict[str, type | tuple]:
-        feats: dict[str, type | tuple] = {
-            "j0": float,
-            "j1": float,
-            "j2": float,
-            "j3_sin": float,
-            "j3_cos": float,
-            "j4_sin": float,
-            "j4_cos": float,
-            "j5_sin": float,
-            "j5_cos": float,
-            "j7": float,
-        }
+        feats: dict[str, type | tuple] = {name: float for name in FANUC_RAW_NAMES}
         for cam_name, camera in {**self.config.cameras, **self.cameras}.items():
             height = getattr(camera, "height", None) or 480
             width = getattr(camera, "width", None) or 640
@@ -397,18 +597,8 @@ class Fanuc(Robot):
 
     @property
     def action_features(self) -> dict[str, type]:
-        return {
-            "j0": float,
-            "j1": float,
-            "j2": float,
-            "j3_sin": float,
-            "j3_cos": float,
-            "j4_sin": float,
-            "j4_cos": float,
-            "j5_sin": float,
-            "j5_cos": float,
-            "j7": float,
-        }
+        """x, y, z (mm), W in [0, 360), P, R (deg) and the gripper (1 = closed); see pose.FANUC_RAW_NAMES."""
+        return {name: float for name in FANUC_RAW_NAMES}
 
     # ------------------------------------------------------------------ #
     #  Background loops                                                    #
@@ -446,6 +636,10 @@ class Fanuc(Robot):
             if self._poll_enabled.is_set():
                 try:
                     self._send_json({"Command": "FRC_ReadCartesianPosition", "Group": self._group})
+                    if self._gripper_state_port_number is not None:
+                        self._send_json({"Command": "FRC_ReadDIN", "PortNumber": int(self._gripper_state_port_number)})
+                    if self._twin_sock is not None:
+                        self._send_json({"Command": "FRC_ReadJointAngles", "Group": self._group})
                 except Exception as exc:
                     if self._connected:
                         logger.error("State poll send error: %s", exc)
@@ -546,6 +740,9 @@ class Fanuc(Robot):
         if resp.get("Command") == "FRC_ReadCartesianPosition":
             self._update_pose_from_response(resp)
             return
+        if resp.get("Command") == "FRC_ReadJointAngles":
+            self._publish_twin_joints(resp)
+            return
         if resp.get("Command") == "FRC_ReadDIN":
             self._update_gripper_state_from_response(resp)
             return
@@ -575,7 +772,12 @@ class Fanuc(Robot):
             if fut is not None and not fut.done():
                 fut.set_result(err_id)
             self._ack_queue.put((seq_id, err_id))
+            if err_id not in (0, None):
+                logger.warning("Fanuc motion rejected ErrorID=%s response=%s", err_id, resp)
             return
+        cmd = resp.get("Command")
+        if cmd:
+            self._command_replies[str(cmd)] = dict(resp)
         self._last_unhandled = dict(resp)
 
     def _frc_connect(self) -> int:
@@ -588,29 +790,75 @@ class Fanuc(Robot):
             raise RuntimeError(f"FRC_Connect failed: {data}")
         return int(data["PortNumber"])
 
+    def _open_tcp_session(self) -> int:
+        dynamic_port = self._frc_connect()
+        self._buf = b""
+        self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        try:
+            self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+        except OSError:
+            pass
+        self._sock.settimeout(5.0)
+        self._sock.connect((self._host, dynamic_port))
+        return dynamic_port
+
+    def _clear_leftover_rmi(self) -> None:
+        """Abort/reset a previous RMI_MOVE session (e.g. twin killed without FRC_Abort).
+
+        Sends best-effort Abort/Reset and does not wait, so leftover acks can be
+        skipped later by ``_recv_until`` without stealing the Initialize reply.
+        """
+        for cmd in ("FRC_Abort", "FRC_Reset"):
+            try:
+                self._send_json({"Command": cmd})
+            except Exception as exc:
+                logger.warning("%s during leftover RMI clear failed: %s", cmd, exc)
+        time.sleep(0.3)
+
+    def _probe_status(self) -> dict[str, Any] | None:
+        try:
+            self._send_json({"Command": "FRC_GetStatus"})
+            resp = self._recv_until(lambda r: r.get("Command") == "FRC_GetStatus")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("FRC_GetStatus failed: %s", exc)
+            return None
+        logger.info("FRC_GetStatus: %s", resp)
+        return dict(resp)
+
+    @staticmethod
+    def _initialize_error(resp: dict[str, Any], status: dict[str, Any] | None) -> str:
+        return (
+            f"FRC_Initialize failed: {resp} status={status}. "
+            "RMI needs AUTO, teach pendant DISABLED (enable switch OFF), "
+            "fault RESET, and RMI_MOVE not selected. "
+            "Do not Abort/run RMI_MOVE on the pendant; Initialize starts it."
+        )
+
     def _initialize_rmi(self) -> None:
+        # Abort is only valid after a session exists. Sending it first poisons
+        # Initialize (ErrorID 2556955 / GroupMask 16) after a SystemFault.
         self._send_json({"Command": "FRC_Initialize", "GroupMask": self._group})
         resp = self._recv_until(lambda r: r.get("Command") == "FRC_Initialize")
         err = int(resp.get("ErrorID", -1))
         if err in (0, _FRC_ALREADY_INITIALIZED):
             return
-        if err != _FRC_INVALID_CONTROLLER_STATE:
-            raise RuntimeError(f"FRC_Initialize failed: {resp}")
+        if err not in (
+            _FRC_INITIALIZE_REJECTED,
+            _FRC_INVALID_CONTROLLER_STATE,
+            _FRC_INVALID_UFRAME_UTOOL,
+        ):
+            raise RuntimeError(self._initialize_error(resp, self._probe_status()))
 
         logger.warning(
-            "FRC_Initialize busy (ErrorID=%s); aborting leftover RMI session and retrying",
+            "FRC_Initialize ErrorID=%s; aborting leftover RMI session and retrying",
             err,
         )
-        self._send_json({"Command": "FRC_Abort"})
-        try:
-            self._recv_until(lambda r: r.get("Command") == "FRC_Abort")
-        except Exception as exc:
-            logger.warning("FRC_Abort during initialize retry failed: %s", exc)
-        time.sleep(0.5)
+        self._clear_leftover_rmi()
         self._send_json({"Command": "FRC_Initialize", "GroupMask": self._group})
         resp = self._recv_until(lambda r: r.get("Command") == "FRC_Initialize")
         if int(resp.get("ErrorID", -1)) not in (0, _FRC_ALREADY_INITIALIZED):
-            raise RuntimeError(f"FRC_Initialize failed after abort: {resp}")
+            raise RuntimeError(self._initialize_error(resp, self._probe_status()))
 
     def _close_socket(self) -> None:
         if self._sock is None:
@@ -621,6 +869,10 @@ class Fanuc(Robot):
         except Exception:
             pass
         try:
+            self._send_json({"Communication": "FRC_Disconnect"})
+        except Exception:
+            pass
+        try:
             self._sock.close()
         except Exception:
             pass
@@ -628,16 +880,30 @@ class Fanuc(Robot):
         self._buf = b""
 
     def _set_uframe_utool(self, uframe: int, utool: int) -> None:
-        self._send_json(
-            {
-                "Command": "FRC_SetUFrameUTool",
-                "UFrameNumber": int(uframe),
-                "UToolNumber": int(utool),
-                "Group": int(self._group),
-            }
-        )
+        payload = {
+            "Command": "FRC_SetUFrameUTool",
+            "UFrameNumber": int(uframe),
+            "UToolNumber": int(utool),
+            "Group": int(self._group),
+        }
+        self._send_json(payload)
         resp = self._recv_until(lambda r: r.get("Command") == "FRC_SetUFrameUTool")
-        if resp.get("ErrorID", -1) != 0:
+        err = int(resp.get("ErrorID", -1))
+        if err == 0:
+            return
+        logger.warning(
+            "FRC_SetUFrameUTool failed (ErrorID=%s); clearing leftover RMI and retrying: %s",
+            err,
+            resp,
+        )
+        self._clear_leftover_rmi()
+        self._send_json({"Command": "FRC_Initialize", "GroupMask": self._group})
+        init = self._recv_until(lambda r: r.get("Command") == "FRC_Initialize")
+        if int(init.get("ErrorID", -1)) not in (0, _FRC_ALREADY_INITIALIZED):
+            raise RuntimeError(f"FRC_Initialize failed during SetUFrameUTool retry: {init}")
+        self._send_json(payload)
+        resp = self._recv_until(lambda r: r.get("Command") == "FRC_SetUFrameUTool")
+        if int(resp.get("ErrorID", -1)) != 0:
             raise RuntimeError(f"FRC_SetUFrameUTool failed: {resp}")
 
     def _send_json(self, payload: dict[str, Any]) -> None:
@@ -682,6 +948,24 @@ class Fanuc(Robot):
         src = raw or {}
         defaults = self._default_configuration()
         return {key: self._cfg_int(src.get(key), default) for key, default in defaults.items()}
+
+    def _publish_twin_joints(self, resp: dict[str, Any]) -> None:
+        if self._twin_sock is None or self._twin_addr is None:
+            return
+        if resp.get("ErrorID", -1) not in (0, None):
+            logger.warning("FRC_ReadJointAngles failed: %s", resp)
+            return
+        joints = _joints_deg_from_response(resp)
+        if joints is None:
+            logger.warning("FRC_ReadJointAngles missing J1..J6: %s", resp)
+            return
+        try:
+            self._twin_sock.sendto(
+                json.dumps({"joints_deg": [float(x) for x in joints]}).encode(),
+                self._twin_addr,
+            )
+        except OSError as exc:
+            logger.debug("Twin UDP publish failed: %s", exc)
 
     def _update_pose_from_response(self, resp: dict[str, Any]) -> None:
         if resp.get("ErrorID", -1) != 0:

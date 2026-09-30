@@ -64,13 +64,13 @@
   },
   "place_height_offset_m": {
     "_comment": "Fanuc root fallback. Prefer execution_by_arm.fanuc. Container Place = table+100mm (UF Z=-235).",
-    "container": 0.10,
-    "yellow_container": 0.10,
-    "square_wooden_box": 0.10,
-    "wooden_box": 0.10,
-    "wooden_block": 0.10,
-    "cube": 0.10,
-    "box": 0.10
+    "container": 0.1,
+    "yellow_container": 0.1,
+    "square_wooden_box": 0.1,
+    "wooden_box": 0.1,
+    "wooden_block": 0.1,
+    "cube": 0.1,
+    "box": 0.1
   },
   "footprint_buffer_m": 0.02,
   "table_polygon_xy": [
@@ -143,7 +143,7 @@
     "topdown_wpr_deg": [
       178.206,
       -1.585,
-      9.606
+      -2.214
     ],
     "move_speed_mm_s": 80.0,
     "solver_margin_m": 0.03,
@@ -171,14 +171,14 @@
         "screw": 0.0
       },
       "place_height_offset_m": {
-        "_comment": "Fanuc Place: dest matching container → z = support.grasp_z + 0.10 m = UF Z -235 mm.",
-        "container": 0.10,
-        "yellow_container": 0.10,
-        "square_wooden_box": 0.10,
-        "wooden_box": 0.10,
-        "wooden_block": 0.10,
-        "cube": 0.10,
-        "box": 0.10
+        "_comment": "Fanuc Place: dest matching container \u2192 z = support.grasp_z + 0.10 m = UF Z -235 mm.",
+        "container": 0.1,
+        "yellow_container": 0.1,
+        "square_wooden_box": 0.1,
+        "wooden_box": 0.1,
+        "wooden_block": 0.1,
+        "cube": 0.1,
+        "box": 0.1
       },
       "flip_x": false,
       "flip_y": false,
@@ -189,7 +189,7 @@
       "topdown_wpr_deg": [
         178.206,
         -1.585,
-        9.606
+        -2.214
       ],
       "use_object_yaw": false,
       "grasp_yaw_offset_rad": 0.0,
@@ -201,17 +201,17 @@
         "_comment": "true_table = A @ pred_table + b (metres). pred = to_table(uv).",
         "A": [
           [
-            -0.020725,
-            -1.297946
+            -0.011486,
+            -1.375066
           ],
           [
-            1.632559,
-            0.027401
+            1.71533,
+            0.025529
           ]
         ],
         "b": [
-          0.307374,
-          0.050587
+          0.299027,
+          0.052837
         ]
       }
     }
@@ -220,17 +220,17 @@
     "_comment": "true_table = A @ pred_table + b (metres). pred = to_table(uv).",
     "A": [
       [
-        -0.020725,
-        -1.297946
+        -0.011486,
+        -1.375066
       ],
       [
-        1.632559,
-        0.027401
+        1.71533,
+        0.025529
       ]
     ],
     "b": [
-      0.307374,
-      0.050587
+      0.299027,
+      0.052837
     ]
   }
 }

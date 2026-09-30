@@ -1,0 +1,619 @@
+{
+  "status": "fail",
+  "reason": "exception:TimeoutError:Timed out waiting for Fanuc ACK seq=9 last={'Command': 'FRC_SetUFrameUTool', 'ErrorID': 0, 'Group': 1}",
+  "plan": [
+    {
+      "step": 1,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "args": {
+        "object": "far_left_black_cube"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "args": {
+        "object": "far_left_black_cube",
+        "destination": "blue_container"
+      },
+      "depends_on": [
+        1
+      ]
+    },
+    {
+      "step": 3,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "args": {
+        "object": "mid_left_black_cube"
+      },
+      "depends_on": [
+        2
+      ]
+    },
+    {
+      "step": 4,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "args": {
+        "object": "mid_left_black_cube",
+        "destination": "blue_container"
+      },
+      "depends_on": [
+        3
+      ]
+    },
+    {
+      "step": 5,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "args": {
+        "object": "inner_left_black_cube"
+      },
+      "depends_on": [
+        4
+      ]
+    },
+    {
+      "step": 6,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "args": {
+        "object": "inner_left_black_cube",
+        "destination": "blue_container"
+      },
+      "depends_on": [
+        5
+      ]
+    },
+    {
+      "step": 7,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "args": {
+        "object": "top_mid_black_cube"
+      },
+      "depends_on": [
+        6
+      ]
+    },
+    {
+      "step": 8,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "args": {
+        "object": "top_mid_black_cube",
+        "destination": "blue_container"
+      },
+      "depends_on": [
+        7
+      ]
+    },
+    {
+      "step": 9,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "args": {
+        "object": "mid_right_black_cube"
+      },
+      "depends_on": [
+        8
+      ]
+    },
+    {
+      "step": 10,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "args": {
+        "object": "mid_right_black_cube",
+        "destination": "blue_container"
+      },
+      "depends_on": [
+        9
+      ]
+    },
+    {
+      "step": 11,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "args": {
+        "object": "inner_right_black_cube"
+      },
+      "depends_on": [
+        10
+      ]
+    },
+    {
+      "step": 12,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "args": {
+        "object": "inner_right_black_cube",
+        "destination": "blue_container"
+      },
+      "depends_on": [
+        11
+      ]
+    },
+    {
+      "step": 13,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "args": {
+        "object": "bottom_right_black_cube"
+      },
+      "depends_on": [
+        12
+      ]
+    },
+    {
+      "step": 14,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "args": {
+        "object": "bottom_right_black_cube",
+        "destination": "blue_container"
+      },
+      "depends_on": [
+        13
+      ]
+    },
+    {
+      "step": 15,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "args": {
+        "object": "top_right_black_cube"
+      },
+      "depends_on": [
+        14
+      ]
+    },
+    {
+      "step": 16,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "args": {
+        "object": "top_right_black_cube",
+        "destination": "blue_container"
+      },
+      "depends_on": [
+        15
+      ]
+    },
+    {
+      "step": 17,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "args": {
+        "object": "far_right_black_cube"
+      },
+      "depends_on": [
+        16
+      ]
+    },
+    {
+      "step": 18,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "args": {
+        "object": "far_right_black_cube",
+        "destination": "blue_container"
+      },
+      "depends_on": [
+        17
+      ]
+    }
+  ],
+  "bound": [
+    {
+      "step": 1,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          0.42810908681657844,
+          -0.19676166095238096,
+          0.0,
+          -0.01856352165248687
+        ],
+        "object": "far_left_black_cube"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          0.5958277281015872,
+          -0.3281858623650793,
+          0.1,
+          -0.01856352165248687
+        ],
+        "object": "far_left_black_cube",
+        "destination": "blue_container"
+      },
+      "depends_on": [
+        1
+      ]
+    },
+    {
+      "step": 3,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          0.40509987791496027,
+          -0.14877185621439287,
+          0.0,
+          -0.018563521652485093
+        ],
+        "object": "mid_left_black_cube"
+      },
+      "depends_on": [
+        2
+      ]
+    },
+    {
+      "step": 4,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          0.5958277281015872,
+          -0.3281858623650793,
+          0.1,
+          -0.018563521652485093
+        ],
+        "object": "mid_left_black_cube",
+        "destination": "blue_container"
+      },
+      "depends_on": [
+        3
+      ]
+    },
+    {
+      "step": 5,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          0.411613779953607,
+          -0.09712885536070523,
+          0.0,
+          -0.018563521652485093
+        ],
+        "object": "inner_left_black_cube"
+      },
+      "depends_on": [
+        4
+      ]
+    },
+    {
+      "step": 6,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          0.5958277281015872,
+          -0.3281858623650793,
+          0.1,
+          -0.018563521652485093
+        ],
+        "object": "inner_left_black_cube",
+        "destination": "blue_container"
+      },
+      "depends_on": [
+        5
+      ]
+    },
+    {
+      "step": 7,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          0.37115255477847053,
+          0.08642018002831237,
+          0.0,
+          -0.17258219486711424
+        ],
+        "object": "top_mid_black_cube"
+      },
+      "depends_on": [
+        6
+      ]
+    },
+    {
+      "step": 8,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          0.5958277281015872,
+          -0.3281858623650793,
+          0.1,
+          -0.17258219486711424
+        ],
+        "object": "top_mid_black_cube",
+        "destination": "blue_container"
+      },
+      "depends_on": [
+        7
+      ]
+    },
+    {
+      "step": 9,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          0.3831578965216952,
+          0.1535313891327,
+          0.0,
+          -0.018563521652485093
+        ],
+        "object": "mid_right_black_cube"
+      },
+      "depends_on": [
+        8
+      ]
+    },
+    {
+      "step": 10,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          0.5958277281015872,
+          -0.3281858623650793,
+          0.1,
+          -0.018563521652485093
+        ],
+        "object": "mid_right_black_cube",
+        "destination": "blue_container"
+      },
+      "depends_on": [
+        9
+      ]
+    },
+    {
+      "step": 11,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          0.43685752120360144,
+          0.10598140587473306,
+          0.0,
+          -1.5641003392377315
+        ],
+        "object": "inner_right_black_cube"
+      },
+      "depends_on": [
+        10
+      ]
+    },
+    {
+      "step": 12,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          0.5958277281015872,
+          -0.3281858623650793,
+          0.1,
+          -1.5641003392377315
+        ],
+        "object": "inner_right_black_cube",
+        "destination": "blue_container"
+      },
+      "depends_on": [
+        11
+      ]
+    },
+    {
+      "step": 13,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          0.5049194389478942,
+          0.11287126358789404,
+          0.0,
+          -0.018563521652485093
+        ],
+        "object": "bottom_right_black_cube"
+      },
+      "depends_on": [
+        12
+      ]
+    },
+    {
+      "step": 14,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          0.5958277281015872,
+          -0.3281858623650793,
+          0.1,
+          -0.018563521652485093
+        ],
+        "object": "bottom_right_black_cube",
+        "destination": "blue_container"
+      },
+      "depends_on": [
+        13
+      ]
+    },
+    {
+      "step": 15,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          0.3669110361889385,
+          0.22786102848014642,
+          0.0,
+          -0.17258251067670827
+        ],
+        "object": "top_right_black_cube"
+      },
+      "depends_on": [
+        14
+      ]
+    },
+    {
+      "step": 16,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          0.5958277281015872,
+          -0.3281858623650793,
+          0.1,
+          -0.17258251067670827
+        ],
+        "object": "top_right_black_cube",
+        "destination": "blue_container"
+      },
+      "depends_on": [
+        15
+      ]
+    },
+    {
+      "step": 17,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          0.4094827968520669,
+          0.2964656689676948,
+          0.0,
+          -0.018563521652486425
+        ],
+        "object": "far_right_black_cube"
+      },
+      "depends_on": [
+        16
+      ]
+    },
+    {
+      "step": 18,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          0.5958277281015872,
+          -0.3281858623650793,
+          0.1,
+          -0.018563521652486425
+        ],
+        "object": "far_right_black_cube",
+        "destination": "blue_container"
+      },
+      "depends_on": [
+        17
+      ]
+    }
+  ],
+  "results": [
+    {
+      "step": 1,
+      "status": "fail",
+      "reason": "exception:TimeoutError:Timed out waiting for Fanuc ACK seq=9 last={'Command': 'FRC_SetUFrameUTool', 'ErrorID': 0, 'Group': 1}",
+      "observed": {}
+    }
+  ],
+  "symbolic_view": {
+    "objects": [
+      {
+        "name": "blue_container",
+        "blocked_by": null,
+        "in_workspace": [
+          "fanuc"
+        ],
+        "preferred_arm": "fanuc"
+      },
+      {
+        "name": "far_left_black_cube",
+        "blocked_by": null,
+        "in_workspace": [
+          "fanuc"
+        ],
+        "preferred_arm": "fanuc"
+      },
+      {
+        "name": "mid_left_black_cube",
+        "blocked_by": null,
+        "in_workspace": [
+          "fanuc"
+        ],
+        "preferred_arm": "fanuc"
+      },
+      {
+        "name": "inner_left_black_cube",
+        "blocked_by": null,
+        "in_workspace": [
+          "fanuc"
+        ],
+        "preferred_arm": "fanuc"
+      },
+      {
+        "name": "top_mid_black_cube",
+        "blocked_by": null,
+        "in_workspace": [
+          "fanuc"
+        ],
+        "preferred_arm": "fanuc"
+      },
+      {
+        "name": "mid_right_black_cube",
+        "blocked_by": null,
+        "in_workspace": [
+          "fanuc"
+        ],
+        "preferred_arm": "fanuc"
+      },
+      {
+        "name": "inner_right_black_cube",
+        "blocked_by": null,
+        "in_workspace": [
+          "fanuc"
+        ],
+        "preferred_arm": "fanuc"
+      },
+      {
+        "name": "bottom_right_black_cube",
+        "blocked_by": null,
+        "in_workspace": [
+          "fanuc"
+        ],
+        "preferred_arm": "fanuc"
+      },
+      {
+        "name": "top_right_black_cube",
+        "blocked_by": null,
+        "in_workspace": [
+          "fanuc"
+        ],
+        "preferred_arm": "fanuc"
+      },
+      {
+        "name": "far_right_black_cube",
+        "blocked_by": null,
+        "in_workspace": [
+          "fanuc"
+        ],
+        "preferred_arm": "fanuc"
+      }
+    ]
+  },
+  "cycle": 2
+}

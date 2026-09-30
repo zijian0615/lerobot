@@ -1,0 +1,12 @@
+{
+ "bounds": [
+  -0.45,
+  0.45,
+  -0.35,
+  0.35
+ ],
+ "px_per_m": 800.0,
+ "frames": 1,
+ "covered": 0.8863715277777777,
+ "camera": "/home/gb2_8634/lerobot/fanuc_lrmate200id_smc/overhead_camera.json"
+}

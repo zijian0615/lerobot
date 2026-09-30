@@ -9,6 +9,7 @@ Verify on the real robot with  twin.py --check-cartesian  (compares forward kine
 import numpy as np
 
 BASE_HEIGHT_M = 0.330   # FANUC world origin = intersection of J1/J2 axes, 330 mm above the base plate
+FINGER_OPEN_M = 0.010   # finger travel per side when open (modelled 10 mm; closed pad gap 2 mm); 0 = closed
 J3_MODES = ("coupled", "direct")
 
 

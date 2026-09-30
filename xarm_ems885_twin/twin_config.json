@@ -1,0 +1,51 @@
+{
+  "_world": "World = Robot1 (xarm) base frame: +x away from the robots across the table, +z up, metres. Table top z = 0 (both bases stand on it; calib table_z_base_m = 0).",
+  "table_height_m": 0.75,
+  "_table_height_note": "Only used to place the ground plane under the table; not measured (the scan stops at the table edge).",
+  "arms": {
+    "xarm": {
+      "ip": "192.168.1.204",
+      "base_xyz": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "base_yaw_deg": 0.0,
+      "ee": "xarm_gripper",
+      "home_joints": [
+        -0.20194,
+        -0.44836,
+        -0.8929,
+        0.0,
+        1.34126,
+        -0.20194
+      ]
+    },
+    "xarm2": {
+      "_base_note": "From tabletop calib execution_by_arm.xarm2.table_base_xy_m (-0.548, 0.505) with the same flip_y as Robot1 -> (-0.098, -0.855) m, axes parallel to Robot1. The base plate seen in the overhead image agrees to ~5 cm; not verified against the controller (unreachable from the Jetson on 2026-09-24).",
+      "ip": "192.168.2.199",
+      "base_xyz": [
+        -0.098,
+        -0.855,
+        0.0
+      ],
+      "base_yaw_deg": 0.0,
+      "ee": "leaphand",
+      "home_joints": [
+        -0.16828,
+        -0.44685,
+        -0.8934,
+        -0.15272,
+        1.34873,
+        -0.03999
+      ]
+    }
+  },
+  "scan": {
+    "glb": "../examples/cosmos_edge_xarm/ems885_xarm_tabletop.glb",
+    "alignment": "../examples/cosmos_edge_xarm/scan_alignment.json"
+  },
+  "overhead": {
+    "calib_samples": "../examples/tabletop_perception/calib/table_xy_calib_samples_xarm.json"
+  }
+}

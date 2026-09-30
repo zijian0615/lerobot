@@ -15,13 +15,14 @@
 """
 Fanuc perceive → plan → solve → execute.
 
-Same stack as ``manipulation.run_xarm_live`` (Gemini-ER / Cosmos planner
-emits Grasp / Place / LiftUp). The arm is Fanuc.
+    Same stack as ``manipulation.run_xarm_live`` (Gemini-ER / Cosmos planner
+    emits Grasp / Place / LiftUp). The arm is Fanuc. Live UI (top + timer)
+    opens at http://127.0.0.1:8765/ unless ``--no-ui``.
 
     cd examples
     UV_NO_SYNC=1 uv run python -m manipulation.run_fanuc_live \\
         --vlm cosmos --camera /dev/video0 --execute \\
-        --instruction "pick all screws and put into the yellow container"
+        --instruction "pick all screws and put them into the yellow container"
 """
 
 from __future__ import annotations
@@ -29,7 +30,9 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import select
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -44,6 +47,7 @@ if str(_EXAMPLES) not in sys.path:
 from manipulation.executor import ArmExecutor, ExecutorConfig  # noqa: E402
 from manipulation.fanuc_backend import FanucMotionBackend  # noqa: E402
 from manipulation.fixed_plan import plan_screws_to_container_xarm  # noqa: E402
+from manipulation.live_ui import LiveUI  # noqa: E402
 from manipulation.orchestrator import run_manipulation  # noqa: E402
 from manipulation.solver import SolverConfig, solve  # noqa: E402
 from openai_backend import resolve_base_model  # noqa: E402
@@ -75,6 +79,13 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Fanuc perceive → plan → execute")
     p.add_argument("--calib", type=Path, default=DEFAULT_CALIB)
     p.add_argument("--camera", type=str, default=None)
+    p.add_argument(
+        "--ui",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Open the live dashboard (top camera + timer). --no-ui to disable.",
+    )
+    p.add_argument("--ui-port", type=int, default=8765)
     p.add_argument("--robot-host", dest="robot_host", type=str, default=None)
     p.add_argument("--instruction", type=str, default=None)
     p.add_argument("--execute", action="store_true", help="Move the arm (default: plan/solve only)")
@@ -155,14 +166,63 @@ def main(argv: list[str] | None = None) -> int:
     last_place_cmd: dict[str, Any] = {}
     perceive_n = {"n": 0}
 
-    def perceive_pair():
-        image = _capture_from_camera(
+    wrist_cfg = dict(calib.get("wrist_camera") or {})
+    wrist_path = wrist_cfg.get("index_or_path")
+    if wrist_path and str(wrist_path) == str(camera_path):
+        wrist_path = None
+
+    ui: LiveUI | None = None
+    if args.ui:
+        ui = LiveUI(
+            instruction=instruction,
+            top_path=str(camera_path),
+            wrist_path=str(wrist_path) if wrist_path else None,
+            width=int(cam_cfg.get("width", 1920)),
+            height=int(cam_cfg.get("height", 1080)),
+            fps=int(cam_cfg.get("fps", 30)),
+            port=int(args.ui_port),
+        )
+        ui.start()
+        deadline = time.perf_counter() + 3.0
+        while time.perf_counter() < deadline:
+            frame = ui.snapshot("top")
+            if frame is not None and int(getattr(frame, "size", 0) or 0) > 0:
+                h, w = frame.shape[:2]
+                if w >= 800 and h >= 600:
+                    break
+            time.sleep(0.05)
+
+    def _on_phase(phase: str, detail: str = "") -> None:
+        if ui is not None:
+            ui.phase(phase, detail)
+
+    def _grab_image() -> np.ndarray:
+        if ui is not None:
+            want_w = int(cam_cfg["width"])
+            want_h = int(cam_cfg["height"])
+            deadline = time.perf_counter() + 4.0
+            last: np.ndarray | None = None
+            while time.perf_counter() < deadline:
+                frame = ui.snapshot("top")
+                last = frame
+                if frame is not None and int(getattr(frame, "size", 0) or 0) > 0:
+                    h, w = frame.shape[:2]
+                    if (w, h) == (want_w, want_h) or (w >= 800 and h >= 600):
+                        return frame
+                time.sleep(0.05)
+            if last is not None and int(getattr(last, "size", 0) or 0) > 0:
+                return last
+            raise RuntimeError("Live UI top camera has no frame; retry or pass --no-ui")
+        return _capture_from_camera(
             camera_path,
             width=int(cam_cfg["width"]),
             height=int(cam_cfg["height"]),
             fps=int(cam_cfg["fps"]),
             fourcc=cam_cfg.get("fourcc") or "MJPG",
         )
+
+    def perceive_pair():
+        image = _grab_image()
         raw = perception.vlm_caller(image, instruction, perception.prompt or "")
         detections = parse_vlm_detections(raw, image_hw=(image.shape[0], image.shape[1]))
         perception_once = Perception(
@@ -237,98 +297,168 @@ def main(argv: list[str] | None = None) -> int:
         place_clearance_m=float(calib.get("place_clearance_m", 0.01)),
     )
 
-    if not args.execute:
-        symbolic, geometric = perceive_pair()
-        plan = plan_fn(symbolic, instruction, [arm_name])
-        bound = solve(plan, geometric, solver_cfg, lookahead=args.lookahead)
-        (out_dir / "bound.json").write_text(json.dumps(bound, indent=2))
-        print(json.dumps({"plan": plan, "bound": bound}, indent=2))
-        print(f"\nDry-run. Re-run with --execute to move. Outputs → {out_dir}")
-        return 0
-
-    print("示教器请保持可急停。")
-    confirm = input("输入 go 开始感知+规划+执行，其它键取消：").strip().lower()
-    if confirm != "go":
-        print("已取消。")
-        return 0
-
-    robot = _connect_fanuc(calib, args.robot_host, arm_name=arm_name)
     try:
-        backend = FanucMotionBackend(
-            robot,
-            calib=calib,
-            arm_name=arm_name,
-            samples_file=_samples_path(args.calib, "fanuc"),
-            speed=float(exe.get("move_speed_mm_s", 40.0)),
-        )
-        backend.use_object_yaw = True
+        if not args.execute:
+            if ui is not None:
+                ui.start_task(instruction)
+            _on_phase("perceiving", "dry-run")
+            symbolic, geometric = perceive_pair()
+            _on_phase("planning", instruction)
+            plan = plan_fn(symbolic, instruction, [arm_name])
+            bound = solve(plan, geometric, solver_cfg, lookahead=args.lookahead)
+            (out_dir / "bound.json").write_text(json.dumps(bound, indent=2))
+            print(json.dumps({"plan": plan, "bound": bound}, indent=2))
+            _on_phase("done", "dry-run")
+            print(f"\nDry-run. Re-run with --execute to move. Outputs → {out_dir}")
+            return 0
 
-        def perceive_for_place():
-            geo = dict(last_views["geometric"] or {"objects": []})
-            obj = last_place_cmd.get("object")
-            pose = last_place_cmd.get("pose")
-            if args.skip_place_verify and obj and pose:
-                objs = []
-                for item in geo.get("objects", []):
-                    row = dict(item)
-                    if str(row.get("name")) == obj:
-                        row["xy"] = (float(pose[0]), float(pose[1]))
-                    objs.append(row)
-                geo["objects"] = objs
+        print("示教器请保持可急停。Live UI → http://127.0.0.1:%s/" % int(args.ui_port))
+        robot = _connect_fanuc(calib, args.robot_host, arm_name=arm_name)
+        twin_host = getattr(robot.config, "twin_udp_host", None)
+        twin_port = getattr(robot.config, "twin_udp_port", 5005)
+        if twin_host:
+            print(
+                f"孪生关节角 → udp://{twin_host}:{twin_port}  "
+                f"(另开终端: DISPLAY=:1 .venv-twin/bin/python twin/twin.py --source udp --udp-port {twin_port})",
+                flush=True,
+            )
+        try:
+            backend = FanucMotionBackend(
+                robot,
+                calib=calib,
+                arm_name=arm_name,
+                samples_file=_samples_path(args.calib, "fanuc"),
+                speed=float(exe.get("move_speed_mm_s", 40.0)),
+            )
+            backend.use_object_yaw = True
+            if ui is not None:
+                ui.set_go_home(backend.go_home)
+
+            def _wait_go(prompt: str) -> bool:
+                if ui is None:
+                    line = input(prompt + " ").strip().lower()
+                    if line in {"go", "rerun", "r"}:
+                        return True
+                    if line in {"q", "quit", "exit"}:
+                        return False
+                    print("已取消。")
+                    return False
+                ui.set_rerun_ready(True)
+                _on_phase("waiting", prompt)
+                print(prompt, flush=True)
+                try:
+                    while True:
+                        if ui.wait_rerun(0.2):
+                            return True
+                        if select.select([sys.stdin], [], [], 0.2)[0]:
+                            line = sys.stdin.readline()
+                            if not line:
+                                continue
+                            cmd = line.strip().lower()
+                            if cmd in {"go", "rerun", "r"}:
+                                return True
+                            if cmd in {"q", "quit", "exit"}:
+                                return False
+                            print("输入 go / rerun 开始，quit 退出。", flush=True)
+                finally:
+                    ui.set_rerun_ready(False)
+
+            def perceive_for_place():
+                geo = dict(last_views["geometric"] or {"objects": []})
+                obj = last_place_cmd.get("object")
+                pose = last_place_cmd.get("pose")
+                if args.skip_place_verify and obj and pose:
+                    objs = []
+                    for item in geo.get("objects", []):
+                        row = dict(item)
+                        if str(row.get("name")) == obj:
+                            row["xy"] = (float(pose[0]), float(pose[1]))
+                        objs.append(row)
+                    geo["objects"] = objs
+                    return geo
+                _sym, geo = perceive_pair()
                 return geo
-            _sym, geo = perceive_pair()
-            return geo
 
-        executor = ArmExecutor(
-            arm_name,
-            move_to_pose=backend.move_to_pose,
-            gripper=backend.gripper,
-            read_gripper_width=backend.read_gripper_width,
-            perceive=perceive_for_place,
-            get_current_pose=backend.get_current_pose_table,
-            config=ExecutorConfig(
-                approach_offset=float(exe.get("approach_offset_m", 0.08)),
-                lift_offset=float(exe.get("lift_offset_m", 0.08)),
-                gripper_open_width=0.085,
-                gripper_closed_width=0.005,
-                place_xy_tol=0.05,
-            ),
-        )
-        raw_execute = executor.execute
+            executor = ArmExecutor(
+                arm_name,
+                move_to_pose=backend.move_to_pose,
+                gripper=backend.gripper,
+                read_gripper_width=backend.read_gripper_width,
+                perceive=perceive_for_place,
+                get_current_pose=backend.get_current_pose_table,
+                config=ExecutorConfig(
+                    approach_offset=float(exe.get("approach_offset_m", 0.08)),
+                    lift_offset=float(exe.get("lift_offset_m", 0.08)),
+                    gripper_open_width=0.085,
+                    gripper_closed_width=0.005,
+                    place_xy_tol=0.05,
+                ),
+            )
+            raw_execute = executor.execute
 
-        def _execute_tracking(step: dict[str, Any]):
-            if str(step.get("primitive")) == "Place":
-                params = step.get("params") or {}
-                last_place_cmd["object"] = params.get("object")
-                last_place_cmd["pose"] = params.get("pose")
-            return raw_execute(step)
+            def _execute_tracking(step: dict[str, Any]):
+                if str(step.get("primitive")) == "Place":
+                    params = step.get("params") or {}
+                    last_place_cmd["object"] = params.get("object")
+                    last_place_cmd["pose"] = params.get("pose")
+                return raw_execute(step)
 
-        executor.execute = _execute_tracking  # type: ignore[method-assign]
+            executor.execute = _execute_tracking  # type: ignore[method-assign]
 
-        result = run_manipulation(
-            instruction,
-            perceive=perceive_pair,
-            plan_fn=plan_fn,
-            executors={arm_name: executor},
-            solver_config=solver_cfg,
-            arms=[arm_name],
-            lookahead=args.lookahead,
-            recover=False,
-        )
-        payload = {
-            "status": result.status,
-            "reason": result.reason,
-            "plan": result.plan,
-            "bound": result.bound,
-            "results": result.results,
-            "symbolic_view": result.symbolic_view,
-        }
-        (out_dir / "result.json").write_text(json.dumps(payload, indent=2, default=str))
-        print(json.dumps(payload, indent=2, default=str))
-        print(f"\nOutputs → {out_dir}")
-        return 0 if result.status == "success" else 1
+            last_status = 1
+            cycle = 0
+            while True:
+                prompt = (
+                    "UI 点 RERUN GO，或终端输入 go。quit 退出。"
+                    if cycle == 0
+                    else "再点 RERUN GO 重跑同一条指令，或 quit 退出。"
+                )
+                if not _wait_go(prompt):
+                    print("已退出。")
+                    break
+                cycle += 1
+                last_place_cmd.clear()
+                if ui is not None:
+                    ui.set_task_busy(True)
+                    ui.start_task(instruction)
+                try:
+                    result = run_manipulation(
+                        instruction,
+                        perceive=perceive_pair,
+                        plan_fn=plan_fn,
+                        executors={arm_name: executor},
+                        solver_config=solver_cfg,
+                        arms=[arm_name],
+                        lookahead=args.lookahead,
+                        recover=False,
+                        on_phase=_on_phase,
+                    )
+                finally:
+                    if ui is not None:
+                        ui.set_task_busy(False)
+                payload = {
+                    "status": result.status,
+                    "reason": result.reason,
+                    "plan": result.plan,
+                    "bound": result.bound,
+                    "results": result.results,
+                    "symbolic_view": result.symbolic_view,
+                    "cycle": cycle,
+                }
+                (out_dir / "result.json").write_text(json.dumps(payload, indent=2, default=str))
+                (out_dir / f"result_{cycle:02d}.json").write_text(
+                    json.dumps(payload, indent=2, default=str)
+                )
+                print(json.dumps(payload, indent=2, default=str))
+                print(f"\nOutputs → {out_dir}  cycle={cycle}")
+                last_status = 0 if result.status == "success" else 1
+                _on_phase("done", f"cycle {cycle} {result.status}")
+            return last_status
+        finally:
+            robot.disconnect()
     finally:
-        robot.disconnect()
+        if ui is not None:
+            ui.close()
 
 
 if __name__ == "__main__":

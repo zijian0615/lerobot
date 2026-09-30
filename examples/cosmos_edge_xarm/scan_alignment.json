@@ -1,0 +1,50 @@
+{
+  "_doc": "T_world_scan maps the GLB's glTF coordinates (metres, +Y up) into the twin world (Robot1 base frame, +Z up, table top z = 0). Written by xarm_ems885_twin/twin/align_scan.py.",
+  "glb": "../examples/cosmos_edge_xarm/ems885_xarm_tabletop.glb",
+  "T_world_scan": [
+    [
+      0.022162829914362185,
+      -0.0043262788997584485,
+      0.9997450332440545,
+      0.012189993610826733
+    ],
+    [
+      0.999514945034527,
+      0.021980789585674135,
+      -0.022062609929560186,
+      -0.3782306006821433
+    ],
+    [
+      -0.02187973535323277,
+      0.9997490326175629,
+      0.00481133672898979,
+      -0.4880268617803397
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "level": {
+    "table_inliers": 8745,
+    "vertices": 13449,
+    "tilt_deg": 1.2836758002490463
+  },
+  "homography": {
+    "n": 12,
+    "rms_mm": 5.937385042235892,
+    "max_mm": 9.269708365059799,
+    "loo_rms_mm": 9.576525284923488
+  },
+  "metrics": {
+    "coarse_corr": 0.8101553320884705,
+    "final_corr": 0.8118992447853088,
+    "tape_iou": 0.7393233499722685,
+    "mat_iou": 0.7350204103062202,
+    "tape_chamfer_mm": 1.8068718910217285,
+    "yaw_deg": 88.73277218282725,
+    "scale_check": 1.0000000196075434
+  }
+}

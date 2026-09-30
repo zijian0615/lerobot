@@ -18,19 +18,11 @@ import mujoco
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from joint_map import J3_MODES, fanuc_to_model, flange_world_mm, limit_violations, model_to_fanuc  # noqa: E402
-from sources import DemoSource, RmiJointSource, UdpJointSource  # noqa: E402
+from joint_map import FINGER_OPEN_M, J3_MODES, fanuc_to_model, flange_world_mm, limit_violations, model_to_fanuc  # noqa: E402
+from sources import RmiJointSource, add_source_args, make_source  # noqa: E402
 
 SCENE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scene.xml")
 STALE_S = 0.5
-
-
-def make_source(a):
-    if a.source == "demo":
-        return DemoSource(a.j3_mode).start()
-    if a.source == "udp":
-        return UdpJointSource(a.udp_port).start()
-    return RmiJointSource(a.host, a.port, a.group, a.rate, init=not a.no_init).start()
 
 
 def fk_check(a, model):
@@ -85,15 +77,8 @@ def draw_overlay(viewer, trail, live, stale):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--source", choices=["rmi", "udp", "demo"], default="rmi")
-    ap.add_argument("--host", default="172.30.109.22")
-    ap.add_argument("--port", type=int, default=16001, help="RMI main port (FRC_Connect)")
-    ap.add_argument("--group", type=int, default=1)
-    ap.add_argument("--rate", type=float, default=30.0, help="RMI polling rate [Hz]")
-    ap.add_argument("--no-init", action="store_true", help="skip FRC_Initialize (try if init disturbs another RMI client)")
-    ap.add_argument("--udp-port", type=int, default=5005)
-    ap.add_argument("--j3-mode", choices=list(J3_MODES), default="coupled")
-    ap.add_argument("--gripper-mm", type=float, default=10.0, help="finger travel per side to display, 0..10 mm")
+    add_source_args(ap)
+    ap.add_argument("--gripper-mm", type=float, default=FINGER_OPEN_M * 1000, help="finger travel per side to display, 0..10 mm")
     ap.add_argument("--trail", type=int, default=300, help="TCP trail length (0 = off)")
     ap.add_argument("--check-cartesian", action="store_true")
     ap.add_argument("--headless", action="store_true", help="no viewer; print status only")
@@ -105,9 +90,15 @@ def main(argv=None):
         return fk_check(a, model)
     data = mujoco.MjData(model)
     mujoco.mj_resetDataKeyframe(model, data, model.key("home").id)
-    gripper = np.clip(a.gripper_mm / 1000.0, 0.0, 0.010)
+    gripper = np.clip(a.gripper_mm / 1000.0, 0.0, FINGER_OPEN_M)
 
     src = make_source(a)
+    if a.source == "rmi":
+        print(
+            "RMI twin owns the robot session. Stop with Ctrl+C (sends FRC_Abort). "
+            "Do not kill the window. For live+viz together use --source udp.",
+            flush=True,
+        )
     trail, last_print, n_last, frame = [], 0.0, 0, 0
     t_end = time.monotonic() + a.duration if a.duration else None
     printed_raw = False

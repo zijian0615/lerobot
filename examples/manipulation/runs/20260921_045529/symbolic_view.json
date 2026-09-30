@@ -1,0 +1,48 @@
+{
+  "objects": [
+    {
+      "name": "screw",
+      "blocked_by": null,
+      "in_workspace": [
+        "fanuc"
+      ],
+      "preferred_arm": "fanuc"
+    },
+    {
+      "name": "screw_2",
+      "blocked_by": null,
+      "in_workspace": [],
+      "preferred_arm": null
+    },
+    {
+      "name": "screw_3",
+      "blocked_by": null,
+      "in_workspace": [],
+      "preferred_arm": null
+    },
+    {
+      "name": "screw_4",
+      "blocked_by": null,
+      "in_workspace": [
+        "fanuc"
+      ],
+      "preferred_arm": "fanuc"
+    },
+    {
+      "name": "screw_5",
+      "blocked_by": null,
+      "in_workspace": [
+        "fanuc"
+      ],
+      "preferred_arm": "fanuc"
+    },
+    {
+      "name": "yellow_container",
+      "blocked_by": null,
+      "in_workspace": [
+        "fanuc"
+      ],
+      "preferred_arm": "fanuc"
+    }
+  ]
+}

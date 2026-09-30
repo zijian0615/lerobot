@@ -44,6 +44,16 @@ lerobot-teleoperate \
     --display_data=true
 ```
 
+Example teleoperation with Quest browser controllers on FANUC (no URDF):
+
+```shell
+lerobot-teleoperate \
+    --robot.type=fanuc \
+    --robot.host=172.30.109.22 \
+    --teleop.type=telegrip \
+    --teleop.controller_side=right
+```
+
 
 Example teleoperation with bimanual so100:
 
@@ -103,6 +113,7 @@ from lerobot.robots import (  # noqa: F401
     unitree_g1 as unitree_g1_robot,
     xarm,
 )
+from lerobot.robots.fanuc import make_phone_fanuc_processors
 from lerobot.robots.xarm import make_phone_xarm_processors
 from lerobot.teleoperators import (  # noqa: F401
     Teleoperator,
@@ -365,6 +376,10 @@ def teleoperate(cfg: TeleoperateConfig):
         )
     elif cfg.teleop.type == "phone" and cfg.robot.type == "xarm":
         teleop_action_processor, robot_action_processor, robot_observation_processor = make_phone_xarm_processors(
+            robot, cfg.teleop
+        )
+    elif cfg.teleop.type == "phone" and cfg.robot.type == "fanuc":
+        teleop_action_processor, robot_action_processor, robot_observation_processor = make_phone_fanuc_processors(
             robot, cfg.teleop
         )
     else:

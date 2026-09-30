@@ -22,7 +22,7 @@ import threading
 import time
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import Any
+from typing import Any, Callable
 
 import cv2
 import numpy as np
@@ -36,7 +36,7 @@ _HTML = """<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
-<title>xArm live</title>
+<title>live</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
@@ -68,6 +68,19 @@ _HTML = """<!DOCTYPE html>
   }
   .timer .clock .ms { color: #7a7a7a; font-weight: 500; }
   .timer .sub { margin-top: 28px; font-size: 42px; color: #d8d8d8; letter-spacing: 0.08em; }
+  .timer button {
+    margin-top: 28px;
+    font-size: 18px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 12px 22px;
+    background: #2c2c2c;
+    color: #f0f0f0;
+    border: 1px solid #5a5a5a;
+    cursor: pointer;
+  }
+  .timer button:disabled { opacity: 0.35; cursor: not-allowed; }
+  .timer button:not(:disabled):hover { background: #3a3a3a; }
   .below { margin-top: 16px; }
   .now {
     font-size: 28px; font-weight: 560; letter-spacing: 0.02em;
@@ -93,13 +106,15 @@ _HTML = """<!DOCTYPE html>
       <div class="tag">top</div>
       <img id="top" src="/stream/top" alt="top"/>
     </div>
-    <div class="panel">
-      <div class="tag">xarm1 wrist</div>
+    <div class="panel" id="wristPanel">
+      <div class="tag" id="wristTag">wrist</div>
       <img id="wrist" src="/stream/wrist" alt="wrist"/>
     </div>
     <div class="panel timer">
       <div class="clock" id="clock">00:00<span class="ms">.0</span></div>
       <div class="sub" id="clockState">planning....</div>
+      <button type="button" id="goHome" disabled>GO HOME</button>
+      <button type="button" id="rerun" disabled>RERUN GO</button>
     </div>
   </div>
   <div class="below">
@@ -114,6 +129,8 @@ const clockState = document.getElementById("clockState");
 const nowEl = document.getElementById("now");
 const logEl = document.getElementById("log");
 const instrEl = document.getElementById("instr");
+const goHomeBtn = document.getElementById("goHome");
+const rerunBtn = document.getElementById("rerun");
 
 function fmtClock(ms) {
   const t = Math.max(0, Math.floor(ms));
@@ -134,7 +151,7 @@ function stageName(phase) {
     shown = "done";
   } else if (p === "go_home") {
     if (shown === "execution") shown = "done";
-  } else if (p === "waiting") {
+  } else if (p === "rerun" || p === "waiting") {
     shown = "planning";
   } else if (p === "perceiving" || p === "planning" || p === "solving" || p === "task") {
     if (shown !== "done") shown = "planning";
@@ -166,9 +183,39 @@ async function tick() {
     '<div><span class="t">' + e.ts + "</span>" + e.phase.toUpperCase() +
     (e.detail ? ("  ·  " + e.detail) : "") + "</div>"
   ).join("");
+  goHomeBtn.disabled = !s.go_home_ready || !!s.go_home_busy;
+  rerunBtn.disabled = !s.rerun_ready || !!s.go_home_busy;
 }
 setInterval(() => tick().catch(() => {}), 200);
 tick().catch(() => {});
+
+goHomeBtn.onclick = async () => {
+  if (goHomeBtn.disabled) return;
+  goHomeBtn.disabled = true;
+  try {
+    const r = await fetch("/go_home", { method: "POST" });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      console.warn("go home", body.detail || r.status);
+    }
+  } catch (err) {
+    console.warn("go home", err);
+  }
+};
+
+rerunBtn.onclick = async () => {
+  if (rerunBtn.disabled) return;
+  rerunBtn.disabled = true;
+  try {
+    const r = await fetch("/rerun", { method: "POST" });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      console.warn("rerun", body.detail || r.status);
+    }
+  } catch (err) {
+    console.warn("rerun", err);
+  }
+};
 </script>
 </body>
 </html>
@@ -278,6 +325,12 @@ class LiveUI:
             self.cams["wrist"] = _CamThread("wrist", wrist_path, width, height, fps)
         self._httpd: ThreadingHTTPServer | None = None
         self._http_thread: threading.Thread | None = None
+        self._go_home: Callable[[], None] | None = None
+        self._home_busy = False
+        self._home_lock = threading.Lock()
+        self._rerun = threading.Event()
+        self._rerun_ready = False
+        self._task_busy = False
 
     def start(self) -> str:
         for cam in self.cams.values():
@@ -292,8 +345,9 @@ class LiveUI:
         self._http_thread = threading.Thread(target=self._httpd.serve_forever, name="live-ui", daemon=True)
         self._http_thread.start()
         url = f"http://127.0.0.1:{self.port}/"
-        logger.info("Live UI → %s  (top + xarm1 wrist + timer)", url)
-        print(f"\nLive UI → {url}\n")
+        cams = "+".join(self.cams) + "+timer"
+        logger.info("Live UI → %s  (%s)", url, cams)
+        print(f"\nLive UI → {url}  ({cams})\n")
         return url
 
     def close(self) -> None:
@@ -359,7 +413,63 @@ class LiveUI:
             "started_at": t0 is not None,
             "current": current,
             "events": events,
+            "go_home_ready": self._go_home is not None,
+            "go_home_busy": self._home_busy,
+            "rerun_ready": (
+                self._rerun_ready and not self._home_busy and not self._task_busy
+            ),
         }
+
+    def set_go_home(self, fn: Callable[[], None] | None) -> None:
+        self._go_home = fn
+
+    def run_go_home(self) -> tuple[bool, str]:
+        fn = self._go_home
+        if fn is None:
+            return False, "robot not connected"
+        with self._lock:
+            phase = str(self._current.get("phase") or "")
+        if phase == "execution":
+            return False, "busy executing"
+        with self._home_lock:
+            if self._home_busy:
+                return False, "go home already running"
+            self._home_busy = True
+        try:
+            self.phase("go_home", "start")
+            fn()
+            self.phase("go_home", "done")
+            return True, "ok"
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("go home failed: %s", exc)
+            self.phase("go_home", f"error: {exc}")
+            return False, str(exc)
+        finally:
+            self._home_busy = False
+
+    def set_task_busy(self, busy: bool) -> None:
+        self._task_busy = bool(busy)
+
+    def set_rerun_ready(self, ready: bool) -> None:
+        self._rerun_ready = bool(ready)
+        if ready:
+            self._rerun.clear()
+
+    def wait_rerun(self, timeout: float | None = None) -> bool:
+        return self._rerun.wait(timeout)
+
+    def request_rerun(self) -> tuple[bool, str]:
+        if self._home_busy or self._task_busy:
+            return False, "busy"
+        with self._lock:
+            phase = str(self._current.get("phase") or "")
+        if phase in {"execution", "perceiving", "planning", "solving", "task"}:
+            return False, "busy"
+        if not self._rerun_ready:
+            return False, "not waiting"
+        self.phase("rerun", self.instruction)
+        self._rerun.set()
+        return True, "ok"
 
 
 def _make_handler(ui: LiveUI) -> type[BaseHTTPRequestHandler]:
@@ -370,7 +480,12 @@ def _make_handler(ui: LiveUI) -> type[BaseHTTPRequestHandler]:
         def do_GET(self) -> None:  # noqa: N802
             path = self.path.split("?", 1)[0]
             if path in {"/", "/index.html"}:
-                body = _HTML.encode("utf-8")
+                html = _HTML
+                if "wrist" not in ui.cams:
+                    html = html.replace(
+                        'id="wristPanel"', 'id="wristPanel" style="display:none"'
+                    ).replace('src="/stream/wrist"', "")
+                body = html.encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Content-Length", str(len(body)))
@@ -389,6 +504,31 @@ def _make_handler(ui: LiveUI) -> type[BaseHTTPRequestHandler]:
             if path.startswith("/stream/"):
                 name = path.rsplit("/", 1)[-1]
                 self._mjpeg(name)
+                return
+            self.send_error(404)
+
+        def do_POST(self) -> None:  # noqa: N802
+            path = self.path.split("?", 1)[0]
+            length = int(self.headers.get("Content-Length") or 0)
+            if length:
+                self.rfile.read(length)
+            if path == "/go_home":
+                ok, msg = ui.run_go_home()
+                body = json.dumps({"ok": ok, "detail": msg}).encode("utf-8")
+                self.send_response(200 if ok else 409)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            if path == "/rerun":
+                ok, msg = ui.request_rerun()
+                body = json.dumps({"ok": ok, "detail": msg}).encode("utf-8")
+                self.send_response(200 if ok else 409)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
                 return
             self.send_error(404)
 

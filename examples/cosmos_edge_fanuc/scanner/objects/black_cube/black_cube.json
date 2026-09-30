@@ -1,0 +1,24 @@
+{
+ "name": "black_cube",
+ "source": "black_cube_1cm.usda (modelled, not scanned)",
+ "size_m": [
+  0.01,
+  0.01,
+  0.01
+ ],
+ "mass_kg": 0.00124, "material": "PLA (1.24 g/cm3)",
+ "collider": {
+  "type": "box",
+  "size": [
+   0.01,
+   0.01,
+   0.01
+  ],
+  "center": [
+   0,
+   0,
+   0.005
+  ]
+ },
+ "frame": "z up, origin at the bottom centre"
+}

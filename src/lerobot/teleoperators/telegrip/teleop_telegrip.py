@@ -69,6 +69,7 @@ class Telegrip(Teleoperator):
             features[f"vr.{side}.target_delta"] = np.ndarray
             features[f"vr.{side}.wrist_roll_deg"] = float
             features[f"vr.{side}.wrist_flex_deg"] = float
+            features[f"vr.{side}.wrist_quat"] = np.ndarray
             features[f"vr.{side}.gripper_closed"] = bool
             features[f"vr.{side}.reset_origin"] = bool
         return features
@@ -123,12 +124,14 @@ class Telegrip(Teleoperator):
             "vr.left.target_delta": left.target_delta,
             "vr.left.wrist_roll_deg": left.wrist_roll_deg,
             "vr.left.wrist_flex_deg": left.wrist_flex_deg,
+            "vr.left.wrist_quat": left.wrist_quat,
             "vr.left.gripper_closed": left.gripper_closed,
             "vr.left.reset_origin": left.reset_origin,
             "vr.right.enabled": right.enabled,
             "vr.right.target_delta": right.target_delta,
             "vr.right.wrist_roll_deg": right.wrist_roll_deg,
             "vr.right.wrist_flex_deg": right.wrist_flex_deg,
+            "vr.right.wrist_quat": right.wrist_quat,
             "vr.right.gripper_closed": right.gripper_closed,
             "vr.right.reset_origin": right.reset_origin,
         }

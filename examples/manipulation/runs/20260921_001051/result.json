@@ -1,0 +1,488 @@
+{
+  "status": "success",
+  "reason": "",
+  "plan": [
+    {
+      "step": 1,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "args": {
+        "object": "screw_top_right"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "args": {
+        "object": "screw_top_right",
+        "destination": "yellow_container"
+      },
+      "depends_on": [
+        1
+      ]
+    },
+    {
+      "step": 3,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "args": {
+        "object": "screw_left"
+      },
+      "depends_on": [
+        2
+      ]
+    },
+    {
+      "step": 4,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "args": {
+        "object": "screw_left",
+        "destination": "yellow_container"
+      },
+      "depends_on": [
+        3
+      ]
+    },
+    {
+      "step": 5,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "args": {
+        "object": "screw_bottom_left"
+      },
+      "depends_on": [
+        4
+      ]
+    },
+    {
+      "step": 6,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "args": {
+        "object": "screw_bottom_left",
+        "destination": "yellow_container"
+      },
+      "depends_on": [
+        5
+      ]
+    },
+    {
+      "step": 7,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "args": {
+        "object": "screw_bottom_middle"
+      },
+      "depends_on": [
+        6
+      ]
+    },
+    {
+      "step": 8,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "args": {
+        "object": "screw_bottom_middle",
+        "destination": "yellow_container"
+      },
+      "depends_on": [
+        7
+      ]
+    },
+    {
+      "step": 9,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "args": {
+        "object": "screw_bottom_right"
+      },
+      "depends_on": [
+        8
+      ]
+    },
+    {
+      "step": 10,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "args": {
+        "object": "screw_bottom_right",
+        "destination": "yellow_container"
+      },
+      "depends_on": [
+        9
+      ]
+    }
+  ],
+  "bound": [
+    {
+      "step": 1,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          0.31574870302545915,
+          -0.14999013812265483,
+          0.0,
+          -0.09331849860174612
+        ],
+        "object": "screw_top_right"
+      },
+      "depends_on": []
+    },
+    {
+      "step": 2,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          0.3632728365556449,
+          0.007501254170886271,
+          0.1,
+          -0.09331849860174612
+        ],
+        "object": "screw_top_right",
+        "destination": "yellow_container"
+      },
+      "depends_on": [
+        1
+      ]
+    },
+    {
+      "step": 3,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          0.3872340950767831,
+          -0.10584414956414817,
+          0.0,
+          -0.02110791237005394
+        ],
+        "object": "screw_left"
+      },
+      "depends_on": [
+        2
+      ]
+    },
+    {
+      "step": 4,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          0.3632728365556449,
+          0.007501254170886271,
+          0.1,
+          -0.02110791237005394
+        ],
+        "object": "screw_left",
+        "destination": "yellow_container"
+      },
+      "depends_on": [
+        3
+      ]
+    },
+    {
+      "step": 5,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          0.4229714061884732,
+          -0.26058264623268074,
+          0.0,
+          0.12738722189643603
+        ],
+        "object": "screw_bottom_left"
+      },
+      "depends_on": [
+        4
+      ]
+    },
+    {
+      "step": 6,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          0.3632728365556449,
+          0.007501254170886271,
+          0.1,
+          0.12738722189643603
+        ],
+        "object": "screw_bottom_left",
+        "destination": "yellow_container"
+      },
+      "depends_on": [
+        5
+      ]
+    },
+    {
+      "step": 7,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          0.4561915290794173,
+          -0.15243182469836689,
+          0.0,
+          -1.3743862089369994
+        ],
+        "object": "screw_bottom_middle"
+      },
+      "depends_on": [
+        6
+      ]
+    },
+    {
+      "step": 8,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          0.3632728365556449,
+          0.007501254170886271,
+          0.1,
+          -1.3743862089369994
+        ],
+        "object": "screw_bottom_middle",
+        "destination": "yellow_container"
+      },
+      "depends_on": [
+        7
+      ]
+    },
+    {
+      "step": 9,
+      "arm": "fanuc",
+      "primitive": "Grasp",
+      "params": {
+        "pose": [
+          0.4715889069563827,
+          -0.0993014345103099,
+          0.0,
+          -0.07333936630535565
+        ],
+        "object": "screw_bottom_right"
+      },
+      "depends_on": [
+        8
+      ]
+    },
+    {
+      "step": 10,
+      "arm": "fanuc",
+      "primitive": "Place",
+      "params": {
+        "pose": [
+          0.3632728365556449,
+          0.007501254170886271,
+          0.1,
+          -0.07333936630535565
+        ],
+        "object": "screw_bottom_right",
+        "destination": "yellow_container"
+      },
+      "depends_on": [
+        9
+      ]
+    }
+  ],
+  "results": [
+    {
+      "step": 1,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "screw_top_right"
+      }
+    },
+    {
+      "step": 2,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          0.3632728365556449,
+          0.007501254170886271,
+          0.1,
+          -0.09331849860174612
+        ],
+        "object": "screw_top_right",
+        "observed_xy": [
+          0.3632728365556449,
+          0.007501254170886271
+        ],
+        "xy_error": 0.0
+      }
+    },
+    {
+      "step": 3,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "screw_left"
+      }
+    },
+    {
+      "step": 4,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          0.3632728365556449,
+          0.007501254170886271,
+          0.1,
+          -0.02110791237005394
+        ],
+        "object": "screw_left",
+        "observed_xy": [
+          0.3632728365556449,
+          0.007501254170886271
+        ],
+        "xy_error": 0.0
+      }
+    },
+    {
+      "step": 5,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "screw_bottom_left"
+      }
+    },
+    {
+      "step": 6,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          0.3632728365556449,
+          0.007501254170886271,
+          0.1,
+          0.12738722189643603
+        ],
+        "object": "screw_bottom_left",
+        "observed_xy": [
+          0.3632728365556449,
+          0.007501254170886271
+        ],
+        "xy_error": 0.0
+      }
+    },
+    {
+      "step": 7,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "screw_bottom_middle"
+      }
+    },
+    {
+      "step": 8,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          0.3632728365556449,
+          0.007501254170886271,
+          0.1,
+          -1.3743862089369994
+        ],
+        "object": "screw_bottom_middle",
+        "observed_xy": [
+          0.3632728365556449,
+          0.007501254170886271
+        ],
+        "xy_error": 0.0
+      }
+    },
+    {
+      "step": 9,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "gripper_width": 0.03,
+        "object": "screw_bottom_right"
+      }
+    },
+    {
+      "step": 10,
+      "status": "success",
+      "reason": "",
+      "observed": {
+        "place_pose": [
+          0.3632728365556449,
+          0.007501254170886271,
+          0.1,
+          -0.07333936630535565
+        ],
+        "object": "screw_bottom_right",
+        "observed_xy": [
+          0.3632728365556449,
+          0.007501254170886271
+        ],
+        "xy_error": 0.0
+      }
+    }
+  ],
+  "symbolic_view": {
+    "objects": [
+      {
+        "name": "yellow_container",
+        "blocked_by": null,
+        "in_workspace": [
+          "fanuc"
+        ],
+        "preferred_arm": "fanuc"
+      },
+      {
+        "name": "screw_top_right",
+        "blocked_by": null,
+        "in_workspace": [
+          "fanuc"
+        ],
+        "preferred_arm": "fanuc"
+      },
+      {
+        "name": "screw_left",
+        "blocked_by": null,
+        "in_workspace": [
+          "fanuc"
+        ],
+        "preferred_arm": "fanuc"
+      },
+      {
+        "name": "screw_bottom_left",
+        "blocked_by": null,
+        "in_workspace": [
+          "fanuc"
+        ],
+        "preferred_arm": "fanuc"
+      },
+      {
+        "name": "screw_bottom_middle",
+        "blocked_by": null,
+        "in_workspace": [
+          "fanuc"
+        ],
+        "preferred_arm": "fanuc"
+      },
+      {
+        "name": "screw_bottom_right",
+        "blocked_by": null,
+        "in_workspace": [
+          "fanuc"
+        ],
+        "preferred_arm": "fanuc"
+      }
+    ]
+  }
+}

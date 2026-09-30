@@ -34,6 +34,7 @@ class ArmVRState:
     target_delta: np.ndarray | None = None
     wrist_roll_deg: float = 0.0
     wrist_flex_deg: float = 0.0
+    wrist_quat: np.ndarray | None = None
     gripper_closed: bool | None = None
     reset_origin: bool = False
 
@@ -155,6 +156,7 @@ class VRControllerProcessor:
                 )
                 wrist_roll = 0.0
                 wrist_flex = 0.0
+                wrist_quat = None
                 if controller.origin_quaternion is not None:
                     if quaternion and all(k in quaternion for k in ("x", "y", "z", "w")):
                         current_quat = np.array(
@@ -165,6 +167,10 @@ class VRControllerProcessor:
                     else:
                         current_quat = None
                     if current_quat is not None:
+                        relative = Rotation.from_quat(current_quat) * Rotation.from_quat(
+                            controller.origin_quaternion
+                        ).inv()
+                        wrist_quat = relative.as_quat()
                         wrist_roll = self._extract_roll_from_quaternion(
                             current_quat, controller.origin_quaternion
                         )
@@ -176,6 +182,7 @@ class VRControllerProcessor:
                 arm_state.target_delta = relative_delta
                 arm_state.wrist_roll_deg = wrist_roll
                 arm_state.wrist_flex_deg = wrist_flex
+                arm_state.wrist_quat = wrist_quat
         elif controller.grip_active:
             controller.reset_grip()
             arm_state.enabled = False

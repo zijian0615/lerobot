@@ -1,0 +1,25 @@
+{
+ "name": "pen",
+ "source": "/home/gb2_8634/lerobot/examples/cosmos_edge_fanuc/scanner/objects/Pen.zip",
+ "size_m": [
+  0.1242,
+  0.0167,
+  0.0114
+ ],
+ "mass_kg": 0.015,
+ "collider": {
+  "type": "capsule",
+  "axis": "X",
+  "radius": 0.0067209878219532376,
+  "height": 0.11070934932429405,
+  "center": [
+   3.469446951953614e-18,
+   5.204170427930421e-18,
+   0.0067209878219532376
+  ]
+ },
+ "triangles": 2294,
+ "surface_fit_std_mm": 0.62,
+ "frame": "z up from the surface it lay on, x along the long axis, origin at the footprint centre on the surface",
+ "note": "visual mesh is open underneath (the surface hid it); collide with the primitive"
+}

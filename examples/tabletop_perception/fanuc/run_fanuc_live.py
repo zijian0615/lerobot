@@ -91,6 +91,8 @@ _FANUC_CFG_KEYS = {
     "gripper_close_value",
     "id",
     "calibration_dir",
+    "twin_udp_host",
+    "twin_udp_port",
 }
 
 

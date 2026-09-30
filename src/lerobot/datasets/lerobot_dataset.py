@@ -200,7 +200,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
         """
         super().__init__()
         self.repo_id = repo_id
-        self._requested_root = Path(root) if root else None
+        self._requested_root = Path(root).expanduser() if root else None
         self.reader = None
         self.set_image_transforms(image_transforms)
         self.delta_timestamps = delta_timestamps
@@ -798,7 +798,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
             )
         obj = cls.__new__(cls)
         obj.repo_id = repo_id
-        obj._requested_root = Path(root)
+        obj._requested_root = Path(root).expanduser()
         obj.revision = revision if revision else CODEBASE_VERSION
         obj.tolerance_s = tolerance_s
         obj.image_transforms = None

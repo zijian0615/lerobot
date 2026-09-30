@@ -1,0 +1,50 @@
+#usda 1.0
+(
+    defaultPrim = "black_cube"
+    metersPerUnit = 1
+    upAxis = "Z"
+    doc = "Physics version of ../black_cube_1cm.usda: 10 mm black cube, origin at the bottom centre, z up."
+)
+
+def Xform "black_cube" (
+    prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI"]
+)
+{
+    float physics:mass = 0.00124
+
+    def Scope "Looks"
+    {
+        def Material "black"
+        {
+            token outputs:surface.connect = </black_cube/Looks/black/Shader.outputs:surface>
+            def Shader "Shader"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.005, 0.005, 0.005)
+                float inputs:roughness = 0.65
+                float inputs:metallic = 0
+                token outputs:surface
+            }
+        }
+        def Material "physics" (
+            prepend apiSchemas = ["PhysicsMaterialAPI"]
+        )
+        {
+            float physics:staticFriction = 0.8
+            float physics:dynamicFriction = 0.8
+            float physics:restitution = 0
+        }
+    }
+
+    def Cube "cube" (
+        prepend apiSchemas = ["PhysicsCollisionAPI", "MaterialBindingAPI"]
+    )
+    {
+        double size = 0.01
+        double3 xformOp:translate = (0, 0, 0.005)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+        rel material:binding = </black_cube/Looks/black>
+        rel material:binding:physics = </black_cube/Looks/physics>
+        color3f[] primvars:displayColor = [(0.005, 0.005, 0.005)]
+    }
+}
