@@ -1,6 +1,44 @@
 This folder contains the Docker code for deploying a secure container
 containing an Openclaw agent
 
+
+in wsl2
+	download repo
+	run container setup script
+	configure agent
+	done
+
+view all containers 
+	docker ps --all 
+
+start stop openclaw container 
+	docker start openclaw-openclaw-gateway-1
+	docker stop openclaw-openclaw-gateway-1
+
+get into the container 
+	docker exec -it openclaw-openclaw-gateway-1 /bin/bash
+
+get token
+	openclaw gateway auth-token --show
+
+access gateway 
+	http://127.0.0.1:18789/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 Need to build the image
     in the directory containing the dockerfile: 
         docker build . -t oc-image
@@ -30,7 +68,7 @@ Need to build the image
 
  docker run -it --rm --name openclaw -e OPENCLAW_GATEWAY_TOKEN=gateway_token -e GEMINI_API_KEY=api_key --cap-drop ALL -v $PWD:/work -v ~/.openclaw:/home/openclaw/.openclaw -w /work oc-image
 
- docker run -it --rm --name openclaw -e OPENCLAW_GATEWAY_TOKEN=1ee17a617aac33bb2c7ef8158d975599d914ffbd1b475571facd19b083c9873g -e GEMINI_API_KEY=geminikey --cap-drop ALL -v $PWD:/work -v ~/.openclaw:/home/openclaw/.openclaw -w /work oc-image
+ docker run -it --rm --name openclaw -e OPENCLAW_GATEWAY_TOKEN=1ee17a617aac33bb2c7ef8158d975599d914ffbd1b475571facd19b083c9873g -e GEMINI_API_KEY=apikey --cap-drop ALL -v $PWD:/work -v ~/.openclaw:/home/openclaw/.openclaw -w /work oc-image
 
 
 token for the gateway

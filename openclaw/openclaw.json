@@ -3,7 +3,7 @@
     "securityAcknowledgedAt": "2026-09-21T21:49:18.429Z",
     "accessMode": "full",
     "lastRunAt": "2026-09-21T21:49:41.463Z",
-    "lastRunVersion": "2026.9.5",
+    "lastRunVersion": "2026.9.4",
     "lastRunCommand": "onboard",
     "lastRunMode": "local"
   },
@@ -33,7 +33,7 @@
       "modelPolicyAllowlist": true,
       "utilityModelSeparation": true
     },
-    "lastTouchedVersion": "2026.9.5"
+    "lastTouchedVersion": "2026.9.4"
   },
   "agents": {
     "defaults": {
