@@ -1,0 +1,7 @@
+# Host-side Python packages (NOT Isaac Sim's interpreter).
+# Used by make_textures.py, encode_video.py and the calibration scripts.
+#   python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+numpy>=2.0
+scipy>=1.14
+opencv-python-headless>=4.10
+imageio-ffmpeg>=0.5

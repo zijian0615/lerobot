@@ -1,0 +1,12 @@
+{
+  "cubes_in_bin": 1,
+  "cubes_still_on_table": 0,
+  "screws_in_bin": 1,
+  "screws_still_on_table": 0,
+  "bin_contents": [
+    "yellow cube",
+    "screw"
+  ],
+  "task_complete": true,
+  "notes": "All loose cubes and screws have been placed in the bin."
+}

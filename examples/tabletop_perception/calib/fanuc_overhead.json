@@ -1,9 +1,18 @@
 {
-  "_comment": "Fanuc overhead. 1920x1080 MJPG. Affine CLEARED until recalib after camera tilt. Default controller 172.30.109.22:16001.",
+  "_comment": "Top: Orbbec Gemini AY6V16300WC color, 1920x1080 MJPG. Wrist: Gemini 305. Affine still from the previous overhead. Default controller 172.30.109.22:16001.",
   "camera": {
-    "index_or_path": "/dev/video0",
+    "_comment": "Orbbec Gemini color, top. Depth is Y16 1280x800 on a separate node, not Z16.",
+    "index_or_path": "/dev/v4l/by-id/usb-Orbbec_R__Orbbec_R__Gemini_TM__AY6V16300WC-video-index0",
     "width": 1920,
     "height": 1080,
+    "fps": 30,
+    "fourcc": "MJPG"
+  },
+  "wrist_camera": {
+    "_comment": "Orbbec Gemini 305 CV2L761000Z8 color, wrist. USB port 1.1.4 interface 1.4.",
+    "index_or_path": "/dev/v4l/by-path/platform-NVDA8000:01-usb-0:1.1.4:1.4-video-index0",
+    "width": 1280,
+    "height": 720,
     "fps": 30,
     "fourcc": "MJPG"
   },
@@ -141,9 +150,9 @@
       0.0
     ],
     "topdown_wpr_deg": [
-      178.206,
-      -1.585,
-      -2.214
+      179.943,
+      -0.559,
+      13.401
     ],
     "move_speed_mm_s": 80.0,
     "solver_margin_m": 0.03,
@@ -187,9 +196,9 @@
         0.0
       ],
       "topdown_wpr_deg": [
-        178.206,
-        -1.585,
-        -2.214
+        179.943,
+        -0.559,
+        13.401
       ],
       "use_object_yaw": false,
       "grasp_yaw_offset_rad": 0.0,
@@ -201,17 +210,17 @@
         "_comment": "true_table = A @ pred_table + b (metres). pred = to_table(uv).",
         "A": [
           [
-            -0.011486,
-            -1.375066
+            -0.228038,
+            -1.632984
           ],
           [
-            1.71533,
-            0.025529
+            1.115184,
+            -0.943114
           ]
         ],
         "b": [
-          0.299027,
-          0.052837
+          0.159479,
+          -0.180158
         ]
       }
     }
@@ -220,17 +229,17 @@
     "_comment": "true_table = A @ pred_table + b (metres). pred = to_table(uv).",
     "A": [
       [
-        -0.011486,
-        -1.375066
+        -0.228038,
+        -1.632984
       ],
       [
-        1.71533,
-        0.025529
+        1.115184,
+        -0.943114
       ]
     ],
     "b": [
-      0.299027,
-      0.052837
+      0.159479,
+      -0.180158
     ]
   }
 }

@@ -328,10 +328,10 @@ def main() -> int:
         f"Projection z=h from calib object_top_z_m (default={z_default:.3f} m): "
         f"{z_heights}"
     )
-    if str(camera_path) not in {"/dev/video0", "0"}:
+    if args.camera and str(args.camera) != str(cam_cfg["index_or_path"]):
         print(
-            "WARNING: live runs use --camera /dev/video0 (Aoni overhead). "
-            "Pass the same camera here or the affine will not match."
+            "WARNING: --camera differs from calib camera "
+            f"{cam_cfg['index_or_path']}. The affine will not match live runs."
         )
     if use_global and global_affine is not None:
         print("Pred XY = global table_xy_affine(to_table(uv, z=h))  → fit per-arm residual")

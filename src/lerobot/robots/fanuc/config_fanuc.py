@@ -35,6 +35,12 @@ class FanucConfig(RobotConfig):
     term_type: str = "CNT"
     term_value: int = 100
 
+    # cartesian: FRC_LinearMotion with j0..j5 in mm / WPR degrees (existing live path).
+    # joint: FRC_JointMotion with J1.pos..J6.pos in pendant degrees plus gripper.pos in {0, 1}.
+    # Joint mode is what lerobot-rollout needs for a policy trained on joint targets.
+    motion: str = "cartesian"
+    joint_speed_percent: int = 10
+
     gripper_lcb_type: str | None = "TA"
     gripper_lcb_value: int = 10
     gripper_port_type: int | None = 2

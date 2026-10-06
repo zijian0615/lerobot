@@ -1,17 +1,20 @@
 {
-  "_comment": "Overhead /dev/video2. Dual xArm: Robot1 image bottom-LEFT true\u2248(-0.45,-0.35); Robot2 image bottom-RIGHT mirrored about image vertical through table_xy_affine \u2192 true\u2248(-0.55,+0.51). Do NOT use naive (+0.45,-0.35) \u2014 affine rotates axes ~90\u00b0.",
+  "_comment": "Top: Orbbec Gemini AY6V16300WC color. Dual xArm: Robot1 image bottom-LEFT true\u2248(-0.45,-0.35); Robot2 image bottom-RIGHT mirrored about image vertical through table_xy_affine \u2192 true\u2248(-0.55,+0.51). Do NOT use naive (+0.45,-0.35) \u2014 affine rotates axes ~90\u00b0. K and affine are still from the previous camera.",
   "camera": {
-    "index_or_path": "/dev/video2",
+    "_comment": "Orbbec Gemini color, top. Depth is a separate node (Y16 1280x800), not this color path.",
+    "index_or_path": "/dev/v4l/by-id/usb-Orbbec_R__Orbbec_R__Gemini_TM__AY6V16300WC-video-index0",
     "width": 640,
     "height": 480,
-    "fps": 30
+    "fps": 30,
+    "fourcc": "MJPG"
   },
   "wrist_camera": {
-    "_comment": "xarm1 wrist Innomaker U20CAM. Overhead live runs use --camera /dev/video0.",
-    "index_or_path": "/dev/video2",
+    "_comment": "Orbbec Gemini 305 CV2L761000Z8 color, wrist. USB port 1.1.4 interface 1.4. by-id does not link this color node.",
+    "index_or_path": "/dev/v4l/by-path/platform-NVDA8000:01-usb-0:1.1.4:1.4-video-index0",
     "width": 640,
     "height": 480,
-    "fps": 30
+    "fps": 30,
+    "fourcc": "MJPG"
   },
   "K": [
     [

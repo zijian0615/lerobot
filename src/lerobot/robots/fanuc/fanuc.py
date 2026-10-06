@@ -45,6 +45,18 @@ _FRC_INVALID_SEQUENCE_ID = 2556957
 _FRC_ALREADY_INITIALIZED = 7015
 
 
+# Names match lerobot-rollout's ".pos" motor filter, in the ACT training order.
+JOINT_POS_NAMES = ("J1.pos", "J2.pos", "J3.pos", "J4.pos", "J5.pos", "J6.pos", "gripper.pos")
+_JOINT_LIMITS_DEG = {
+    "J1": (-170.0, 170.0),
+    "J2": (-110.0, 120.0),
+    "J3": (-69.0, 205.0),
+    "J4": (-190.0, 190.0),
+    "J5": (-120.0, 120.0),
+    "J6": (-360.0, 360.0),
+}
+
+
 def _joints_deg_from_response(resp: dict[str, Any]) -> tuple[float, ...] | None:
     """Extract FANUC J1..J6 degrees from an FRC_ReadJointAngles payload."""
     cand = None
@@ -89,6 +101,7 @@ class Fanuc(Robot):
         self._send_lock = threading.Lock()
 
         self._latest_pose: tuple[float, ...] | None = None
+        self._latest_joints: tuple[float, ...] | None = None
         self._latest_t: float | None = None
         self._latest_tick: int | None = None
         self._latest_configuration: dict[str, Any] | None = None
@@ -315,8 +328,16 @@ class Fanuc(Robot):
     # ------------------------------------------------------------------ #
 
     def send_action(self, action: RobotAction) -> RobotAction:
-        """Send a cartesian motion command and return the action that was sent."""
+        """Send a motion command and return the action that was sent.
+
+        ``motion="cartesian"`` sends ``FRC_LinearMotion``. ``motion="joint"`` sends
+        ``FRC_JointMotion`` from pendant degrees named ``J1.pos``..``J6.pos``.
+        """
         self._require_connected()
+        if self.config.motion == "joint":
+            return self._send_joint_action(action)
+        if self.config.motion != "cartesian":
+            raise ValueError(f"Unknown fanuc motion mode {self.config.motion!r}")
         if action.get("stream"):
             now = time.perf_counter()
             with self._pending_lock:
@@ -458,6 +479,85 @@ class Fanuc(Robot):
         sent["sequence_id"] = seq_id
         return sent
 
+    def _joint_values(self, action: RobotAction) -> tuple[list[float], float | None]:
+        joints = []
+        for index, name in enumerate(JOINT_POS_NAMES[:6]):
+            bare = f"J{index + 1}"
+            if name in action:
+                joints.append(float(action[name]))
+            elif bare in action:
+                joints.append(float(action[bare]))
+            else:
+                raise ValueError(f"Joint action is missing {name}")
+        if "gripper.pos" in action:
+            gripper = float(action["gripper.pos"])
+        elif "gripper" in action:
+            gripper = float(action["gripper"])
+        elif "j7" in action:
+            gripper = float(action["j7"])
+        else:
+            gripper = None
+        return joints, gripper
+
+    def _send_joint_action(self, action: RobotAction) -> RobotAction:
+        joints, gripper = self._joint_values(action)
+        for index, value in enumerate(joints):
+            lo, hi = _JOINT_LIMITS_DEG[f"J{index + 1}"]
+            if not lo <= value <= hi:
+                raise ValueError(f"J{index + 1}={value} deg is outside [{lo}, {hi}]")
+        seq_id = self.seq_id
+        self.seq_id += 1
+        # ReadJointAngles / the policy use pendant angles (J3 relative to J2).
+        # FRC_JointMotion expects Fanuc ground-plane J3 (J2 + pendant J3). Sending
+        # the pendant value makes this pose look like J3 ≈ -69°, which is RMIT-044.
+        wire = list(joints)
+        wire[2] = joints[1] + joints[2]
+        joint_angle = {f"J{i + 1}": wire[i] for i in range(6)}
+        joint_angle.update({"J7": 0.0, "J8": 0.0, "J9": 0.0})
+        packet: dict[str, Any] = {
+            "Instruction": "FRC_JointMotion",
+            "SequenceID": seq_id,
+            "JointAngle": joint_angle,
+            "SpeedType": "Percent",
+            "Speed": int(self.config.joint_speed_percent),
+            "TermType": "FINE",
+            "TermValue": 100,
+        }
+        if gripper is not None:
+            closed = float(gripper) >= 0.5
+        else:
+            closed = None
+        if closed is not None and closed != (None if self._last_stream_j7 is None else self._last_stream_j7 >= 0.5):
+            packet.update(
+                {
+                    "LCBType": str(self.config.gripper_lcb_type or "TA"),
+                    "LCBValue": int(self.config.gripper_lcb_value),
+                    "PortType": int(self.config.gripper_port_type or 2),
+                    "PortNumber": int(
+                        self.config.gripper_close_port_number if closed else self.config.gripper_open_port_number
+                    ),
+                    "PortValue": "ON",
+                }
+            )
+            self._commanded_gripper = float(gripper)
+            self._last_stream_j7 = float(gripper)
+        fut: Future = Future()
+        with self._pending_lock:
+            self._pending_futures[seq_id] = fut
+        self._send_json(packet)
+        logger.info(
+            "FRC_JointMotion seq=%s joints=%s wire_j3=%s gripper=%s",
+            seq_id,
+            [round(v, 2) for v in joints],
+            round(wire[2], 2),
+            gripper,
+        )
+        sent = {JOINT_POS_NAMES[i]: joints[i] for i in range(6)}
+        if gripper is not None:
+            sent["gripper.pos"] = float(gripper)
+        sent["sequence_id"] = seq_id
+        return sent
+
     def reset_episode(self, timeout_s: float = 20.0) -> dict[str, Any] | None:
         """Isaac Sim twin only (config.sim_reset): ask the simulated controller for a fresh scene between episodes.
 
@@ -490,16 +590,39 @@ class Fanuc(Robot):
 
     def get_observation(self) -> RobotObservation:
         self._require_connected()
-        if self._latest_pose is None:
-            deadline = time.time() + 1.0
-            while self._latest_pose is None and time.time() < deadline:
-                time.sleep(0.01)
-        if self._latest_pose is None:
-            raise RuntimeError("No cartesian observation received yet.")
+        if self.config.motion != "joint":
+            if self._latest_pose is None:
+                deadline = time.time() + 1.0
+                while self._latest_pose is None and time.time() < deadline:
+                    time.sleep(0.01)
+            if self._latest_pose is None:
+                raise RuntimeError("No cartesian observation received yet.")
         if self._gripper_state_port_number is not None and self._latest_gripper_state is None:
             deadline = time.time() + 1.0
             while self._latest_gripper_state is None and time.time() < deadline:
                 time.sleep(0.01)
+
+        if self.config.motion == "joint":
+            if self._latest_joints is None:
+                deadline = time.time() + 1.0
+                while self._latest_joints is None and time.time() < deadline:
+                    time.sleep(0.01)
+            if self._latest_joints is None:
+                raise RuntimeError("No joint observation received yet.")
+            obs: RobotObservation = {
+                name: float(value) for name, value in zip(JOINT_POS_NAMES[:6], self._latest_joints, strict=True)
+            }
+            if self._latest_gripper_state is not None:
+                gripper = float(self._latest_gripper_state)
+            elif self._commanded_gripper is not None:
+                gripper = float(self._commanded_gripper)
+            else:
+                gripper = 0.0
+            obs["gripper.pos"] = gripper
+            for cam_name, camera in self.cameras.items():
+                frame = camera.read()
+                obs[cam_name] = self._resize_hw(frame, 224, 224)
+            return obs
 
         x, y, z, w, p, r = self._latest_pose
         if self._latest_gripper_state is not None:
@@ -586,10 +709,22 @@ class Fanuc(Robot):
             )
         return int(err_id or 0)
 
+    @staticmethod
+    def _resize_hw(frame: Any, height: int, width: int) -> Any:
+        if frame.shape[0] == height and frame.shape[1] == width:
+            return frame
+        import cv2
+
+        return cv2.resize(frame, (width, height))
+
     @property
     def observation_features(self) -> dict[str, type | tuple]:
-        feats: dict[str, type | tuple] = {name: float for name in FANUC_RAW_NAMES}
+        names = JOINT_POS_NAMES if self.config.motion == "joint" else FANUC_RAW_NAMES
+        feats: dict[str, type | tuple] = {name: float for name in names}
         for cam_name, camera in {**self.config.cameras, **self.cameras}.items():
+            if self.config.motion == "joint":
+                feats[cam_name] = (224, 224, 3)
+                continue
             height = getattr(camera, "height", None) or 480
             width = getattr(camera, "width", None) or 640
             feats[cam_name] = (int(height), int(width), 3)
@@ -597,8 +732,9 @@ class Fanuc(Robot):
 
     @property
     def action_features(self) -> dict[str, type]:
-        """x, y, z (mm), W in [0, 360), P, R (deg) and the gripper (1 = closed); see pose.FANUC_RAW_NAMES."""
-        return {name: float for name in FANUC_RAW_NAMES}
+        """Cartesian ``j0``..``j7``, or joint ``J1.pos``..``gripper.pos`` when ``motion="joint"``."""
+        names = JOINT_POS_NAMES if self.config.motion == "joint" else FANUC_RAW_NAMES
+        return {name: float for name in names}
 
     # ------------------------------------------------------------------ #
     #  Background loops                                                    #
@@ -635,7 +771,10 @@ class Fanuc(Robot):
             start_t = time.perf_counter()
             if self._poll_enabled.is_set():
                 try:
-                    self._send_json({"Command": "FRC_ReadCartesianPosition", "Group": self._group})
+                    if self.config.motion == "joint":
+                        self._send_json({"Command": "FRC_ReadJointAngles", "Group": self._group})
+                    else:
+                        self._send_json({"Command": "FRC_ReadCartesianPosition", "Group": self._group})
                     if self._gripper_state_port_number is not None:
                         self._send_json({"Command": "FRC_ReadDIN", "PortNumber": int(self._gripper_state_port_number)})
                     if self._twin_sock is not None:
@@ -950,14 +1089,15 @@ class Fanuc(Robot):
         return {key: self._cfg_int(src.get(key), default) for key, default in defaults.items()}
 
     def _publish_twin_joints(self, resp: dict[str, Any]) -> None:
-        if self._twin_sock is None or self._twin_addr is None:
-            return
         if resp.get("ErrorID", -1) not in (0, None):
             logger.warning("FRC_ReadJointAngles failed: %s", resp)
             return
         joints = _joints_deg_from_response(resp)
         if joints is None:
             logger.warning("FRC_ReadJointAngles missing J1..J6: %s", resp)
+            return
+        self._latest_joints = joints
+        if self._twin_sock is None or self._twin_addr is None:
             return
         try:
             self._twin_sock.sendto(

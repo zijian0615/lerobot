@@ -180,6 +180,8 @@ def main(argv: list[str] | None = None) -> int:
             width=int(cam_cfg.get("width", 1920)),
             height=int(cam_cfg.get("height", 1080)),
             fps=int(cam_cfg.get("fps", 30)),
+            wrist_width=int(wrist_cfg.get("width") or cam_cfg.get("width", 1920)),
+            wrist_height=int(wrist_cfg.get("height") or cam_cfg.get("height", 1080)),
             port=int(args.ui_port),
         )
         ui.start()

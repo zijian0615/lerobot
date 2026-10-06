@@ -307,6 +307,8 @@ class LiveUI:
         width: int = PANEL_W,
         height: int = PANEL_H,
         fps: int = 30,
+        wrist_width: int | None = None,
+        wrist_height: int | None = None,
         host: str = "0.0.0.0",
         port: int = 8765,
     ) -> None:
@@ -322,7 +324,13 @@ class LiveUI:
             "top": _CamThread("top", top_path, width, height, fps),
         }
         if wrist_path:
-            self.cams["wrist"] = _CamThread("wrist", wrist_path, width, height, fps)
+            self.cams["wrist"] = _CamThread(
+                "wrist",
+                wrist_path,
+                int(wrist_width or width),
+                int(wrist_height or height),
+                fps,
+            )
         self._httpd: ThreadingHTTPServer | None = None
         self._http_thread: threading.Thread | None = None
         self._go_home: Callable[[], None] | None = None

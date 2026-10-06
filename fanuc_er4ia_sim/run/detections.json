@@ -1,0 +1,154 @@
+{
+  "objects": [
+    {
+      "label": "yellow cube",
+      "category": "cube",
+      "colour": "yellow",
+      "center": [
+        680,
+        605
+      ],
+      "bbox": [
+        642,
+        556,
+        719,
+        656
+      ],
+      "graspable": true
+    },
+    {
+      "label": "black cube",
+      "category": "cube",
+      "colour": "black",
+      "center": [
+        923,
+        257
+      ],
+      "bbox": [
+        881,
+        208,
+        972,
+        314
+      ],
+      "graspable": true
+    },
+    {
+      "label": "black screw",
+      "category": "screw",
+      "center": [
+        420,
+        712
+      ],
+      "bbox": [
+        410,
+        688,
+        435,
+        736
+      ],
+      "graspable": true
+    },
+    {
+      "label": "black screw",
+      "category": "screw",
+      "center": [
+        457,
+        675
+      ],
+      "bbox": [
+        446,
+        669,
+        476,
+        688
+      ],
+      "graspable": true
+    },
+    {
+      "label": "black screw",
+      "category": "screw",
+      "center": [
+        492,
+        644
+      ],
+      "bbox": [
+        481,
+        627,
+        507,
+        656
+      ],
+      "graspable": true
+    },
+    {
+      "label": "black screw",
+      "category": "screw",
+      "center": [
+        517,
+        673
+      ],
+      "bbox": [
+        507,
+        656,
+        530,
+        692
+      ],
+      "graspable": true
+    },
+    {
+      "label": "black screw",
+      "category": "screw",
+      "center": [
+        542,
+        707
+      ],
+      "bbox": [
+        529,
+        694,
+        560,
+        726
+      ],
+      "graspable": true
+    },
+    {
+      "label": "black screw",
+      "category": "screw",
+      "center": [
+        552,
+        631
+      ],
+      "bbox": [
+        539,
+        614,
+        566,
+        649
+      ],
+      "graspable": true
+    },
+    {
+      "label": "black screw",
+      "category": "screw",
+      "center": [
+        596,
+        692
+      ],
+      "bbox": [
+        585,
+        678,
+        616,
+        706
+      ],
+      "graspable": true
+    }
+  ],
+  "bin": {
+    "label": "collection bin",
+    "center": [
+      535,
+      221
+    ],
+    "bbox": [
+      464,
+      154,
+      612,
+      341
+    ]
+  }
+}

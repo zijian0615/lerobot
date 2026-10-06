@@ -119,6 +119,14 @@ class OpenCVCamera(Camera):
 
         self.rotation: int | None = get_cv2_rotation(config.rotation)
         self.backend: int = config.backend
+        # CAP_ANY prefers FFmpeg on this build, which opens V4L nodes but cannot
+        # set FOURCC or deliver frames. Device nodes need the V4L2 backend.
+        if (
+            platform.system() == "Linux"
+            and self.backend == cv2.CAP_ANY
+            and str(self.index_or_path).startswith("/dev/video")
+        ):
+            self.backend = cv2.CAP_V4L2
 
         if self.height and self.width:
             self.capture_width, self.capture_height = self.width, self.height
@@ -168,6 +176,8 @@ class OpenCVCamera(Camera):
         self._start_read_thread()
 
         if warmup and self.warmup_s > 0:
+            # Some UVC cameras take longer than warmup_s to deliver the first frame.
+            self.async_read(timeout_ms=max(self.warmup_s, 5) * 1000)
             start_time = time.time()
             while time.time() - start_time < self.warmup_s:
                 self.async_read(timeout_ms=self.warmup_s * 1000)
@@ -239,9 +249,12 @@ class OpenCVCamera(Camera):
 
         success = self.videocapture.set(cv2.CAP_PROP_FPS, float(self.fps))
         actual_fps = self.videocapture.get(cv2.CAP_PROP_FPS)
-        # Use math.isclose for robust float comparison
+        # Use math.isclose for robust float comparison. V4L2 often refuses the
+        # requested rate while still streaming; rollout paces frames itself.
         if not success or not math.isclose(self.fps, actual_fps, rel_tol=1e-3):
-            raise RuntimeError(f"{self} failed to set fps={self.fps} ({actual_fps=}).")
+            logger.warning(
+                f"{self} failed to set fps={self.fps} ({actual_fps=}, {success=}). Continuing at the device rate."
+            )
 
     def _validate_fourcc(self) -> None:
         """Validates and sets the camera's FOURCC code."""
@@ -277,13 +290,14 @@ class OpenCVCamera(Camera):
         height_success = self.videocapture.set(cv2.CAP_PROP_FRAME_HEIGHT, float(self.capture_height))
 
         actual_width = int(round(self.videocapture.get(cv2.CAP_PROP_FRAME_WIDTH)))
-        if not width_success or self.capture_width != actual_width:
+        # V4L2 often returns False from set() when the requested size is already active.
+        if self.capture_width != actual_width:
             raise RuntimeError(
                 f"{self} failed to set capture_width={self.capture_width} ({actual_width=}, {width_success=})."
             )
 
         actual_height = int(round(self.videocapture.get(cv2.CAP_PROP_FRAME_HEIGHT)))
-        if not height_success or self.capture_height != actual_height:
+        if self.capture_height != actual_height:
             raise RuntimeError(
                 f"{self} failed to set capture_height={self.capture_height} ({actual_height=}, {height_success=})."
             )

@@ -509,7 +509,7 @@ def _mirror_latest(src: Path, dest: Path) -> None:
 def main() -> int:
     p = argparse.ArgumentParser(description="Conservative Fanuc single grasp")
     p.add_argument("--calib", type=Path, default=DEFAULT_CALIB)
-    p.add_argument("--camera", type=str, default="/dev/video0")
+    p.add_argument("--camera", type=str, default=None)
     p.add_argument("--robot-host", dest="robot_host", type=str, default=None)
     p.add_argument("--object", type=str, default=None, help="Optional name hint; otherwise taken from the prompt")
     p.add_argument("--instruction", type=str, default=None, help="Task prompt. If omitted, asked at runtime.")

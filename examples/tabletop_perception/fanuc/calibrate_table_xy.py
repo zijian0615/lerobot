@@ -526,7 +526,7 @@ def _run_points(args) -> int:
 def main() -> int:
     p = argparse.ArgumentParser(description="Fanuc table XY calibration")
     p.add_argument("--calib", type=Path, default=DEFAULT_CALIB)
-    p.add_argument("--camera", type=str, default="/dev/video0")
+    p.add_argument("--camera", type=str, default=None)
     p.add_argument("--robot-host", "--robot-ip", dest="robot_host", type=str, default=None)
     p.add_argument("--seed", action="store_true", help="Read current TCP and write UF=table seed (no motion)")
     p.add_argument("--object", type=str, default=None)
@@ -544,7 +544,7 @@ def main() -> int:
     p.add_argument("--append", action="store_true")
     p.add_argument("--samples", type=Path, default=None)
     p.add_argument("--hover-z-mm", type=float, default=None)
-    p.add_argument("--speed", type=float, default=40.0)
+    p.add_argument("--speed", type=float, default=200.0)
     p.add_argument("--step-mm", type=float, default=5.0)
     p.add_argument("--type-delta", action="store_true")
     p.add_argument("--use-global-affine", action="store_true")

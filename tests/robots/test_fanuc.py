@@ -681,3 +681,39 @@ def test_pose_encode_decode_roundtrip():
     assert math.isclose(decoded["j3"], 90.0, abs_tol=1e-6)
     assert math.isclose(decoded["j5"], -45.0, abs_tol=1e-6)
     assert math.isclose(decode_angle_degrees(0.0, 0.0), 0.0)
+
+
+def test_joint_motion_sends_pendant_degrees(fanuc_config):
+    fanuc_config.motion = "joint"
+    factory = SocketFactory()
+    robot = Fanuc(fanuc_config)
+    with patch("lerobot.robots.fanuc.fanuc.socket.socket", factory):
+        robot.connect()
+        try:
+            robot.pause_state_poll()
+            assert tuple(robot.action_features)[0] == "J1.pos"
+            sent = robot.send_action(
+                {
+                    "J1.pos": -20.0,
+                    "J2.pos": 35.0,
+                    "J3.pos": -10.0,
+                    "J4.pos": 0.0,
+                    "J5.pos": -40.0,
+                    "J6.pos": 15.0,
+                    "gripper.pos": 1.0,
+                }
+            )
+            assert sent["J2.pos"] == 35.0
+            assert sent["gripper.pos"] == 1.0
+            motion = next(
+                p for p in _sent_payloads(factory.session_sock) if p.get("Instruction") == "FRC_JointMotion"
+            )
+            assert motion["JointAngle"]["J1"] == -20.0
+            assert motion["JointAngle"]["J3"] == 25.0
+            assert motion["JointAngle"]["J6"] == 15.0
+            assert motion["JointAngle"]["J9"] == 0.0
+            assert motion["SpeedType"] == "Percent"
+            assert motion["TermType"] == "FINE"
+            assert motion["PortNumber"] == fanuc_config.gripper_close_port_number
+        finally:
+            robot.disconnect()

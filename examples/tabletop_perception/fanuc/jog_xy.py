@@ -34,7 +34,7 @@ _HELP = (
     "  w = +X   s = -X   a = +Y   d = -Y\n"
     "Line mode — type a line and Enter:\n"
     "  w          one step +X\n"
-    "  d 3        three steps -Y\n"
+    "  d 20       one smooth move of 20 steps (not 20 separate moves)\n"
     "  step 10    set step mm\n"
     "  r          reset to start hover\n"
     "  ok / done  confirm\n"
@@ -95,7 +95,7 @@ def jog_xy_wasd(
     start_xy_mm: tuple[float, float],
     z_mm: float,
     wpr_deg: tuple[float, float, float],
-    speed: float = 40.0,
+    speed: float = 200.0,
     step_mm: float = 5.0,
 ) -> tuple[float, float]:
     x0, y0 = float(start_xy_mm[0]), float(start_xy_mm[1])
@@ -117,13 +117,17 @@ def jog_xy_wasd(
         )
 
     def _status() -> None:
-        print(f"  pose=({x:.1f}, {y:.1f})  Δ=({x - x0:+.1f}, {y - y0:+.1f}) mm  step={step:.1f}")
+        print(
+            f"  pose=({x:.1f}, {y:.1f})  Δ=({x - x0:+.1f}, {y - y0:+.1f}) mm  "
+            f"step={step:.1f}  speed={speed:.0f} mm/s"
+        )
 
-    def _apply_key(ch: str) -> None:
+    def _apply_delta(dx: float, dy: float) -> None:
         nonlocal x, y
-        sx, sy = _KEY_DELTA_BASE_MM[ch]
-        x += sx * step
-        y += sy * step
+        if abs(dx) < 1e-6 and abs(dy) < 1e-6:
+            return
+        x += dx
+        y += dy
         _goto(x, y)
 
     _status()
@@ -149,7 +153,7 @@ def jog_xy_wasd(
                 i += 1
                 continue
             if tok == "step" and i + 1 < len(tokens):
-                step = max(1.0, min(50.0, float(tokens[i + 1])))
+                step = max(1.0, min(200.0, float(tokens[i + 1])))
                 print(f"  step → {step:.1f} mm")
                 i += 2
                 continue
@@ -158,14 +162,18 @@ def jog_xy_wasd(
                 if i + 1 < len(tokens) and tokens[i + 1].isdigit():
                     n = max(1, int(tokens[i + 1]))
                     i += 1
-                for _ in range(n):
-                    _apply_key(tok)
+                sx, sy = _KEY_DELTA_BASE_MM[tok]
+                _apply_delta(sx * step * n, sy * step * n)
                 _status()
                 i += 1
                 continue
             if all(c in _KEY_DELTA_BASE_MM for c in tok):
+                dx = dy = 0.0
                 for c in tok:
-                    _apply_key(c)
+                    sx, sy = _KEY_DELTA_BASE_MM[c]
+                    dx += sx * step
+                    dy += sy * step
+                _apply_delta(dx, dy)
                 _status()
                 i += 1
                 continue
