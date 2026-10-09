@@ -7,7 +7,7 @@ import os
 import sys
 import math
 import numpy as np
-from pxr import UsdGeom, UsdLux, UsdPhysics, UsdShade, Sdf, Gf
+from pxr import Usd, UsdGeom, UsdLux, UsdPhysics, UsdShade, Sdf, Gf
 import omni.usd
 from isaacsim.core.utils.stage import add_reference_to_stage
 from isaacsim.storage.native import get_assets_root_path
@@ -64,9 +64,25 @@ _MATERIAL_SPEC = {
     "black_anodised":   ((0.030, 0.030, 0.033), 0.35, 0.40),
     "base_grey":        ((0.200, 0.205, 0.210), 0.00, 0.50),
     # "BLOCK-03", 3D-printed amber-yellow PLA, as in the physical cell
-    "bin_yellow":       ((0.820, 0.560, 0.055), 0.00, 0.62),
+    # REAL (2026-10-08): the printed bin reads amber, not lemon, from the table camera; from the side it is
+    # paler still (translucent PLA against the window), which an albedo cannot do -- this splits the two.
+    "bin_yellow":       ((0.850, 0.500, 0.120), 0.00, 0.70),
     "duct_tape":        ((0.380, 0.390, 0.395), 0.05, 0.78),
 }
+
+
+def recolor_robot(stage):
+    """Repaint the asset's pure-yellow arm materials with C.ROBOT_YELLOW."""
+    looks = stage.GetPrimAtPath(C.ROBOT_PRIM + "/Looks")
+    if not looks.IsValid() or getattr(C, "ROBOT_YELLOW", None) is None:
+        return
+    for prim in Usd.PrimRange(looks):
+        if not prim.IsA(UsdShade.Shader):
+            continue
+        inp = UsdShade.Shader(prim).GetInput("diffuse_color_constant")
+        col = inp.Get() if inp else None
+        if col is not None and abs(col[0] - 1) < 1e-3 and abs(col[1] - 1) < 1e-3 and col[2] < 1e-3:
+            inp.Set(Gf.Vec3f(*C.ROBOT_YELLOW))
 
 
 def init_materials(stage):
@@ -361,14 +377,15 @@ def build(stage, with_objects=True):
         (0.23, 0.23, 0.25), mat="floor_grey")
 
     tw, td, tt = C.TABLE_SIZE
+    top = C.TABLE_TOP_Z + C.SURFACE_DZ - C.MAT_T  # the table top, under the surface sheet
     box(stage, "/World/Table", (tw, td, tt),
-        (C.TABLE_CENTER[0], C.TABLE_CENTER[1], C.TABLE_TOP_Z - tt / 2.0),
+        (C.TABLE_CENTER[0], C.TABLE_CENTER[1], top - tt / 2.0),
         (0.88, 0.88, 0.875), mat="table_white")
     # The printed laminate covers the whole top, and is what objects rest on.
     # (Do not parent anything under /World/Mat -- it is a scaled Cube, and
     # children inherit the scale.)
-    matp = box(stage, "/World/Mat", (tw, td, C.SURFACE_DZ),
-               (C.TABLE_CENTER[0], C.TABLE_CENTER[1], C.TABLE_TOP_Z + C.SURFACE_DZ / 2),
+    matp = box(stage, "/World/Mat", (tw, td, C.MAT_T),
+               (C.TABLE_CENTER[0], C.TABLE_CENTER[1], top + C.MAT_T / 2),
                (0.90, 0.90, 0.895), mat="table_white")
     bind_physics_material(matp)
 
@@ -385,10 +402,13 @@ def build(stage, with_objects=True):
         UsdShade.MaterialBindingAPI.Apply(base).Bind(
             MATS["base_grey"], bindingStrength=UsdShade.Tokens.strongerThanDescendants)
 
+    recolor_robot(stage)
+
     if C.MAT_MARKINGS:
         add_mat_print(stage)
     if with_objects:
-        add_props(stage)
+        if C.INCLUDE_FIXTURE:
+            add_props(stage)
         add_grasp_cubes(stage)
         add_screws(stage)
         add_bin(stage)

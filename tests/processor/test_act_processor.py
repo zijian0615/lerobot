@@ -410,3 +410,34 @@ def test_act_processor_bfloat16_device_float32_normalizer():
     assert normalizer_step.dtype == torch.bfloat16
     for stat_tensor in normalizer_step._tensor_stats[OBS_STATE].values():
         assert stat_tensor.dtype == torch.bfloat16
+
+
+def test_act_processor_resize_shape():
+    """resize_shape inserts the image resize between batching and device placement, as a saved
+    policy_preprocessor.json from a resize_shape-trained ACT lists it."""
+    from lerobot.processor import ImageCropResizeProcessorStep
+    from lerobot.utils.constants import OBS_IMAGES
+
+    config = create_default_config()
+    config.resize_shape = (48, 64)
+    image_key = f"{OBS_IMAGES}.table"
+    config.input_features[image_key] = PolicyFeature(type=FeatureType.VISUAL, shape=(3, 108, 192))
+    config.normalization_mapping[FeatureType.VISUAL] = NormalizationMode.MEAN_STD
+    stats = create_default_stats()
+    stats[image_key] = {"mean": torch.zeros(3, 1, 1), "std": torch.ones(3, 1, 1)}
+
+    preprocessor, _ = make_act_pre_post_processors(config, stats)
+    kinds = [type(step) for step in preprocessor.steps]
+    assert kinds[:4] == [
+        RenameObservationsProcessorStep,
+        AddBatchDimensionProcessorStep,
+        ImageCropResizeProcessorStep,
+        DeviceProcessorStep,
+    ]
+    out = preprocessor({OBS_STATE: torch.zeros(7), image_key: torch.rand(3, 108, 192), ACTION: torch.zeros(4)})
+    assert out[image_key].shape == (1, 3, 48, 64)
+
+
+def test_act_config_rejects_bad_resize_shape():
+    with pytest.raises(ValueError, match="resize_shape"):
+        ACTConfig(resize_shape=(480,))

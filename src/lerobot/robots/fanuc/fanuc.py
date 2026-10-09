@@ -24,12 +24,22 @@ from collections.abc import Callable
 from concurrent.futures import Future
 from typing import Any
 
+import numpy as np
+
 from lerobot.cameras.utils import make_cameras_from_configs
 from lerobot.types import RobotAction, RobotObservation
 
 from ..robot import Robot
 from .config_fanuc import FanucConfig
-from .pose import FANUC_RAW_NAMES, controller_degrees, decode_fanuc_pose_dict, raw_fanuc_pose_dict, wrap_w_degrees
+from .er4ia_fk import controller_tcp_pose, sim_from_controller_deg
+from .pose import (
+    FANUC_RAW_NAMES,
+    controller_degrees,
+    decode_fanuc_pose_dict,
+    raw_fanuc_pose_dict,
+    wpr_from_rotation_matrix,
+    wrap_w_degrees,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +65,13 @@ _JOINT_LIMITS_DEG = {
     "J5": (-120.0, 120.0),
     "J6": (-360.0, 360.0),
 }
+
+
+def _limit_step(origin: np.ndarray, target: np.ndarray, max_m: float) -> np.ndarray:
+    """Pull target back onto the sphere of radius max_m around origin if it lies outside."""
+    delta = target - origin
+    distance = float(np.linalg.norm(delta))
+    return target if distance <= max_m else origin + delta * (max_m / distance)
 
 
 def _joints_deg_from_response(resp: dict[str, Any]) -> tuple[float, ...] | None:
@@ -102,6 +119,13 @@ class Fanuc(Robot):
 
         self._latest_pose: tuple[float, ...] | None = None
         self._latest_joints: tuple[float, ...] | None = None
+        # Joint mode: the controller's active UTOOL / UFRAME (X, Y, Z, W, P, R), read at connect.
+        self._utool_data: tuple[float, ...] | None = None
+        # Joint mode: the last TCP position (m) actually sent; the next target is limited against it.
+        self._joint_target_m: np.ndarray | None = None
+        # Joint mode: the last joint target (sim degrees) actually sent; each step is limited against it.
+        self._joint_target_deg: np.ndarray | None = None
+        self._uframe_data: tuple[float, ...] | None = None
         self._latest_t: float | None = None
         self._latest_tick: int | None = None
         self._latest_configuration: dict[str, Any] | None = None
@@ -176,6 +200,12 @@ class Fanuc(Robot):
         except Exception:
             self._close_socket()
             raise
+        if self.config.motion == "joint":
+            try:
+                self._read_tool_and_frame()
+            except Exception:
+                self._close_socket()
+                raise
         self._motion_configuration = {
             "UToolNumber": self._utool,
             "UFrameNumber": self._uframe,
@@ -188,6 +218,8 @@ class Fanuc(Robot):
             "Turn6": 0,
         }
         self._latest_configuration = dict(self._motion_configuration)
+        self._joint_target_m = None
+        self._joint_target_deg = None
         self._connected = True
 
         self._recv_thread = threading.Thread(target=self._recv_loop, name="fanuc-recv", daemon=True)
@@ -330,8 +362,10 @@ class Fanuc(Robot):
     def send_action(self, action: RobotAction) -> RobotAction:
         """Send a motion command and return the action that was sent.
 
-        ``motion="cartesian"`` sends ``FRC_LinearMotion``. ``motion="joint"`` sends
-        ``FRC_JointMotion`` from pendant degrees named ``J1.pos``..``J6.pos``.
+        ``motion="cartesian"`` sends ``FRC_LinearMotion``. ``motion="joint"`` takes
+        sim joint degrees named ``J1.pos``..``J6.pos`` (J3 relative to the upper arm),
+        maps them through ER-4iA FK onto the controller's UTOOL TCP in the user frame,
+        and sends ``FRC_LinearMotion``.
         """
         self._require_connected()
         if self.config.motion == "joint":
@@ -499,63 +533,94 @@ class Fanuc(Robot):
             gripper = None
         return joints, gripper
 
+    def _read_tool_and_frame(self) -> None:
+        """Read the active UTOOL (and UFRAME unless World) so joint mode targets the real TCP."""
+
+        def frame_values(command: str, number_key: str, number: int) -> tuple[float, ...]:
+            self._send_json({"Command": command, number_key: int(number), "Group": int(self._group)})
+            resp = self._recv_until(lambda r: r.get("Command") == command)
+            if int(resp.get("ErrorID", -1)) != 0:
+                raise RuntimeError(f"{command} {number_key}={number} failed: {resp}")
+            frame = resp["Frame"]
+            return tuple(float(frame[key]) for key in ("X", "Y", "Z", "W", "P", "R"))
+
+        self._utool_data = frame_values("FRC_ReadUToolData", "ToolNumber", self._utool)
+        self._uframe_data = (
+            frame_values("FRC_ReadUFrameData", "FrameNumber", self._uframe) if self._uframe else None
+        )
+        logger.info("Joint mode UTOOL %s=%s UFRAME %s=%s", self._utool, self._utool_data, self._uframe, self._uframe_data)
+
     def _send_joint_action(self, action: RobotAction) -> RobotAction:
         joints, gripper = self._joint_values(action)
         for index, value in enumerate(joints):
             lo, hi = _JOINT_LIMITS_DEG[f"J{index + 1}"]
             if not lo <= value <= hi:
                 raise ValueError(f"J{index + 1}={value} deg is outside [{lo}, {hi}]")
-        seq_id = self.seq_id
-        self.seq_id += 1
-        # ReadJointAngles / the policy use pendant angles (J3 relative to J2).
-        # FRC_JointMotion expects Fanuc ground-plane J3 (J2 + pendant J3). Sending
-        # the pendant value makes this pose look like J3 ≈ -69°, which is RMIT-044.
-        wire = list(joints)
-        wire[2] = joints[1] + joints[2]
-        joint_angle = {f"J{i + 1}": wire[i] for i in range(6)}
-        joint_angle.update({"J7": 0.0, "J8": 0.0, "J9": 0.0})
-        packet: dict[str, Any] = {
-            "Instruction": "FRC_JointMotion",
-            "SequenceID": seq_id,
-            "JointAngle": joint_angle,
-            "SpeedType": "Percent",
-            "Speed": int(self.config.joint_speed_percent),
-            "TermType": "FINE",
-            "TermValue": 100,
+        if self._utool_data is None:
+            raise RuntimeError("UTOOL data was not read at connect")
+        # Limit the joint step against the previous target (or the live joints): a policy can jump between
+        # action chunks (J6 109 deg in one step on the real arm), which a FRC_LinearMotion turns into a wrist
+        # flick that faults the controller. The whole vector is scaled, so the motion keeps its direction.
+        anchor_q = self._joint_target_deg
+        if anchor_q is None and self._latest_joints is not None:
+            anchor_q = np.array(sim_from_controller_deg(self._latest_joints), dtype=float)
+        if anchor_q is not None:
+            dq = np.asarray(joints, dtype=float) - anchor_q
+            worst = float(np.max(np.abs(dq)))
+            if worst > self.config.joint_max_step_deg:
+                joints = list(anchor_q + dq * (self.config.joint_max_step_deg / worst))
+        rotation, wanted = controller_tcp_pose(np.radians(joints), self._utool_data, self._uframe_data)
+        wanted[2] += self.config.joint_z_offset_mm / 1000.0
+        if self.config.joint_z_min_mm is not None:
+            wanted[2] = max(wanted[2], self.config.joint_z_min_mm / 1000.0)
+        position = wanted.copy()
+        live = None if self._latest_pose is None else np.array(self._latest_pose[:3], dtype=float) / 1000.0
+        # Limit each step against the previous target, not the live pose: the controller then gets one
+        # continuous path to blend at joint_tcp_speed_mm_s. Stepping from the live pose made every target
+        # trail the last one, so each CNT segment braked and the arm fell 3-9 cm behind the policy.
+        anchor = self._joint_target_m if self._joint_target_m is not None else live
+        if anchor is not None:
+            position = _limit_step(anchor, position, self.config.joint_max_step_mm / 1000.0)
+        if live is not None:  # never lead the real arm by more than this
+            position = _limit_step(live, position, self.config.joint_max_lead_mm / 1000.0)
+        w, p, r = wpr_from_rotation_matrix(rotation.tolist())
+        linear: dict[str, Any] = {
+            "j0": float(position[0] * 1000.0),
+            "j1": float(position[1] * 1000.0),
+            "j2": float(position[2] * 1000.0),
+            "j3": float(w),
+            "j4": float(p),
+            "j5": float(r),
+            "speed": int(self.config.joint_tcp_speed_mm_s),
+            "speed_type": "mmSec",
+            "term_type": "CNT",
+            "term_value": 50,
+            "stream": True,
         }
         if gripper is not None:
             closed = float(gripper) >= 0.5
-        else:
-            closed = None
-        if closed is not None and closed != (None if self._last_stream_j7 is None else self._last_stream_j7 >= 0.5):
-            packet.update(
-                {
-                    "LCBType": str(self.config.gripper_lcb_type or "TA"),
-                    "LCBValue": int(self.config.gripper_lcb_value),
-                    "PortType": int(self.config.gripper_port_type or 2),
-                    "PortNumber": int(
-                        self.config.gripper_close_port_number if closed else self.config.gripper_open_port_number
-                    ),
-                    "PortValue": "ON",
-                }
-            )
-            self._commanded_gripper = float(gripper)
-            self._last_stream_j7 = float(gripper)
-        fut: Future = Future()
-        with self._pending_lock:
-            self._pending_futures[seq_id] = fut
-        self._send_json(packet)
+            last_closed = None if self._last_stream_j7 is None else self._last_stream_j7 >= 0.5
+            if closed != last_closed:
+                linear["j7"] = 1.0 if closed else 0.0
         logger.info(
-            "FRC_JointMotion seq=%s joints=%s wire_j3=%s gripper=%s",
-            seq_id,
+            "joint->linear joints=%s gripper=%s xyz_mm=(%.1f, %.1f, %.1f) short_of_policy_mm=%.1f lead_mm=%s",
             [round(v, 2) for v in joints],
-            round(wire[2], 2),
             gripper,
+            linear["j0"],
+            linear["j1"],
+            linear["j2"],
+            float(np.linalg.norm(wanted - position) * 1000.0),
+            None if live is None else round(float(np.linalg.norm(position - live) * 1000.0), 1),
         )
-        sent = {JOINT_POS_NAMES[i]: joints[i] for i in range(6)}
-        if gripper is not None:
-            sent["gripper.pos"] = float(gripper)
-        sent["sequence_id"] = seq_id
+        saved = self.config.motion
+        self.config.motion = "cartesian"
+        try:
+            sent = self.send_action(linear)
+        finally:
+            self.config.motion = saved
+        if "sequence_id" in sent:  # a stream send can be skipped while acks are pending
+            self._joint_target_m = position
+            self._joint_target_deg = np.asarray(joints, dtype=float)
         return sent
 
     def reset_episode(self, timeout_s: float = 20.0) -> dict[str, Any] | None:
@@ -575,6 +640,8 @@ class Fanuc(Robot):
         self._stream_sent_mono = None
         self._last_stream_j7 = None
         self._commanded_gripper = 0.0
+        self._joint_target_m = None
+        self._joint_target_deg = None
         self._command_replies.pop("SIM_Reset", None)
         self._send_json({"Command": "SIM_Reset"})
         deadline = time.time() + timeout_s
@@ -609,8 +676,10 @@ class Fanuc(Robot):
                     time.sleep(0.01)
             if self._latest_joints is None:
                 raise RuntimeError("No joint observation received yet.")
+            # The policy was trained on sim joints: J3 relative to the upper arm.
+            joints = sim_from_controller_deg(self._latest_joints)
             obs: RobotObservation = {
-                name: float(value) for name, value in zip(JOINT_POS_NAMES[:6], self._latest_joints, strict=True)
+                name: float(value) for name, value in zip(JOINT_POS_NAMES[:6], joints, strict=True)
             }
             if self._latest_gripper_state is not None:
                 gripper = float(self._latest_gripper_state)
@@ -619,9 +688,10 @@ class Fanuc(Robot):
             else:
                 gripper = 0.0
             obs["gripper.pos"] = gripper
+            # Native camera resolution, as recorded. The policy's pre-processor resizes (e.g. to 480x640)
+            # with the same op it used in training; resizing here would put a second, different resize in front.
             for cam_name, camera in self.cameras.items():
-                frame = camera.read()
-                obs[cam_name] = self._resize_hw(frame, 224, 224)
+                obs[cam_name] = camera.read()
             return obs
 
         x, y, z, w, p, r = self._latest_pose
@@ -709,22 +779,11 @@ class Fanuc(Robot):
             )
         return int(err_id or 0)
 
-    @staticmethod
-    def _resize_hw(frame: Any, height: int, width: int) -> Any:
-        if frame.shape[0] == height and frame.shape[1] == width:
-            return frame
-        import cv2
-
-        return cv2.resize(frame, (width, height))
-
     @property
     def observation_features(self) -> dict[str, type | tuple]:
         names = JOINT_POS_NAMES if self.config.motion == "joint" else FANUC_RAW_NAMES
         feats: dict[str, type | tuple] = {name: float for name in names}
         for cam_name, camera in {**self.config.cameras, **self.cameras}.items():
-            if self.config.motion == "joint":
-                feats[cam_name] = (224, 224, 3)
-                continue
             height = getattr(camera, "height", None) or 480
             width = getattr(camera, "width", None) or 640
             feats[cam_name] = (int(height), int(width), 3)
@@ -773,6 +832,8 @@ class Fanuc(Robot):
                 try:
                     if self.config.motion == "joint":
                         self._send_json({"Command": "FRC_ReadJointAngles", "Group": self._group})
+                        # The step limit in _send_joint_action needs the live TCP.
+                        self._send_json({"Command": "FRC_ReadCartesianPosition", "Group": self._group})
                     else:
                         self._send_json({"Command": "FRC_ReadCartesianPosition", "Group": self._group})
                     if self._gripper_state_port_number is not None:

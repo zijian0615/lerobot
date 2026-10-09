@@ -141,6 +141,15 @@ class OpenCVCamera(Camera):
         """Checks if the camera is currently connected and opened."""
         return isinstance(self.videocapture, cv2.VideoCapture) and self.videocapture.isOpened()
 
+    def _apply_exposure(self, exposure: float) -> None:
+        """Switch to manual exposure and set it. Some UVC cameras ignore exposure written before the
+        stream starts, so one frame is read first."""
+        self.videocapture.read()
+        self.videocapture.set(cv2.CAP_PROP_AUTO_EXPOSURE, 1)  # V4L2 menu value 1 = manual
+        if not self.videocapture.set(cv2.CAP_PROP_EXPOSURE, float(exposure)):
+            raise RuntimeError(f"{self} failed to set exposure={exposure}.")
+        logger.info(f"{self} exposure set to {self.videocapture.get(cv2.CAP_PROP_EXPOSURE)}")
+
     @check_if_already_connected
     def connect(self, warmup: bool = True) -> None:
         """
@@ -173,6 +182,8 @@ class OpenCVCamera(Camera):
             )
 
         self._configure_capture_settings()
+        if self.config.exposure is not None:
+            self._apply_exposure(self.config.exposure)
         self._start_read_thread()
 
         if warmup and self.warmup_s > 0:

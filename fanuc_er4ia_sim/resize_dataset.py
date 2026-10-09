@@ -1,4 +1,8 @@
-"""Write a 224x224 copy of the screw dataset for ACT."""
+"""Write a 224x224 copy of a screw dataset for ACT.
+
+    uv run python fanuc_er4ia_sim/resize_dataset.py --src-root ... --src-repo ... --dst-root ... --dst-repo ... [--push]
+"""
+import argparse
 from pathlib import Path
 import shutil
 
@@ -8,8 +12,6 @@ from PIL import Image
 
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
-SRC = Path("fanuc_er4ia_sim/data/fanuc_er4ia_screw_v3")
-DST = Path("fanuc_er4ia_sim/data/fanuc_er4ia_screw_224")
 CAMS = ("table", "wrist", "side")
 SIZE = (224, 224)
 
@@ -25,9 +27,17 @@ def to_uint8(image: torch.Tensor) -> np.ndarray:
 
 
 def main() -> None:
-    src = LeRobotDataset("zijian2022/fanuc_er4ia_screw", root=SRC)
-    if DST.exists():
-        shutil.rmtree(DST)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--src-root", type=Path, default=Path("fanuc_er4ia_sim/data/fanuc_er4ia_screw_v3"))
+    parser.add_argument("--src-repo", default="zijian2022/fanuc_er4ia_screw")
+    parser.add_argument("--dst-root", type=Path, default=Path("fanuc_er4ia_sim/data/fanuc_er4ia_screw_224"))
+    parser.add_argument("--dst-repo", default="zijian2022/fanuc_er4ia_screw_224")
+    parser.add_argument("--push", action="store_true")
+    parser.add_argument("--private", action="store_true")
+    args = parser.parse_args()
+    src = LeRobotDataset(args.src_repo, root=args.src_root)
+    if args.dst_root.exists():
+        shutil.rmtree(args.dst_root)
     features = {
         f"observation.images.{name}": {
             "dtype": "video",
@@ -39,10 +49,10 @@ def main() -> None:
     features["observation.state"] = src.meta.features["observation.state"]
     features["action"] = src.meta.features["action"]
     dst = LeRobotDataset.create(
-        repo_id="zijian2022/fanuc_er4ia_screw_224",
+        repo_id=args.dst_repo,
         fps=src.fps,
         features=features,
-        root=DST,
+        root=args.dst_root,
         robot_type="fanuc_er4ia",
         use_videos=True,
         image_writer_processes=0,
@@ -69,7 +79,10 @@ def main() -> None:
             print(f"[resize] {index}/{len(src)}", flush=True)
     dst.save_episode()
     dst.finalize()
-    print(f"[resize] {DST} frames {len(src)}")
+    print(f"[resize] {args.dst_root} frames {len(src)}")
+    if args.push:
+        dst.push_to_hub(private=True if args.private else None)
+        print(f"[resize] pushed {args.dst_repo}")
 
 
 if __name__ == "__main__":

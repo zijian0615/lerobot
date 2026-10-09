@@ -13,6 +13,8 @@ import shutil
 from pathlib import Path
 
 import numpy as np
+import torch
+import torchvision.transforms.functional as F
 from PIL import Image
 
 from lerobot.datasets.dataset_metadata import CODEBASE_VERSION
@@ -29,17 +31,37 @@ def main() -> int:
     parser.add_argument("--repo-id", default="local/fanuc_er4ia_screw")
     parser.add_argument("--push", action="store_true")
     parser.add_argument("--private", action="store_true")
+    parser.add_argument("--keep-failed", action="store_true", help="also pack episodes whose screw missed the bin")
+    parser.add_argument("--resize", type=int, nargs=2, default=None, metavar=("H", "W"),
+                        help="store every camera at H x W, resized like the policy pre-processor does it")
     args = parser.parse_args()
     if (args.src / "frames.json").is_file():
         sources = [args.src]
     else:
         sources = sorted(p for p in args.src.iterdir() if (p / "frames.json").is_file())
+    if not args.keep_failed:
+        failed = [
+            p for p in sources
+            if not all(s["in_bin"] for s in json.loads((p / "frames.json").read_text()).get("final_screws", []))
+        ]
+        for p in failed:
+            print(f"[pack] skip {p.name}: screw not in the bin", flush=True)
+        sources = [p for p in sources if p not in failed]
     if not sources:
         raise FileNotFoundError(args.src)
+    def load(path):
+        image = np.asarray(Image.open(path).convert("RGB"))
+        if args.resize is None:
+            return image
+        # Same op and order as ImageCropResizeProcessorStep: float [0, 1] -> F.resize -> clamp
+        t = torch.from_numpy(image).permute(2, 0, 1).float() / 255.0
+        t = F.resize(t, list(args.resize)).clamp(0.0, 1.0)
+        return (t.permute(1, 2, 0).numpy() * 255.0).round().astype(np.uint8)
+
     meta = json.loads((sources[0] / "frames.json").read_text())
     frames = meta["frames"]
     sample = {
-        name: np.asarray(Image.open(sources[0] / name / frames[0]["images"][name]).convert("RGB"))
+        name: load(sources[0] / name / frames[0].get("images", {}).get(name, "000000.png"))
         for name in ("table", "wrist", "side")
     }
     features = {
@@ -75,16 +97,15 @@ def main() -> int:
             for frame in frames
         ]
         actions = states[1:] + [states[-1]]
-        for frame, state, action in zip(frames, states, actions, strict=True):
+        for frame_index, (frame, state, action) in enumerate(zip(frames, states, actions, strict=True)):
             row = {
                 "observation.state": state,
                 "action": action,
                 "task": episode["task"],
             }
             for name in ("table", "wrist", "side"):
-                row[f"observation.images.{name}"] = np.asarray(
-                    Image.open(src / name / frame["images"][name]).convert("RGB")
-                )
+                image_name = frame.get("images", {}).get(name, f"{frame_index:06d}.png")
+                row[f"observation.images.{name}"] = load(src / name / image_name)
             dataset.add_frame(row)
         dataset.save_episode()
         total += len(frames)
