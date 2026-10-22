@@ -4,6 +4,7 @@ import pickle
 import socket
 
 import torch
+import torchvision.transforms.functional as F
 
 from lerobot.policies.act.modeling_act import ACTPolicy
 from lerobot.policies.factory import make_pre_post_processors
@@ -14,6 +15,8 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--ckpt", required=True)
     parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--resize", type=int, nargs=2, default=[480, 640], metavar=("H", "W"),
+                        help="resize every camera first, as the policy's image_crop_resize_processor did in training")
     args = parser.parse_args()
     policy = ACTPolicy.from_pretrained(args.ckpt)
     policy.to("cuda")
@@ -23,7 +26,8 @@ def main() -> None:
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server.bind(("127.0.0.1", args.port))
     server.listen(1)
-    print(f"[act] listening {args.port}", flush=True)
+    cams = [k.split(".")[-1] for k in policy.config.input_features if k.startswith("observation.images.")]
+    print(f"[act] listening {args.port}, cameras {cams}, images resized to {args.resize[0]}x{args.resize[1]}", flush=True)
     while True:
         conn, _ = server.accept()
         with conn:
@@ -45,7 +49,11 @@ def main() -> None:
                 else:
                     batch = {}
                     for key, image in msg["images"].items():
+                        if f"observation.images.{key}" not in policy.config.input_features:
+                            continue  # e.g. a two-camera policy: drop the side view
                         tensor = torch.from_numpy(image).permute(2, 0, 1).unsqueeze(0).float() / 255.0
+                        # Same op and order as training: float [0, 1] -> F.resize -> clamp, then normalize.
+                        tensor = F.resize(tensor, list(args.resize)).clamp(0.0, 1.0)
                         batch[f"observation.images.{key}"] = tensor
                     state = torch.from_numpy(msg["state"]).float().unsqueeze(0)
                     batch["observation.state"] = state

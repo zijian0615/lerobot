@@ -20,6 +20,7 @@ import torch
 from lerobot.processor import (
     AddBatchDimensionProcessorStep,
     DeviceProcessorStep,
+    ImageCropResizeProcessorStep,
     NormalizerProcessorStep,
     PolicyAction,
     PolicyProcessorPipeline,
@@ -42,7 +43,8 @@ def make_act_pre_post_processors(
 ]:
     """Creates the pre- and post-processing pipelines for the ACT policy.
 
-    The pre-processing pipeline handles normalization, batching, and device placement for the model inputs.
+    The pre-processing pipeline handles batching, optional image resizing (`config.resize_shape`),
+    device placement and normalization for the model inputs.
     The post-processing pipeline handles unnormalization and moves the model outputs back to the CPU.
 
     Args:
@@ -58,6 +60,10 @@ def make_act_pre_post_processors(
     input_steps = [
         RenameObservationsProcessorStep(rename_map={}),
         AddBatchDimensionProcessorStep(),
+    ]
+    if config.resize_shape is not None:
+        input_steps.append(ImageCropResizeProcessorStep(resize_size=tuple(config.resize_shape)))
+    input_steps += [
         DeviceProcessorStep(device=config.device),
         NormalizerProcessorStep(
             features={**config.input_features, **config.output_features},

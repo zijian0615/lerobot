@@ -40,6 +40,21 @@ class FanucConfig(RobotConfig):
     # Joint mode is what lerobot-rollout needs for a policy trained on joint targets.
     motion: str = "cartesian"
     joint_speed_percent: int = 10
+    # Joint mode streams FRC_LinearMotion at this TCP speed. Keep it equal to the
+    # sim demos' cap (fanuc_er4ia_sim/record_screw_episode.py --max-speed).
+    joint_tcp_speed_mm_s: int = 50
+    # A single policy step moves the TCP target at most this far from the previous target.
+    joint_max_step_mm: float = 8.0
+    # The TCP target never runs further than this ahead of the live pose.
+    joint_max_lead_mm: float = 40.0
+    # No joint target moves more than this from the previous one in one step (the demos peak at 3.45 deg
+    # on J6). Chunk-to-chunk jumps are spread over several steps instead of faulting the controller.
+    joint_max_step_deg: float = 5.0
+    # Shift every joint-mode TCP target by this much in the user frame's Z (mm), e.g. -7 when the real work
+    # surface sits 7 mm below the one the policy was trained on.
+    joint_z_offset_mm: float = 0.0
+    # Never command a joint-mode TCP target below this user-frame Z (mm); None = no floor.
+    joint_z_min_mm: float | None = None
 
     gripper_lcb_type: str | None = "TA"
     gripper_lcb_value: int = 10

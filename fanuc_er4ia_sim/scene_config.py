@@ -46,6 +46,10 @@ CAPTURE_POSE_DEG = {"J1": -81.1, "J2": 7.4, "J3": 5.8, "J4": 0.0, "J5": -88.4, "
 
 # VIDEO: the real J1 base casting is mid grey, not black as the asset renders it.
 ROBOT_BASE_GREY = True
+# REAL (2026-10-08): the asset paints the arm pure (1, 1, 0), which renders lime. The real arm reads
+# orange-yellow, R > G (table cam (116, 99, 9), side cam (150, 119, 69) against the asset's
+# (188, 187, 25) / (169, 165, 17)); fitted in linear light (sRGB ratio ** 2.2), averaged over both cameras.
+ROBOT_YELLOW = (0.45, 0.28, 0.03)
 
 # ------------------------------------------------------------------ work cell
 # GUESS. The site scan does not reach the floor; it only shows the top is at
@@ -68,7 +72,7 @@ EDGE_BAND_W  = 0.048
 # "200iD" / "200iD/4S" and are centred ~0.37 m BEHIND the ER-4iA's J1, which is
 # why the earlier assumption (arcs = ER-4iA reach, centred on J1) was wrong.
 # The "#" of black tape next to the bin and the black pad are in it too.
-MAT_TEXTURE  = "assets/mat_print.png"
+MAT_TEXTURE  = "assets/surface_real.png"  # 2026-10-08 white surface, make_real_mat.py --scan; old: assets/mat_print.png
 MAT_MARKINGS = True       # False -> plain white laminate
 
 # ------------------------------------------------------------------ props
@@ -76,6 +80,8 @@ MAT_MARKINGS = True       # False -> plain white laminate
 # plate carrying a raised tray, a two-hole block and a pill bottle. It is a
 # distractor for perception, not a task object. Footprint mapped from the
 # video; internal layout approximate.
+# REAL (2026-10-07): not in the current cell, so it is left out.
+INCLUDE_FIXTURE = False
 FIXTURE_XY      = (0.555, -0.640)
 FIXTURE_PLATE   = (0.230, 0.260, 0.012)
 FIXTURE_TRAY    = (0.130, 0.170, 0.026)     # raised tray, recessed top
@@ -97,33 +103,45 @@ BOTTLE_H        = 0.058
 # pneumatic parallel gripper with push-in fittings -> two taped blade fingers.
 # A cylindrical Class 2 laser pointer rides alongside the fingers (not modelled;
 # its red dot is visible on the mat in the video).
-TOOL_LENGTH       = 0.300     # VIDEO, flange face to fingertip, +/- 0.02
-_s                = TOOL_LENGTH / 0.300      # scale factor on the figures below
+#
+# REAL (2026-10-07), overrides the video scale. The gripper hangs off the
+# J6_link origin, which is the WRIST CENTRE (J5 axis), not the faceplate. On
+# the controller, UTOOL1 = (0, 0, 223) mm off the faceplate (FRC_ReadUToolData)
+# and the faceplate is 70 mm out from the wrist centre (four FRC poses, see
+# check_j3_convention.py), so the fingertip is 293 mm from this origin. This
+# takes UTOOL1 to be taught at the fingertip.
+TOOL_LENGTH       = 0.293     # REAL, J6_link origin (wrist centre) to fingertip
+_s                = TOOL_LENGTH / 0.300      # scale factor on the figures below (drawn at 300)
 
 ADAPTER_R         = 0.030 * _s   # black, ~60 mm across
 ADAPTER_T         = 0.044 * _s
 ZCYL_R            = 0.0235 * _s  # ~47 mm silver body
-ZCYL_LEN          = 0.088 * _s
+# ZCYL_LEN is set below FINGER_LENGTH: it takes up whatever the measured parts leave of TOOL_LENGTH.
 COLLAR_R          = 0.032 * _s   # white clamp collar round the cylinder
 COLLAR_T          = 0.028 * _s
 COLLAR_AT         = 0.018 * _s   # down the cylinder from its top
 ZFLANGE_R         = 0.016 * _s   # narrow rod guide under the cylinder
 ZFLANGE_T         = 0.020 * _s
-BODY_LEN          = 0.030 * _s   # compact parallel gripper body
+# REAL (2026-10-09): SMC MHZL2-16D2 (long-stroke parallel gripper, 16 mm bore, through-hole fingers).
+# Lengths along the tool from the 2026-10-09 photos, scaled so the flange-to-jaw-bottom stack is
+# 223 - 76 = 147 mm: Z cylinder + plate ~90, gripper body + guide ~45, SMC jaw ~12.
+BODY_LEN          = 0.039        # gripper body (photo, scaled)
 BODY_W            = 0.030 * _s
 BODY_D            = 0.026 * _s
-PLATE_T           = 0.006 * _s   # jaw guide
+PLATE_T           = 0.006        # jaw guide
 PLATE_W           = 0.036 * _s
 PLATE_D           = 0.022 * _s
-CARRIAGE_LEN      = 0.010 * _s   # jaw carriages the fingers bolt to
+CARRIAGE_LEN      = 0.0188       # the SMC jaws the blades bolt to: 12 mm shows below the guide
 CARRIAGE_W        = 0.010 * _s
 CARRIAGE_D        = 0.018 * _s
-CARRIAGE_OVERLAP  = 0.007 * _s   # finger root is clamped inside the carriage
+CARRIAGE_OVERLAP  = 0.0068       # finger root is clamped inside the carriage
 
-# The fingers take whatever is left of TOOL_LENGTH, so the fingertip is exactly
-# TOOL_LENGTH from the flange.
-FINGER_LENGTH     = TOOL_LENGTH - (ADAPTER_T + ZCYL_LEN + ZFLANGE_T + BODY_LEN
-                                   + PLATE_T + CARRIAGE_LEN - CARRIAGE_OVERLAP)
+# REAL (2026-10-09): the blade shows 76 mm below the SMC jaw (measured). It was 106.5 mm when the fingers
+# took whatever the estimated stack left of TOOL_LENGTH. Now the Z cylinder takes the slack, so the
+# fingertip stays exactly TOOL_LENGTH from the J6 origin (wrist centre; the J6 faceplate is 70 mm out).
+FINGER_LENGTH     = 0.076
+ZCYL_LEN          = TOOL_LENGTH - (ADAPTER_T + ZFLANGE_T + BODY_LEN + PLATE_T
+                                   + CARRIAGE_LEN - CARRIAGE_OVERLAP + FINGER_LENGTH)
 FINGER_WIDTH      = 0.010 * _s   # VIDEO: along the closing direction
 FINGER_THICK      = 0.012 * _s
 # PHOTO: a semicircular scallop on the inner face near the tip. Covered by the
@@ -134,13 +152,13 @@ FINGER_THICK      = 0.012 * _s
 SCALLOP_R         = 0.0035 * _s
 SCALLOP_AT        = 0.86
 
-# Per-jaw travel; inner faces sit at +/- these from the tool axis. Stroke is
-# still UNMEASURED. Closed: a pneumatic gripper is commanded fully shut and
-# stalls on the part, so this only needs to be narrower than the thinnest thing
-# gripped (the 6 mm shank). Open: clears a 12 mm countersunk head with margin
-# while keeping the jaws about as wide as the video shows.
+# Per-jaw travel; inner faces sit at +/- these from the tool axis. REAL (2026-10-09): MHZL2-16D strokes
+# 12 mm across both jaws (SMC catalogue), 6 mm each. Closed: a pneumatic gripper is commanded fully shut
+# and stalls on the part, so this only needs to be narrower than the thinnest thing gripped (the 6 mm
+# shank). Open = closed + 6 mm: 16 mm between the blades, clearing a 12 mm countersunk head. (The
+# open blade gap itself is still unmeasured; it was 18 mm with a 7 mm-per-jaw guess.)
 JAW_CLOSED        = 0.002
-JAW_OPEN          = 0.009
+JAW_OPEN          = 0.008
 # How far above the work surface the fingertips are commanded when picking.
 # At 1 mm the position-controlled arm pressed the taped tips into the mat, and
 # tape-on-mat friction held the jaws open: they were still 1.5-5 mm short of
@@ -176,9 +194,12 @@ CAMBODY           = (0.029, 0.029, 0.030)      # XC-56 form factor (SC130EF2)
 # the taped fingertip. ±15 mm: the phone is not perfectly square to the tool.
 # Look direction stays parallel to the tool. The old 65 mm was the ring light,
 # which hung much lower.
-WRISTCAM_LATERAL  = 0.084
+# REAL (2026-10-07): the solved lens is 97 mm off the tool axis and 163 mm down
+# it from the J6 origin (WRIST_CAM below), i.e. 130 mm above the fingertip. The
+# housing follows it; the render camera itself uses the solved pose directly.
+WRISTCAM_LATERAL  = 0.097
 WRISTCAM_DIR      = (0.0, 0.0, 1.0)            # flange-frame side it hangs on
-RINGLIGHT_ABOVE_TIP = 0.150
+RINGLIGHT_ABOVE_TIP = 0.132
 BRACKET_T         = 0.006
 
 # ------------------------------------------------------------------ task objects
@@ -194,10 +215,14 @@ CUBE_MATS         = ["plastic_red", "plastic_yellow", "plastic_blue"]
 if INCLUDE_CUBES:
     JAW_OPEN = 0.012            # a 20 mm cube needs more than the screw opening
 
-# Objects rest on the printed mat, which sits 2 mm proud of the table top.
-# Grasp heights and the back-projection plane must both use this, or every
-# grasp is 2 mm low.
-SURFACE_DZ        = 0.002
+# The work surface (what objects rest on), as a height above the ROBOT BASE MOUNTING PLANE (z = 0 of the
+# base frame, which sits at TABLE_TOP_Z in the world). Grasp heights and the back-projection plane must
+# both use this, or every grasp is off by the error.
+# REAL (2026-10-08, white surface): with the arm at home the fingertip measures 245 mm above the surface,
+# where FK puts it 239.9 mm above the base plane, so the surface is 5.1 mm BELOW the base plane. (It was
+# taken as the old mat, 2 mm proud of a table flush with the base; grasps then stopped ~7 mm high.)
+SURFACE_DZ        = -0.0051
+MAT_T             = 0.002       # the surface sheet's thickness; only the drawn slab, the table top is below it
 
 # VIDEO: M6 x 30 COUNTERSUNK socket screws (ISO 10642), black oxide -- the head
 # is a 90 deg cone, clearly visible side-on in the footage. (An earlier pass
@@ -209,7 +234,9 @@ SCREW_SHANK_D     = 0.0060
 SCREW_MASS        = 0.0076      # steel, ~0.97 cm3
 # VIDEO: the eight screws' starting layout at t=10 s, clustered inside the
 # printed screw target. (x, y) is the HEAD, yaw is the head->tip direction.
-SCREWS            = [(0.435, -0.128,   24.5),
+# REAL (2026-10-08, testbed rebuilt): SCREWS[0], the single-screw task, is where the screw lies now,
+# located from the table view (locate_objects.py, data/objects_v2); the video's was (0.435, -0.128, 24.5).
+SCREWS            = [(0.416, -0.139,   37.9),
                      (0.420, -0.097,   98.5),
                      (0.401, -0.054,  150.3),
                      (0.339, -0.079,    3.7),
@@ -223,79 +250,72 @@ SCREWS            = [(0.435, -0.128,   24.5),
 # thick wall and a rounded-square pocket. It is NOT the scanned orange
 # "BLOCK-06" in assets/ (thin-walled, never seen in the video). Built
 # procedurally; size is scaled off the screws and the mat in the video.
-BIN_XY            = (0.370, 0.161)
-BIN_OUTER         = (0.060, 0.060)
-BIN_WALL_H        = 0.060
-BIN_POCKET        = 0.036       # square pocket opening
-BIN_POCKET_R      = 0.008       # its corner radius
+# REAL (2026-10-07): fingertip jogged to the pocket centre and read over FRC
+# (it moved from the video estimate (0.370, 0.161) by ~10 cm).
+# REAL (2026-10-08, testbed rebuilt): a smaller yellow bin, axis-aligned, its pose and outer size fitted to
+# the table and side silhouettes (locate_objects.py --bin-height 0.055 on the -5.1 mm surface, IoU 0.87); the 2026-10-07 bin was
+# 60 x 60 x 60 mm at (0.3313, 0.2547). The pocket is not measured: scaled with the outer size.
+BIN_XY            = (0.5110, 0.1076)
+BIN_OUTER         = (0.047, 0.047)
+BIN_WALL_H        = 0.055       # REAL: measured with a ruler
+BIN_POCKET        = 0.028       # square pocket opening (GUESS: 0.6 x outer, as the old bin)
+BIN_POCKET_R      = 0.0062      # its corner radius
 BIN_FLOOR_T       = 0.015       # GUESS: pocket depth is not visible
 BIN_WALL_T        = (BIN_OUTER[0] - BIN_POCKET) / 2
 BIN_SIZE          = (BIN_POCKET, BIN_POCKET)   # usable interior, for drops
-BIN_RELEASE_Z     = 0.092                      # above the rim
+BIN_RELEASE_Z     = SURFACE_DZ + BIN_WALL_H + 0.030  # fingertip at release: 30 mm above the rim
 
 # ------------------------------------------------------------------ cameras
 # Cameras are specified as eye + look_at in the parent's frame, not Euler
 # angles -- it is the only formulation that stays readable while iterating.
 
-# The wrist camera at its REAL mount: the SC130EF2 lens, looking straight down
-# the tool direction through the ring light. iRVision is used camera-over-part
-# -- the arm parks the camera above the scene, snaps, then moves the gripper --
-# so this view does not contain the fingers, by design.
-# 2 mm below the ring light's window so the housing cannot occlude the view
-_WC_AT  = TOOL_LENGTH - RINGLIGHT_ABOVE_TIP + 0.002
-_WC_EYE = tuple(a * _WC_AT + d * WRISTCAM_LATERAL
-                for a, d in zip(TOOL_AXIS, WRISTCAM_DIR))
-# Intrinsics: Orbbec Gemini 305 color, datasheet typical (not this unit).
-# 1280x720 is the 16:9 crop of the 1280x800 sensor: HFOV 94°, VFOV 62°, ±3°.
-# Distortion < 1.5%, so a pinhole is enough. fx = 640/tan(47°) = 597 px.
-# Mount is the side-photo estimate above: 84 mm off the tool axis, 150 mm
-# above the fingertips, looking straight down the tool.
+# REAL (2026-10-07): solved from 13 robot poses against two ArUco markers on the
+# table (calib_capture.py / calib_solve.py, corner RMS 0.90 px). The lens is
+# 163 mm down the tool axis from the J6 origin, 97 mm out on the
+# WRISTCAM_DIR side and 12 mm along +Y; the optical axis is within 2 deg of the
+# tool axis. Image up is J6 +Z (the side the camera hangs on) -- the old
+# (0, 1, 0) rendered the view rolled 90 deg against the real one. fx 620 px
+# (datasheet said 597); real k1 -0.020, rendered as a pinhole.
 WRIST_CAM = dict(
     parent         = ROBOT_PRIM + "/J6_link",
-    eye            = _WC_EYE,
-    look_at        = tuple(e + a * 0.2 for e, a in zip(_WC_EYE, TOOL_AXIS)),
-    up             = (0.0, 1.0, 0.0),          # flange coordinates
+    eye            = (0.1633, 0.0125, 0.0971),
+    look_at        = (0.3632, 0.0180, 0.0930),
+    up             = (0.0198, 0.0231, 0.9995),   # flange coordinates
     resolution     = (1280, 720),
-    focal_length   = 9.7704,                   # fx 597 px at horiz_aperture 20.955
+    focal_length   = 10.1440,                   # fx 619.6 px at horiz_aperture 20.955
     horiz_aperture = 20.955,
 )
 
-# Current overhead: Orbbec Gemini color, 1920x1080. Intrinsics are the
-# undistorted pinhole fit on that stream (fx = fy = 1249 px, principal point
-# at the centre). horiz_aperture 20.955 mm is the USD aperture that pair uses,
-# so focal_length = fx * aperture / width.
-# Pose is that same solve, in this robot frame: the calibration's XY is the
-# controller base (J1 axis, same origin as the mounting face) and z = 0 is the
-# table plane the samples were touched on. Eye is 0.765 m forward, 0.049 m to
-# the robot's left, 0.929 m above the table, tilted 26.7 deg off nadir. The
-# optical axis meets the table at (0.297, 0.052).
+# Overhead: Orbbec Gemini 2 color, 1920x1080. REAL (2026-10-07): solved against
+# three ArUco markers on the table, two of them located by the wrist camera
+# (calib_solve.py, corner RMS 0.42 px). fx 1028 px matches the datasheet
+# HFOV 86 deg (960 / tan 43 = 1029); the earlier 1249 px fit was wrong and put
+# the mat 100-150 px off. Real k1 +0.009, rendered as a pinhole.
+# Eye is 0.777 m forward, -0.043 m to the left, 0.802 m above the table; the
+# optical axis meets the table at (0.164, -0.021).
 TABLE_CAM = dict(
     parent         = "/World",
-    eye            = (0.7646, 0.0486, TABLE_TOP_Z + 0.9289),
-    look_at        = (0.2966, 0.0521, TABLE_TOP_Z),
-    up             = (-0.8930, 0.0043, 0.4500),
+    eye            = (0.7770, -0.0426, TABLE_TOP_Z + 0.8024),
+    look_at        = (0.1636, -0.0210, TABLE_TOP_Z),
+    up             = (-0.7943, -0.0398, 0.6062),
     resolution     = (1920, 1080),
-    focal_length   = 13.633273452911222,
+    focal_length   = 11.2158,          # 1027.6 px at horiz_aperture 20.955
     horiz_aperture = 20.955,
     fisheye        = False,
 )
 
-# Fixed side webcam: Shenzhen AONI Full HD, 1920x1080, reference/side_aoni_1920.jpg.
-# Plane solve against the orthophoto (same J1 registration as the overhead).
-# Correspondences: the black "#" tape, the BATTERY KIT lettering, and the
-# diamond in the nested-square target. Principal point at the image centre,
-# no distortion. Reprojection RMS about 13 px, so the pose is good to roughly
-# a centimetre, not to the overhead's sample fit. The lens sits on the robot's
-# left, about 0.12 m above the table, looking across the mat toward -Y with
-# the optical axis a few degrees above the horizon (the frame is mostly wall
-# and arm, table in the lower half).
+# Fixed side webcam: Shenzhen AONI Full HD, 1920x1080.
+# REAL (2026-10-08, testbed rebuilt, camera moved): solved from 52 robot poses against the ArUco
+# on the gripper (calib_solve.py --free-marker-b --side-k1 0, data/cam_calib_v2, corner RMS
+# 3.99 px), as a pinhole since that is how it is rendered (with k1 free: +0.23, RMS 3.33 px).
+# 2026-10-07 solve: eye (0.4558, 0.6218, +0.1426), fx 1168.5, RMS 3.08 px.
 SIDE_CAM = dict(
     parent         = "/World",
-    eye            = (0.4895, 0.5050, TABLE_TOP_Z + 0.1232),
-    look_at        = (0.3735, -0.0302, TABLE_TOP_Z + 0.1727),
-    up             = (0.0930, 0.0721, 0.9931),
+    eye            = (0.4577, 0.6287, TABLE_TOP_Z + 0.1378),
+    look_at        = (0.4350, 0.1293, TABLE_TOP_Z + 0.1409),
+    up             = (0.0293, 0.0050, 0.9996),
     resolution     = (1920, 1080),
-    focal_length   = 8.382,          # 768 px at horiz_aperture 20.955; HFOV ~103 deg
+    focal_length   = 12.9427,          # 1185.9 px at horiz_aperture 20.955
     horiz_aperture = 20.955,
     fisheye        = False,
 )

@@ -78,6 +78,8 @@ class ACTConfig(PreTrainedConfig):
         dropout: Dropout to use in the transformer layers (see code for details).
         kl_weight: The weight to use for the KL-divergence component of the loss if the variational objective
             is enabled. Loss is then calculated as: `reconstruction_loss + kl_weight * kld_loss`.
+        resize_shape: (H, W) to resize every camera image to in the pre-processor, before normalization.
+            None keeps the dataset resolution.
     """
 
     # Input / output structure.
@@ -92,6 +94,7 @@ class ACTConfig(PreTrainedConfig):
             "ACTION": NormalizationMode.MEAN_STD,
         }
     )
+    resize_shape: tuple[int, int] | None = None
 
     # Architecture.
     # Vision backbone.
@@ -145,6 +148,10 @@ class ACTConfig(PreTrainedConfig):
                 f"The chunk size is the upper bound for the number of action steps per model invocation. Got "
                 f"{self.n_action_steps} for `n_action_steps` and {self.chunk_size} for `chunk_size`."
             )
+        if self.resize_shape is not None and (
+            len(self.resize_shape) != 2 or any(d <= 0 for d in self.resize_shape)
+        ):
+            raise ValueError(f"`resize_shape` must be a pair of positive integers. Got {self.resize_shape}.")
         if self.n_obs_steps != 1:
             raise ValueError(
                 f"Multiple observation steps not handled yet. Got `nobs_steps={self.n_obs_steps}`"

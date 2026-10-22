@@ -19,15 +19,22 @@ import math
 import threading
 from unittest.mock import patch
 
+import numpy as np
 import pytest
 
 from lerobot.robots.fanuc import Fanuc, FanucConfig
+from lerobot.robots.fanuc.er4ia_fk import (
+    controller_from_sim_deg,
+    controller_tcp_pose,
+    sim_from_controller_deg,
+)
 from lerobot.robots.fanuc.pose import (
     FANUC_RAW_NAMES,
     decode_angle_degrees,
     decode_fanuc_pose_dict,
     encode_fanuc_pose_dict,
     raw_fanuc_pose_dict,
+    rotation_matrix_from_wpr,
 )
 from lerobot.robots.utils import make_robot_from_config
 
@@ -683,37 +690,172 @@ def test_pose_encode_decode_roundtrip():
     assert math.isclose(decode_angle_degrees(0.0, 0.0), 0.0)
 
 
-def test_joint_motion_sends_pendant_degrees(fanuc_config):
+# Real ER-4iA at rest, UF0/UT1, 2026-10-07 (fanuc_er4ia_sim/check_j3_convention.py).
+_REAL_JOINTS = {"J1": 15.9, "J2": -17.13, "J3": 0.85, "J4": 13.84, "J5": -85.03, "J6": -79.87}
+_REAL_XYZWPR = (252.529, -0.6921, -10.23, -176.722, -14.652, -63.888)
+_UTOOL_REPLY = {
+    "Command": "FRC_ReadUToolData",
+    "ErrorID": 0,
+    "ToolNumber": 1,
+    "Group": 1,
+    "Frame": {"X": 0.0, "Y": 0.0, "Z": 223.0, "W": 0.0, "P": 0.0, "R": 0.0},
+}
+
+
+def _joint_robot(fanuc_config):
     fanuc_config.motion = "joint"
-    factory = SocketFactory()
-    robot = Fanuc(fanuc_config)
+    fanuc_config.twin_udp_host = ""
+    return SocketFactory(extra=(_UTOOL_REPLY,)), Fanuc(fanuc_config)
+
+
+def test_controller_tcp_pose_matches_the_real_arm():
+    joints = sim_from_controller_deg([_REAL_JOINTS[f"J{i}"] for i in range(1, 7)])
+    rotation, position = controller_tcp_pose(np.radians(joints), (0.0, 0.0, 223.0, 0.0, 0.0, 0.0))
+    assert np.allclose(position * 1000.0, _REAL_XYZWPR[:3], atol=0.5)
+    measured = np.asarray(rotation_matrix_from_wpr(*_REAL_XYZWPR[3:]))
+    assert np.allclose(rotation, measured, atol=1e-3)
+    assert np.allclose(controller_from_sim_deg(joints), list(_REAL_JOINTS.values()))
+
+
+def test_joint_observation_reports_sim_j3(fanuc_config):
+    factory, robot = _joint_robot(fanuc_config)
+    with patch("lerobot.robots.fanuc.fanuc.socket.socket", factory):
+        robot.connect()
+        try:
+            robot.pause_state_poll()
+            robot._dispatch_response({"Command": "FRC_ReadJointAngles", "ErrorID": 0, "JointAngle": _REAL_JOINTS})
+            obs = robot.get_observation()
+            assert obs["J2.pos"] == -17.13
+            assert math.isclose(obs["J3.pos"], 0.85 - 17.13)
+            assert obs["J6.pos"] == -79.87
+        finally:
+            robot.disconnect()
+
+
+def test_joint_motion_targets_the_controller_tcp(fanuc_config):
+    factory, robot = _joint_robot(fanuc_config)
     with patch("lerobot.robots.fanuc.fanuc.socket.socket", factory):
         robot.connect()
         try:
             robot.pause_state_poll()
             assert tuple(robot.action_features)[0] == "J1.pos"
-            sent = robot.send_action(
-                {
-                    "J1.pos": -20.0,
-                    "J2.pos": 35.0,
-                    "J3.pos": -10.0,
-                    "J4.pos": 0.0,
-                    "J5.pos": -40.0,
-                    "J6.pos": 15.0,
-                    "gripper.pos": 1.0,
-                }
+            assert robot._utool_data == (0.0, 0.0, 223.0, 0.0, 0.0, 0.0)
+            assert any(
+                p.get("Command") == "FRC_ReadUToolData" and p["ToolNumber"] == fanuc_config.utool
+                for p in _sent_payloads(factory.session_sock)
             )
-            assert sent["J2.pos"] == 35.0
-            assert sent["gripper.pos"] == 1.0
+            robot.commit_commanded_pose(*_REAL_XYZWPR)
+            joints = sim_from_controller_deg([_REAL_JOINTS[f"J{i}"] for i in range(1, 7)])
+            action = {f"J{i + 1}.pos": value for i, value in enumerate(joints)}
+            robot.send_action({**action, "gripper.pos": 1.0})
             motion = next(
-                p for p in _sent_payloads(factory.session_sock) if p.get("Instruction") == "FRC_JointMotion"
+                p for p in _sent_payloads(factory.session_sock) if p.get("Instruction") == "FRC_LinearMotion"
             )
-            assert motion["JointAngle"]["J1"] == -20.0
-            assert motion["JointAngle"]["J3"] == 25.0
-            assert motion["JointAngle"]["J6"] == 15.0
-            assert motion["JointAngle"]["J9"] == 0.0
-            assert motion["SpeedType"] == "Percent"
-            assert motion["TermType"] == "FINE"
+            position = motion["Position"]
+            assert motion["SpeedType"] == "mmSec"
+            assert motion["Speed"] == fanuc_config.joint_tcp_speed_mm_s
+            assert np.allclose([position[k] for k in "XYZ"], _REAL_XYZWPR[:3], atol=0.5)
+            assert np.allclose(
+                rotation_matrix_from_wpr(position["W"], position["P"], position["R"]),
+                rotation_matrix_from_wpr(*_REAL_XYZWPR[3:]),
+                atol=1e-3,
+            )
             assert motion["PortNumber"] == fanuc_config.gripper_close_port_number
+        finally:
+            robot.disconnect()
+
+
+def test_joint_motion_limits_one_step(fanuc_config):
+    factory, robot = _joint_robot(fanuc_config)
+    with patch("lerobot.robots.fanuc.fanuc.socket.socket", factory):
+        robot.connect()
+        try:
+            robot.pause_state_poll()
+            robot.commit_commanded_pose(*_REAL_XYZWPR)
+            joints = sim_from_controller_deg([_REAL_JOINTS[f"J{i}"] for i in range(1, 7)])
+            joints[0] += 20.0
+            robot.send_action({f"J{i + 1}.pos": value for i, value in enumerate(joints)})
+            motion = next(
+                p for p in _sent_payloads(factory.session_sock) if p.get("Instruction") == "FRC_LinearMotion"
+            )
+            step = np.linalg.norm(np.subtract([motion["Position"][k] for k in "XYZ"], _REAL_XYZWPR[:3]))
+            _, target = controller_tcp_pose(np.radians(joints), robot._utool_data)
+            full = np.linalg.norm(target * 1000.0 - np.asarray(_REAL_XYZWPR[:3]))
+            assert full > 50.0
+            assert np.isclose(step, fanuc_config.joint_max_step_mm, atol=0.01)
+        finally:
+            robot.disconnect()
+
+
+def test_joint_observation_keeps_native_camera_resolution(fanuc_config):
+    class _Cam:
+        width, height = 1920, 1080
+        is_connected = True
+
+        def connect(self):
+            pass
+
+        def disconnect(self):
+            pass
+
+        def read(self):
+            return np.zeros((1080, 1920, 3), np.uint8)
+
+    factory, robot = _joint_robot(fanuc_config)
+    robot.cameras = {"table": _Cam()}
+    assert robot.observation_features["table"] == (1080, 1920, 3)
+    with patch("lerobot.robots.fanuc.fanuc.socket.socket", factory):
+        robot.connect()
+        try:
+            robot.pause_state_poll()
+            robot._dispatch_response({"Command": "FRC_ReadJointAngles", "ErrorID": 0, "JointAngle": _REAL_JOINTS})
+            assert robot.get_observation()["table"].shape == (1080, 1920, 3)
+        finally:
+            robot.disconnect()
+
+
+def test_joint_motion_steps_from_the_previous_target(fanuc_config):
+    """While the arm has not moved yet, successive targets still advance one step each, up to the lead cap."""
+    factory, robot = _joint_robot(fanuc_config)
+    with patch("lerobot.robots.fanuc.fanuc.socket.socket", factory):
+        robot.connect()
+        try:
+            robot.pause_state_poll()
+            robot.commit_commanded_pose(*_REAL_XYZWPR)
+            joints = sim_from_controller_deg([_REAL_JOINTS[f"J{i}"] for i in range(1, 7)])
+            joints[0] += 20.0
+            live = np.asarray(_REAL_XYZWPR[:3])
+            leads = []
+            for _ in range(8):
+                robot._stream_sent_mono = None  # pretend the acks came back, so every send goes out
+                with robot._pending_lock:
+                    robot._pending_futures.clear()
+                robot.send_action({f"J{i + 1}.pos": value for i, value in enumerate(joints)})
+                motion = [p for p in _sent_payloads(factory.session_sock) if p.get("Instruction") == "FRC_LinearMotion"][-1]
+                leads.append(float(np.linalg.norm(np.subtract([motion["Position"][k] for k in "XYZ"], live))))
+            step = fanuc_config.joint_max_step_mm
+            assert np.allclose(leads[:5], [step * (k + 1) for k in range(5)], atol=0.05)
+            assert np.isclose(max(leads), fanuc_config.joint_max_lead_mm, atol=0.05)
+        finally:
+            robot.disconnect()
+
+
+def test_joint_motion_limits_the_joint_step(fanuc_config):
+    """A 109 deg J6 jump between chunks becomes joint_max_step_deg per step, all joints scaled together."""
+    factory, robot = _joint_robot(fanuc_config)
+    with patch("lerobot.robots.fanuc.fanuc.socket.socket", factory):
+        robot.connect()
+        try:
+            robot.pause_state_poll()
+            robot._dispatch_response({"Command": "FRC_ReadJointAngles", "ErrorID": 0, "JointAngle": _REAL_JOINTS})
+            robot.commit_commanded_pose(*_REAL_XYZWPR)
+            start = np.array(sim_from_controller_deg([_REAL_JOINTS[f"J{i}"] for i in range(1, 7)]))
+            goal = start.copy()
+            goal[5] += 109.0
+            goal[1] += 10.0
+            robot.send_action({f"J{i + 1}.pos": float(v) for i, v in enumerate(goal)})
+            sent = robot._joint_target_deg - start
+            assert np.isclose(np.max(np.abs(sent)), fanuc_config.joint_max_step_deg)
+            assert np.isclose(sent[1] / sent[5], 10.0 / 109.0)
         finally:
             robot.disconnect()
