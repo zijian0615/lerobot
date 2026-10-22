@@ -32,9 +32,11 @@ import numpy as np
 
 from . import layout as L
 
-# fanuc_er4ia_sim/ holds the cell, the verified FK/IK and the dimensions.
+# ManipSecBench/fanuc_cell/ holds the cell, the verified FK/IK and the dimensions:
+# a frozen copy of fanuc_er4ia_sim/ (see its README), so recalibrating the twin
+# does not change the benchmark.
 FANUC_SIM_DIR = Path(os.environ.get("FANUC_SIM_DIR")
-                     or Path(__file__).resolve().parents[6] / "fanuc_er4ia_sim")
+                     or Path(__file__).resolve().parents[3] / "fanuc_cell")
 if str(FANUC_SIM_DIR) not in sys.path:
     sys.path.insert(0, str(FANUC_SIM_DIR))
 

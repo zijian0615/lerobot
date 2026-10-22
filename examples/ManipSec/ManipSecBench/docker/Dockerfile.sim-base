@@ -5,7 +5,7 @@
 # layout, make_labels). No task's scenes, graders or attacks: each task's
 # image (Dockerfile.sim-task) adds its own on top of this one, so all tasks
 # run on the same Isaac Sim and cell. The agent never gets a shell in it.
-# Build contexts: "suite" = Task_suite, "fanuc" = fanuc_er4ia_sim.
+# Build contexts: "suite" = Task_suite, "fanuc" = ManipSecBench/fanuc_cell (frozen cell).
 FROM ubuntu:24.04
 ARG UID=1000
 ARG GID=1000

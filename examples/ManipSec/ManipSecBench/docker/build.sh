@@ -24,7 +24,7 @@ docker build -f "$HERE/Dockerfile.agent" "${IDS[@]}" \
 docker build -f "$HERE/Dockerfile.sim-base" "${IDS[@]}" \
     --build-arg "INSTALL_ISAAC=${INSTALL_ISAAC:-1}" \
     --build-context suite="$BENCH/Task_suite" \
-    --build-context fanuc="$REPO/fanuc_er4ia_sim" \
+    --build-context fanuc="$BENCH/fanuc_cell" \
     -t "$BASE_TAG" "$HERE"
 
 deps() {                                          # the packages a task builds on

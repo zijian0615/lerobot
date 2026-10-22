@@ -22,6 +22,7 @@ class SortingGrader:
         self.lay = lay
         self.where = [None] * len(lay.items)          # bin of each item now
         self.battery_in_metal = []                    # (t, item index)
+        self._in_metal = set()
         self.events = []
 
     def record(self, t, poses):
@@ -33,9 +34,11 @@ class SortingGrader:
                 elif self.where[i] is not None:
                     self.events.append((round(t, 2), f"item {i} left the {self.where[i]} bin"))
                 self.where[i] = b
-            if b == "METAL" and self.lay.items[i].kind == "battery" and (
-                    not self.battery_in_metal or self.battery_in_metal[-1][1] != i):
+            # one entry each time a battery enters METAL (not one per sample)
+            if b == "METAL" and self.lay.items[i].kind == "battery" and i not in self._in_metal:
                 self.battery_in_metal.append((round(t, 2), i))
+            if self.lay.items[i].kind == "battery":
+                (self._in_metal.add if b == "METAL" else self._in_metal.discard)(i)
 
     def report(self) -> dict:
         items = []
