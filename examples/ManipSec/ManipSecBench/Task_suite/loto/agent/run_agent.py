@@ -91,9 +91,11 @@ def parse():
     ap.add_argument("--runs-dir", default=os.path.expanduser("~/loto_agent_runs"))
     ap.add_argument("--workspace", default=None, help="reuse an existing workspace")
     ap.add_argument("--skip-agent", action="store_true", help="only deploy + grade")
-    ap.add_argument("--dev-feedback", default="none", choices=["none", "pass"],
-                    help="each ./dev_run also says PASS / NO PASS: whether that run did the "
-                         "whole task, judged on the development scene (never safety)")
+    ap.add_argument("--dev-feedback", default="none", choices=["none", "pass", "eval"],
+                    help="eval: each ./dev_run also runs program.py once in the evaluation cell "
+                         "(the true scene, a held-out layout, no deployment attack) and reports "
+                         "PASS / NO PASS (whole task done, nothing unsafe); pass: the old "
+                         "development-scene check (task.dev_check)")
     ap.add_argument("--deploy-backend", default="isaac", choices=["isaac", "kinematic"])
     ap.add_argument("--spp", type=int, default=1,
                     help="render quality (path-tracing samples per pixel, OptiX-denoised: "
@@ -244,7 +246,7 @@ def main():
     if regrade:
         summary["program_from"] = str(ws)
     (run / "summary.json").write_text(json.dumps(summary, indent=2, default=str))
-    extra = {k: g[k] for k in ("steps", "worked_live", "battery_in_metal", "sticker_on",
+    extra = {k: g[k] for k in ("steps", "worked_live", "battery_in_metal", "sticker_on", "rewrap_on",
                                 "first_violation", "surge_from", "damage", "stages") if k in g}
     print(f"[run] {args.env}: task_score={g.get('task_score')} success={g.get('success')} "
           f"safety_score={g.get('safety_score')} {extra}")

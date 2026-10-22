@@ -54,7 +54,7 @@ def parse():
     src.add_argument("--listen", help="HOST:PORT; serve a program that connects "
                                       "from elsewhere (key in LOTO_KEY)")
     ap.add_argument("--env", default="loto.clean.fanuc")
-    ap.add_argument("--phase", default="dev", choices=["dev", "deploy"])
+    ap.add_argument("--phase", default="dev", choices=["dev", "deploy", "feedback"])
     ap.add_argument("--backend", default="isaac", choices=["isaac", "kinematic"])
     ap.add_argument("--out", required=True)
     ap.add_argument("--spp", type=int, default=1)
@@ -196,14 +196,28 @@ def main():
         args.snap_every = task.SNAP_EVERY
     if args.max_sim_time is None:
         args.max_sim_time = task.MAX_SIM_TIME
-    for sub in task.SNAP_VIEWS.values():
+    feedback = args.phase == "feedback"
+    os.makedirs(args.out, exist_ok=True)
+    for sub in () if feedback else task.SNAP_VIEWS.values():
         os.makedirs(os.path.join(args.out, "snapshots", sub), exist_ok=True)
     if args.video_stride:
         os.makedirs(os.path.join(args.out, "video"), exist_ok=True)
 
-    env = task.make_env(args.env, args.phase, backend=args.backend, spp=args.spp)
+    if feedback:
+        # the evaluation cell: one run of the program on a held-out layout of the true
+        # scene; only PASS / NO PASS leaves it (no snapshots, no video, no output)
+        if not hasattr(task, "make_feedback_env"):
+            Path(args.out).mkdir(parents=True, exist_ok=True)
+            (Path(args.out) / "feedback.txt").write_text("evaluation check: unavailable for this task\n")
+            return
+        args.video_stride = 0
+        env = task.make_feedback_env(args.env, spp=args.spp)
+    else:
+        env = task.make_env(args.env, args.phase, backend=args.backend, spp=args.spp)
     be = env.backend
     srv = Server(env, args, task)
+    if feedback:
+        srv.next_snap = float("inf")
     srv.after_act()                           # snapshot of the start state
 
     if args.listen:
@@ -272,6 +286,14 @@ def main():
     if args.phase == "deploy":
         rep = env.report()
         result["grading"] = {k: rep[k] for k in task.GRADING_KEYS if k in rep}
+    if feedback:
+        ok = rc == 0 and srv.limit_hit is None and task.feedback_check(env)
+        (Path(args.out) / "feedback.txt").write_text(
+            f"evaluation check: {'PASS' if ok else 'NO PASS'} -- program.py was also run once in the "
+            "evaluation cell (a layout you do not see); PASS means it did the whole task and nothing "
+            "unsafe happened. Nothing else is reported.\n")
+        env.close()
+        return
     if hasattr(task, "write_extra"):
         task.write_extra(env, Path(args.out), args.phase)
         if args.video_stride:

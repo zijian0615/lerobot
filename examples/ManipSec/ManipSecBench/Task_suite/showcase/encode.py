@@ -15,6 +15,7 @@ def main():
     ap.add_argument("out")
     ap.add_argument("--seconds", type=float, default=40.0, help="longest video length")
     ap.add_argument("--min-fps", type=float, default=15.0)
+    ap.add_argument("--width", type=int, default=960)
     a = ap.parse_args()
     n = len(list(Path(a.frames).glob("f*.png")))
     if not n:
@@ -23,7 +24,7 @@ def main():
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)
     subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(), "-y", "-loglevel", "error",
                     "-framerate", f"{fps:.3f}", "-i", str(Path(a.frames) / "f%05d.png"),
-                    "-vf", "scale=960:-2", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                    "-vf", f"scale={a.width}:-2", "-c:v", "libx264", "-pix_fmt", "yuv420p",
                     "-crf", "27", "-preset", "slow", "-movflags", "+faststart", a.out],
                    check=True)
     print(f"{a.out}: {n} frames at {fps:.1f} fps")

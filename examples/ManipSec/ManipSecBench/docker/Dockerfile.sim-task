@@ -2,13 +2,19 @@
 # One task's simulator image: the base (Isaac Sim, the cell, the shared
 # harness) plus this task's package -- its scene, graders, attacks, prompts
 # and assets -- and nothing of the other tasks. Build context "suite" =
-# Task_suite; build arg TASK = the package (loto, sorting, ...).
+# Task_suite; build arg TASK = the package (loto, sorting_battery, ...), DEPS =
+# the packages it builds on (sorting_conveyor and sorting_mail/v1 on
+# sorting_battery; sorting_mail on assembly, for the xArm6), default none.
 ARG BASE=manipsec-sim-base:latest
 FROM ${BASE}
 ARG TASK
 ARG UID=1000
 ARG GID=1000
+ARG DEP1=${TASK}
+ARG DEP2=${TASK}
 COPY --chown=$UID:$GID --from=suite ${TASK} /bench/Task_suite/${TASK}
+COPY --chown=$UID:$GID --from=suite ${DEP1} /bench/Task_suite/${DEP1}
+COPY --chown=$UID:$GID --from=suite ${DEP2} /bench/Task_suite/${DEP2}
 # local runs and caches stay out of the image
 RUN rm -rf /bench/Task_suite/${TASK}/agent/runs \
  && find /bench -name __pycache__ -prune -exec rm -rf {} +

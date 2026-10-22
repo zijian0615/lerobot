@@ -3,12 +3,12 @@ it: the environment for program_runner.py, the agent's snapshots, the grading
 fields and the workspace.
 
     loto.*      the lockout-tagout task (loto/)
-    sorting.*   sorting suite, task 1: battery / metal / plastic (sorting/)
-    conveyor.*  sorting suite, task 2: dynamic sorting from a conveyor (sorting/conveyor/)
+    sorting.*   sorting suite, task 1: battery / metal / plastic (sorting_battery/)
+    conveyor.*  sorting suite, task 2: dynamic sorting from a conveyor (sorting_conveyor/)
     mail_sorting.*  sorting suite, task 3: sort sealed envelopes into AUTHORIZED / STANDARD
-                (sorting/mail_sorting/)
+                (sorting_mail/v1/)
     mail_v2.*   task 3, version 2: the same on an xArm6 with a vacuum gripper, a tote
-                and letter trays (sorting/mail_v2/)
+                and letter trays (sorting_mail/)
     assembly.*  assembly suite, task 1: install a GPU in a PCIe slot (assembly/)
     assembly.instrument.*  assembly suite, task 2: screw a pressure transmitter to its
                 plate with an xArm6 and an electric screwdriver (assembly/instrument/)
@@ -51,16 +51,16 @@ def _loto():
 
 def load(env_name: str):
     if env_name.startswith("sorting."):
-        from sorting import harness
+        from sorting_battery import harness
         return harness
     if env_name.startswith("conveyor."):
-        from sorting.conveyor import harness
+        from sorting_conveyor import harness
         return harness
     if env_name.startswith("mail_v2."):
-        from sorting.mail_v2 import harness
+        from sorting_mail import harness
         return harness
     if env_name.startswith("mail_sorting."):
-        from sorting.mail_sorting import harness
+        from sorting_mail.v1 import harness
         return harness
     if env_name.startswith("assembly.instrument."):
         from assembly.instrument import harness

@@ -3,7 +3,7 @@
 #   ./build.sh                 manipsec-agent:latest (shared by every task),
 #                              manipsec-sim-base:latest (Isaac Sim + cell + harness),
 #                              manipsec-sim-<task>:latest for each task in TASKS
-#   TASKS=sorting ./build.sh   only that task's simulator image (base rebuilt if changed)
+#   TASKS=sorting_mail ./build.sh   only that task's simulator image (base rebuilt if changed)
 #   INSTALL_ISAAC=0 SIM_TAG_SUFFIX=kinematic ./build.sh
 #                              simulators without Isaac Sim (kinematic backend only)
 set -euo pipefail
@@ -13,7 +13,7 @@ REPO="$(cd "$BENCH/../../.." && pwd)"
 SUFFIX="${SIM_TAG_SUFFIX:-latest}"
 AGENT_TAG="${AGENT_TAG:-manipsec-agent:latest}"
 BASE_TAG="manipsec-sim-base:$SUFFIX"
-TASKS="${TASKS:-loto sorting assembly}"
+TASKS="${TASKS:-loto sorting_battery sorting_conveyor sorting_mail assembly}"
 IDS=(--build-arg "UID=$(id -u)" --build-arg "GID=$(id -g)")
 
 docker build -f "$HERE/Dockerfile.agent" "${IDS[@]}" \
@@ -27,9 +27,18 @@ docker build -f "$HERE/Dockerfile.sim-base" "${IDS[@]}" \
     --build-context fanuc="$REPO/fanuc_er4ia_sim" \
     -t "$BASE_TAG" "$HERE"
 
+deps() {                                          # the packages a task builds on
+    case "$1" in
+        sorting_conveyor) echo "sorting_battery sorting_battery" ;;
+        sorting_mail) echo "sorting_battery assembly" ;;
+        *) echo "$1 $1" ;;
+    esac
+}
 for task in $TASKS; do
+    read -r dep1 dep2 <<< "$(deps "$task")"
     docker build -f "$HERE/Dockerfile.sim-task" "${IDS[@]}" \
         --build-arg "BASE=$BASE_TAG" --build-arg "TASK=$task" \
+        --build-arg "DEP1=$dep1" --build-arg "DEP2=$dep2" \
         --build-context suite="$BENCH/Task_suite" \
         -t "manipsec-sim-$task:$SUFFIX" "$HERE"
 done

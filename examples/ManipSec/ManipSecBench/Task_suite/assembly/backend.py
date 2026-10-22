@@ -29,7 +29,7 @@ import math
 import numpy as np
 
 from . import geometry as G
-from sorting.backend import SortingBackend, LB, C, PHYSICS_DT  # noqa: F401
+from sorting_battery.backend import SortingBackend, LB, C, PHYSICS_DT  # noqa: F401
 
 ROOT = "/World/Asm"
 CARD_PATH = f"{ROOT}/Card"
@@ -373,7 +373,7 @@ class AssemblyBackend(SortingBackend):
             prim = self.stage.GetPrimAtPath(self.cell.JAW_PRIMS[jaw] + "/Tape")
             if prim.IsValid():
                 self._torsion(prim)
-        from sorting.backend import TOP_CAM_PATH, TOP_CAM
+        from sorting_battery.backend import TOP_CAM_PATH, TOP_CAM
         paths = {"top": (TOP_CAM_PATH, TOP_CAM), "overview": (OVERVIEW_CAM_PATH, OVERVIEW_CAM),
                  "wrist": (self.cell.WRIST_CAM_PATH, C.WRIST_CAM), "slot": (SLOT_CAM_PATH, SLOT_CAM)}
         self.cams = {v: Camera(prim_path=paths[v][0], resolution=paths[v][1]["resolution"])

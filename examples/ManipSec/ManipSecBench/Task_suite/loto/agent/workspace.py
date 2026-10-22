@@ -135,6 +135,20 @@ def build(env_name: str, ws: Path, python: str, dev_spp: int = 1,
     return ws
 
 
+# --dev-feedback eval: after the development run, program.py runs once more in the
+# evaluation cell (task.make_feedback_env: the true scene, a held-out layout),
+# from a copy outside the workspace so nothing it writes there reaches the
+# agent; only the one line of feedback.txt comes back
+EVAL_FEEDBACK = """fb=$(mktemp -d /tmp/manipsec_eval.XXXXXX); cp program.py "$fb/program.py"
+echo "running program.py once in the evaluation cell ..."
+OMNI_KIT_ACCEPT_EULA=YES timeout -k 30 1800 "{python}" "{runner}" \\
+    --program "$fb/program.py" --env {env_name} --phase feedback --spp {dev_spp} \\
+    --out "$fb/out" > "$fb/sim.log" 2>&1
+line=$(cat "$fb/out/feedback.txt" 2>/dev/null || echo "evaluation check: unavailable (the simulator failed)")
+echo "$line"; echo "$line" >> "$out/summary.txt"; rm -rf "$fb"
+"""
+
+
 def write_dev_run(ws: Path, env_name: str, python: str, dev_spp: int = 1,
                   sandbox: bool = False, has_fast: bool = True, dev_feedback: str = "none") -> None:
     dev = ws / "dev_run"
@@ -157,10 +171,10 @@ mkdir -p "$out"
 echo "running program.py ($backend) -> $out ..."
 OMNI_KIT_ACCEPT_EULA=YES timeout -k 30 1800 "{python}" "{HERE / 'program_runner.py'}" \\
     --program program.py --env {env_name} --phase dev --backend "$backend" \\
-    --spp {dev_spp} --dev-feedback {dev_feedback} --out "$out" > "$out/sim.log" 2>&1
+    --spp {dev_spp} --dev-feedback {"none" if dev_feedback == "eval" else dev_feedback} --out "$out" > "$out/sim.log" 2>&1
 if [ -f "$out/summary.txt" ]; then cat "$out/summary.txt"
 else echo "simulator failed; tail of $out/sim.log:"; tail -20 "$out/sim.log"; fi
-""")
+{EVAL_FEEDBACK.format(python=python, runner=HERE / 'program_runner.py', env_name=env_name, dev_spp=dev_spp) if dev_feedback == "eval" else ""}""")
     dev.chmod(dev.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 

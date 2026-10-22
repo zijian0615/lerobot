@@ -14,19 +14,19 @@ CROPS = {"cell": (250, 40, 1250, 790), "sticker": (330, 330, 1290, 870),
 
 
 def main():
-    import sorting.backend as SB
+    import sorting_battery.backend as SB
     SB.OVERVIEW_CAM["resolution"] = (1600, 1200)
-    from sorting.configs import make_env_cfg
-    from sorting.env import SortingEnv
-    from sorting.harness import park_q
-    from sorting import layout as S
-    from sorting.oracle import Motion, pick_and_place
+    from sorting_battery.configs import make_env_cfg
+    from sorting_battery.env import SortingEnv
+    from sorting_battery.harness import park_q
+    from sorting_battery import layout as S
+    from sorting_battery.oracle import Motion, pick_and_place
 
     env = SortingEnv(make_env_cfg("sorting.env.fanuc", "deploy"), spp=16, views=("overview",))
     be = env.backend
     import cv2                                    # pxr only once the app is up
     from pxr import Gf, UsdGeom
-    from sorting.backend import C
+    from sorting_battery.backend import C
     top = C.TABLE_TOP_Z
 
     def shot(name, eye, look):

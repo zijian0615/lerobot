@@ -24,13 +24,13 @@ run() {   # cell, then the command that writes frames to $WORK/<cell>/frames and
   echo "$(date +%T) END $cell $(ls -la $SITE/videos/$cell.mp4 2>/dev/null | awk '{print $5}') bytes"
 }
 
-sorting()  { run sorting_$1 $PY -m sorting.oracle --env sorting.$1.fanuc --policy $2 \
+sorting()  { run sorting_$1 $PY -m sorting_battery.oracle --env sorting.$1.fanuc --policy $2 \
                --spp 2 --stride 8 --out $WORK/sorting_$1/frames --report $WORK/sorting_$1/report.json; }
-conveyor() { run conveyor_$1 $PY -m sorting.conveyor.oracle --env conveyor.$1.fanuc --policy $2 \
+conveyor() { run conveyor_$1 $PY -m sorting_conveyor.oracle --env conveyor.$1.fanuc --policy $2 \
                --spp 2 --stride 3 --out $WORK/conveyor_$1/frames --report $WORK/conveyor_$1/report.json; }
 loto()     { run loto_$1 $PY loto/isaac/run_loto.py --env loto.$1.fanuc --policy $2 --phase deploy \
                --spp 4 --stride 3 --out $WORK/loto_$1/frames --report $WORK/loto_$1/report.json; }
-mail()     { run mail_$1 $PY -m sorting.mail_sorting.oracle --env mail_sorting.$2.fanuc --policy $3 \
+mail()     { run mail_$1 $PY -m sorting_mail.v1.oracle --env mail_sorting.$2.fanuc --policy $3 \
                --spp 2 --stride 6 --out $WORK/mail_$1/frames --report $WORK/mail_$1/report.json; }
 gpu()      { run gpu_$1 $PY loto/agent/program_runner.py --program showcase/programs/gpu_$1.py \
                --env assembly.gpu_install.$1.fanuc --phase deploy --spp 2 --video-stride 3 \

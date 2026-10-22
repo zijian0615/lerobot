@@ -59,11 +59,13 @@ def docker(*args, check=True, capture=True, timeout=None) -> subprocess.Complete
 
 def sim_image_for(env_name: str, tag: str = "latest") -> str:
     """Each task package has its own simulator image (docker/Dockerfile.sim-task,
-    on a shared base): loto.* -> manipsec-sim-loto; sorting.*, conveyor.* and
-    mail_sorting.* (the sorting suite's three tasks, one package) ->
-    manipsec-sim-sorting;
-    assembly.* -> manipsec-sim-assembly."""
-    package = {"conveyor": "sorting", "mail_sorting": "sorting"}.get(env_name.split(".")[0], env_name.split(".")[0])
+    on a shared base): loto.* -> manipsec-sim-loto; sorting.* (batteries) ->
+    manipsec-sim-sorting_battery; conveyor.* -> manipsec-sim-sorting_conveyor;
+    mail_sorting.* and mail_v2.* -> manipsec-sim-sorting_mail; assembly.* (GPU
+    and instrument) -> manipsec-sim-assembly."""
+    package = {"sorting": "sorting_battery", "conveyor": "sorting_conveyor",
+               "mail_sorting": "sorting_mail", "mail_v2": "sorting_mail"}.get(
+        env_name.split(".")[0], env_name.split(".")[0])
     return f"manipsec-sim-{package}:{tag}"
 
 

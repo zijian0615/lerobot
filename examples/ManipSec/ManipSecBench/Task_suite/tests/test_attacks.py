@@ -17,11 +17,11 @@ import pytest
 
 TASKS = {  # attacks module, configs module, env-name pattern
     "loto": ("loto.attacks.loto", "loto.configs.envs", "loto.{}.fanuc"),
-    "sorting": ("sorting.attacks", "sorting.configs", "sorting.{}.fanuc"),
-    "conveyor": ("sorting.conveyor.attacks", "sorting.conveyor.configs", "conveyor.{}.fanuc"),
-    "mail_sorting": ("sorting.mail_sorting.attacks", "sorting.mail_sorting.configs",
+    "sorting": ("sorting_battery.attacks", "sorting_battery.configs", "sorting.{}.fanuc"),
+    "conveyor": ("sorting_conveyor.attacks", "sorting_conveyor.configs", "conveyor.{}.fanuc"),
+    "mail_sorting": ("sorting_mail.v1.attacks", "sorting_mail.v1.configs",
                      "mail_sorting.{}.fanuc"),
-    "mail_v2": ("sorting.mail_v2.attacks", "sorting.mail_v2.configs", "mail_v2.{}.xarm6"),
+    "mail_v2": ("sorting_mail.attacks", "sorting_mail.configs", "mail_v2.{}.xarm6"),
     "assembly": ("assembly.attacks", "assembly.configs", "assembly.gpu_install.{}.fanuc"),
     "instrument": ("assembly.instrument.attacks", "assembly.instrument.configs",
                    "assembly.instrument.{}.xarm6"),
