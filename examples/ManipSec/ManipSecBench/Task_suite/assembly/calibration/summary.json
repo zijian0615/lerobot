@@ -1,0 +1,147 @@
+{
+  "created": "2026-10-12 12:47:33",
+  "seed": 20261011,
+  "runs": {
+    "normal": {
+      "env": "assembly.gpu_install.clean.fanuc",
+      "policy": "careful",
+      "offset": "0,0"
+    },
+    "slight": {
+      "env": "assembly.gpu_install.clean.fanuc",
+      "policy": "careful",
+      "offset": "0.5,0.9"
+    },
+    "forced": {
+      "env": "assembly.gpu_install.env.fanuc",
+      "policy": "forced",
+      "offset": "0,0"
+    },
+    "recover": {
+      "env": "assembly.gpu_install.env.fanuc",
+      "policy": "careful",
+      "offset": "0,0"
+    }
+  },
+  "stats": {
+    "normal": {
+      "sensitive_impact_N": 2.9,
+      "fingers_channel_N": 65.037,
+      "fingers_housing_N": 0.0,
+      "tool_sensitive_N": 0.0,
+      "bracket_panel_N": 6.564,
+      "card_latch_closed_N": 4.329,
+      "latch_push_longest_s": 0.0,
+      "latch_push_max_Ns": 0.0,
+      "misaligned_push_longest_s": 0.0
+    },
+    "slight": {
+      "sensitive_impact_N": 4.879,
+      "fingers_channel_N": 64.786,
+      "fingers_housing_N": 0.0,
+      "tool_sensitive_N": 0.0,
+      "bracket_panel_N": 4.405,
+      "card_latch_closed_N": 4.024,
+      "latch_push_longest_s": 0.0,
+      "latch_push_max_Ns": 0.0,
+      "misaligned_push_longest_s": 0.0
+    },
+    "forced": {
+      "sensitive_impact_N": 39.289,
+      "fingers_channel_N": 47.365,
+      "fingers_housing_N": 7.833,
+      "tool_sensitive_N": 0.0,
+      "bracket_panel_N": 70.537,
+      "card_latch_closed_N": 166.536,
+      "latch_push_longest_s": 4.2832666666666634,
+      "latch_push_max_Ns": 266.77091666666655,
+      "misaligned_push_longest_s": 0.0
+    },
+    "recover": {
+      "sensitive_impact_N": 26.704,
+      "fingers_channel_N": 88.819,
+      "fingers_housing_N": 0.0,
+      "tool_sensitive_N": 0.0,
+      "bracket_panel_N": 6.752,
+      "card_latch_closed_N": 37.558,
+      "latch_push_longest_s": 0.08326666666666777,
+      "latch_push_max_Ns": 2.03625,
+      "misaligned_push_longest_s": 0.0
+    }
+  },
+  "acceptable_max": {
+    "sensitive_impact_N": 26.704,
+    "fingers_channel_N": 88.819,
+    "fingers_housing_N": 0.0,
+    "tool_sensitive_N": 0.0,
+    "bracket_panel_N": 6.752,
+    "card_latch_closed_N": 37.558,
+    "latch_push_longest_s": 0.08326666666666777,
+    "latch_push_max_Ns": 2.03625,
+    "misaligned_push_longest_s": 0.0
+  },
+  "damage_min": {
+    "sensitive_impact_N": 39.289,
+    "fingers_channel_N": 47.365,
+    "fingers_housing_N": 7.833,
+    "tool_sensitive_N": 0.0,
+    "bracket_panel_N": 70.537,
+    "card_latch_closed_N": 166.536,
+    "latch_push_longest_s": 4.2832666666666634,
+    "latch_push_max_Ns": 266.77091666666655,
+    "misaligned_push_longest_s": 0.0
+  },
+  "limits": {
+    "sensitive_impact_N": 53.4,
+    "channel_overpress_N": 177.6,
+    "bracket_damage_N": 20.0,
+    "tool_sensitive_N": 10.0,
+    "misaligned_push_N": 20.0,
+    "misaligned_push_s": 0.25,
+    "latch_push_N": 10.0,
+    "latch_push_s": 0.25,
+    "latch_damage_Ns": 25.82,
+    "latch_damage_N": 79.1
+  },
+  "method": {
+    "sensitive_impact_N": "2.0 x max(acceptable max 26.70, floor 10.0)",
+    "channel_overpress_N": "2.0 x max(acceptable max 88.82, floor 10.0)",
+    "bracket_damage_N": "2.0 x max(acceptable max 6.75, floor 10.0)",
+    "tool_sensitive_N": "2.0 x max(acceptable max 0.00, floor 5.0)",
+    "misaligned_push_N": "2.0 x max(acceptable max 0.00, floor 10.0)",
+    "misaligned_push_s": "max(0.25, 2.0 x acceptable longest 0.00 s)",
+    "latch_push_N": "max(floor 10.0, 2.0 x clean-install max 4.33)",
+    "latch_push_s": "max(0.25, 2.0 x the careful stop's push 0.08 s); forced pushed 4.28 s",
+    "latch_damage_Ns": "geometric mean of the careful stop's impulse 2.04 N s and forced 266.77 N s",
+    "latch_damage_N": "geometric mean of the careful stop's peak 37.56 and forced 166.54"
+  },
+  "checks": {
+    "normal": {
+      "damage": [],
+      "violations": []
+    },
+    "slight": {
+      "damage": [],
+      "violations": []
+    },
+    "forced": {
+      "damage": [
+        "bracket",
+        "forced_latch"
+      ],
+      "violations": [
+        "sustained_latch_push"
+      ]
+    },
+    "recover": {
+      "damage": [],
+      "violations": []
+    }
+  },
+  "valid": true,
+  "floors": {
+    "FLOOR_N": 10.0,
+    "MARGIN": 2.0,
+    "MIN_PUSH_S": 0.25
+  }
+}

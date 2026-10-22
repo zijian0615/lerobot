@@ -1,0 +1,58 @@
+# syntax=docker/dockerfile:1
+# Simulator base image: Isaac Sim, the FANUC cell, and what every task shares
+# -- the agent harness (loto/agent: program_runner, dev_server, workspace,
+# wire) and the arm's kinematics and backgrounds (loto/isaac: backends,
+# layout, make_labels). No task's scenes, graders or attacks: each task's
+# image (Dockerfile.sim-task) adds its own on top of this one, so all tasks
+# run on the same Isaac Sim and cell. The agent never gets a shell in it.
+# Build contexts: "suite" = Task_suite, "fanuc" = fanuc_er4ia_sim.
+FROM ubuntu:24.04
+ARG UID=1000
+ARG GID=1000
+ARG INSTALL_ISAAC=1
+ARG ISAACSIM_VERSION=6.0.1.0
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      python3.12 python3.12-venv ca-certificates \
+      libgl1 libglu1-mesa libegl1 libvulkan1 libgomp1 libxkbcommon0 \
+      libxrandr2 libxinerama1 libxcursor1 libxi6 libxt6 libsm6 libice6 \
+ && rm -rf /var/lib/apt/lists/*
+# Vulkan finds the driver the NVIDIA container toolkit mounts in
+RUN mkdir -p /etc/vulkan/icd.d \
+ && printf '{"file_format_version":"1.0.0","ICD":{"library_path":"libGLX_nvidia.so.0","api_version":"1.3"}}\n' \
+      > /etc/vulkan/icd.d/nvidia_icd.json
+
+# ubuntu:24.04 ships a user "ubuntu" with 1000:1000; reuse the ids if taken
+RUN (getent group "$GID" || groupadd -g "$GID" sim) \
+ && (getent passwd "$UID" >/dev/null && usermod -l sim -d /home/sim -m "$(getent passwd "$UID" | cut -d: -f1)" \
+     || useradd -m -u "$UID" -g "$GID" -d /home/sim -s /bin/bash sim) \
+ && install -d -o "$UID" -g "$GID" /opt/venv /bench
+
+# Isaac Sim writes into its install at runtime: install it as the run user
+USER sim
+RUN python3.12 -m venv /opt/venv
+ENV PATH=/opt/venv/bin:$PATH
+RUN pip install --no-cache-dir numpy opencv-python-headless
+RUN if [ "$INSTALL_ISAAC" = "1" ]; then \
+      pip install --no-cache-dir "isaacsim[all,extscache]==${ISAACSIM_VERSION}" \
+          --extra-index-url https://pypi.nvidia.com; \
+    fi
+
+COPY --chown=$UID:$GID --from=fanuc . /bench/fanuc_er4ia_sim
+COPY --chown=$UID:$GID --from=suite loto/__init__.py /bench/Task_suite/loto/
+COPY --chown=$UID:$GID --from=suite \
+     loto/isaac/__init__.py loto/isaac/backends.py loto/isaac/layout.py loto/isaac/make_labels.py \
+     /bench/Task_suite/loto/isaac/
+COPY --chown=$UID:$GID --from=suite \
+     loto/agent/tasks.py loto/agent/program_runner.py loto/agent/dev_server.py \
+     loto/agent/workspace.py loto/agent/wire.py loto/agent/robot_api.py \
+     loto/agent/program_host.py loto/agent/dev_client.py \
+     /bench/Task_suite/loto/agent/
+RUN find /bench -name __pycache__ -prune -exec rm -rf {} +
+
+ENV NVIDIA_VISIBLE_DEVICES=all NVIDIA_DRIVER_CAPABILITIES=all \
+    OMNI_KIT_ACCEPT_EULA=YES FANUC_SIM_DIR=/bench/fanuc_er4ia_sim \
+    PYTHONDONTWRITEBYTECODE=1 HOME=/home/sim
+WORKDIR /bench/Task_suite/loto/agent

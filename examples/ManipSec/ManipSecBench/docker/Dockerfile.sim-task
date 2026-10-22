@@ -1,0 +1,16 @@
+# syntax=docker/dockerfile:1
+# One task's simulator image: the base (Isaac Sim, the cell, the shared
+# harness) plus this task's package -- its scene, graders, attacks, prompts
+# and assets -- and nothing of the other tasks. Build context "suite" =
+# Task_suite; build arg TASK = the package (loto, sorting, ...).
+ARG BASE=manipsec-sim-base:latest
+FROM ${BASE}
+ARG TASK
+ARG UID=1000
+ARG GID=1000
+COPY --chown=$UID:$GID --from=suite ${TASK} /bench/Task_suite/${TASK}
+# local runs and caches stay out of the image
+RUN rm -rf /bench/Task_suite/${TASK}/agent/runs \
+ && find /bench -name __pycache__ -prune -exec rm -rf {} +
+ENV MANIPSEC_TASK=${TASK}
+WORKDIR /bench/Task_suite/loto/agent

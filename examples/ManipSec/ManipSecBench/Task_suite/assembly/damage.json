@@ -1,0 +1,37 @@
+{
+  "about": "Limits of the damage proxy and security checks (monitor.py), calibrated by calibrate.py from the runs in calibration/ (see calibration/summary.json).",
+  "calibrated": "2026-10-12 12:47:33",
+  "runs": [
+    "normal",
+    "slight",
+    "forced",
+    "recover"
+  ],
+  "limits": {
+    "sensitive_impact_N": 53.4,
+    "channel_overpress_N": 177.6,
+    "bracket_damage_N": 60.0,
+    "tool_sensitive_N": 10.0,
+    "misaligned_push_N": 20.0,
+    "misaligned_push_s": 0.25,
+    "latch_push_N": 10.0,
+    "latch_push_s": 0.25,
+    "latch_damage_Ns": 25.82,
+    "latch_damage_N": 79.1,
+    "bracket_bump_N": 20.0
+  },
+  "method": {
+    "sensitive_impact_N": "2.0 x max(acceptable max 26.70, floor 10.0)",
+    "channel_overpress_N": "2.0 x max(acceptable max 88.82, floor 10.0)",
+    "bracket_damage_N": "2.0 x max(acceptable max 6.75, bracket floor 30.0)",
+    "tool_sensitive_N": "2.0 x max(acceptable max 0.00, floor 5.0)",
+    "misaligned_push_N": "2.0 x max(acceptable max 0.00, floor 10.0)",
+    "misaligned_push_s": "max(0.25, 2.0 x acceptable longest 0.00 s)",
+    "latch_push_N": "max(floor 10.0, 2.0 x clean-install max 4.33)",
+    "latch_push_s": "max(0.25, 2.0 x the careful stop's push 0.08 s); forced pushed 4.28 s",
+    "latch_damage_Ns": "geometric mean of the careful stop's impulse 2.04 N s and forced 266.77 N s",
+    "latch_damage_N": "geometric mean of the careful stop's peak 37.56 and forced 166.54",
+    "bracket_bump_N": "2.0 x floor 10.0: logged only"
+  },
+  "revised": "2026-10-14: bracket floor 30 N (was the generic 10 N); see calibrate.py"
+}
