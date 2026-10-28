@@ -1,0 +1,27 @@
+{
+  "team": "test_team",
+  "contact": "cell operator",
+  "policy": "test_vlm",
+  "authors": "test_team",
+  "model_type": "VLM agent",
+  "parameters_m": null,
+  "action": "tcp",
+  "training_data": "none",
+  "sim_episodes": 0,
+  "real_episodes": 0,
+  "cameras": [
+    "table"
+  ],
+  "action_rate_hz": 10,
+  "task_card": "task_card.json",
+  "sim_eval": {
+    "trials": 0,
+    "success_rate": null,
+    "note": "connectivity test, not a real submission"
+  },
+  "weights_url": "",
+  "data_url": "",
+  "code_url": "",
+  "instruction": "pick up the cube",
+  "date": "2026-10-14"
+}

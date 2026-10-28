@@ -24,10 +24,14 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from move_home import NAMES, go_home, live_joints, tip  # noqa: E402
 
+import scene_config as C  # noqa: E402
+
 from lerobot.robots.fanuc import Fanuc, FanucConfig  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
-MIN_TIP_Z_M = 0.003  # the demo grasps at 4.4 mm
+# Never closer to the work surface than this. The surface is C.SURFACE_DZ in the base frame (measured
+# 5.1 mm below the base plane); demos grasp TIP_CLEARANCE (2.5 mm) above it.
+MIN_TIP_CLEARANCE_M = 0.001
 
 
 def main():
@@ -48,11 +52,13 @@ def main():
     closes = [i for i in range(1, len(targets)) if targets[i][1] >= 0.5 > targets[i - 1][1]]
     fps = args.fps or meta["fps"]
     print(f"[replay] {args.episode.parent.name}: {len(targets)} actions at {fps} Hz (~{len(targets) / fps:.0f} s), "
-          f"screw layout {meta['screw_layout']}")
-    print(f"[replay] lowest fingertip target {lowest * 1000:.1f} mm above the table; gripper closes at step "
+          f"screw layout {meta.get('screw_layout', meta.get('object_layout'))}")
+    print(f"[replay] lowest fingertip target {(lowest - C.SURFACE_DZ) * 1000:.1f} mm above the work surface "
+          f"({lowest * 1000:.1f} mm in the base frame); gripper closes at step "
           f"{closes} with the tip at {[np.round(tip(targets[i][0]) * 1000, 1).tolist() for i in closes]} mm")
-    if lowest < MIN_TIP_Z_M:
-        raise SystemExit(f"[replay] refusing: a target takes the fingertip below {MIN_TIP_Z_M * 1000:.0f} mm")
+    if lowest - C.SURFACE_DZ < MIN_TIP_CLEARANCE_M:
+        raise SystemExit(f"[replay] refusing: a target takes the fingertip within {MIN_TIP_CLEARANCE_M * 1000:.0f} mm "
+                         "of the work surface")
 
     robot = Fanuc(FanucConfig(host=args.host, motion="joint", twin_udp_host=""))
     robot.connect()
@@ -83,7 +89,7 @@ def main():
         if log:
             args.out.mkdir(parents=True, exist_ok=True)
             path = args.out / f"replay_{time.strftime('%Y%m%d_%H%M%S')}.json"
-            path.write_text(json.dumps({"episode": str(args.episode), "screw_layout": meta["screw_layout"], "log": log}))
+            path.write_text(json.dumps({"episode": str(args.episode), "screw_layout": meta.get('screw_layout', meta.get('object_layout')), "log": log}))
             lags = np.array([e["lag_mm"] for e in log[: len(targets)]])
             at_close = [log[i]["live_tip_mm"] for i in closes if i < len(log)]
             print(f"[replay] tracking lag median {np.median(lags):.1f} mm, p90 {np.percentile(lags, 90):.1f}, "

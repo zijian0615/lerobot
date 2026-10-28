@@ -1,0 +1,1475 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Physical AI Hackathon for the Factory Floor (2026) · Participant dashboard</title>
+<link rel="icon" type="image/svg+xml" href='data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"%3E%3Crect width="32" height="32" rx="7" fill="%23141413"/%3E%3Crect x="5.5" y="24" width="13" height="3.6" rx="1.2" fill="%23faf8f3"/%3E%3Cpath d="M12 22.5V12.5L22.5 8.5" fill="none" stroke="%23ffbd00" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"/%3E%3Cpath d="M22.5 8.5V13M19.8 13.2H25.2M19.8 13.2V18M25.2 13.2V18" fill="none" stroke="%23faf8f3" stroke-width="1.9" stroke-linecap="round"/%3E%3Ccircle cx="12" cy="22.5" r="2.7" fill="%23faf8f3"/%3E%3Ccircle cx="12" cy="12.5" r="2.4" fill="%23faf8f3"/%3E%3Ccircle cx="22.5" cy="8.5" r="2.1" fill="%23faf8f3"/%3E%3C/svg%3E'>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Anthropic-like warm neutrals, UWM gold and black */
+  --bg: #faf9f5; --bg-2: #ffffff; --surface: #ffffff; --surface2: #f0eee6; --border: #e8e6dc; --border-strong: #d1cfc5;
+  --text: #141413; --text-muted: #6b6a63; --ink: #141413; --gold-uwm: #ffbd00; --accent: #141413;
+  --gold: #c99300; --silver: #8a8a85; --bronze: #a8693a; --green: #3f7d58; --red: #b5452f; --amber: #b07d00;
+  --stage0: #e8e6dc; --stage1: #f6e3a8; --stage2: #f2cf6a; --stage3: #e6b422; --stage4: #3f7d58;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141413; --bg-2: #1c1c1a; --surface: #1f1e1c; --surface2: #2a2926; --border: #33322e; --border-strong: #46453f;
+    --text: #f0eee6; --text-muted: #a3a198; --ink: #f0eee6; --accent: #ffbd00;
+    --gold: #ffbd00; --silver: #b9b7ae; --bronze: #d08a52; --green: #6fb38a; --red: #e07a62; --amber: #ffbd00;
+    --stage0: #33322e; --stage1: #5c4e1f; --stage2: #8a6d12; --stage3: #c99300; --stage4: #4f9a6d;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141413; --bg-2: #1c1c1a; --surface: #1f1e1c; --surface2: #2a2926; --border: #33322e; --border-strong: #46453f;
+  --text: #f0eee6; --text-muted: #a3a198; --ink: #f0eee6; --accent: #ffbd00;
+  --gold: #ffbd00; --silver: #b9b7ae; --bronze: #d08a52; --green: #6fb38a; --red: #e07a62; --amber: #ffbd00;
+  --stage0: #33322e; --stage1: #5c4e1f; --stage2: #8a6d12; --stage3: #c99300; --stage4: #4f9a6d;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: 15px/1.6 Inter, system-ui, sans-serif; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 40px 16px 72px; }
+h1, h2, h3 { font-family: "Source Serif 4", Georgia, serif; font-weight: 600; letter-spacing: -0.01em; }
+h1 { font-size: clamp(1.6rem, 3.6vw, 2.2rem); line-height: 1.15; margin: 0 0 8px; }
+.marks { display: inline-grid; gap: 3px; margin-right: 10px; vertical-align: middle; }  /* one square: Participants; two, stacked: Organizer; three, one over two: Operator */
+.marks .mark { display: block; width: 12px; height: 12px; background: var(--gold-uwm); border-radius: 2px; }
+.marks.n2 .mark, .marks.n3 .mark { width: 9px; height: 9px; }
+.marks.n3 { grid-template-columns: 9px 9px; }
+.marks.n3 .mark:first-child { grid-column: 1 / 3; justify-self: center; }
+.track { font: 500 1.12rem "Source Serif 4", Georgia, serif; color: var(--text); margin: 0 0 14px; }
+.role { display: flex; align-items: center; font: 600 1.25rem "Source Serif 4", Georgia, serif; margin: 0 0 8px; }
+h2 { font-size: 1.3rem; margin: 44px 0 14px; }
+.sub { color: var(--text-muted); margin: 0 0 8px; max-width: 720px; font-size: 1rem; }
+.label { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+.card .v { font-weight: 500; margin-top: 4px; }
+.banner { border: 1px solid var(--border-strong); border-left: 4px solid var(--gold-uwm); background: var(--surface); border-radius: 8px;
+  padding: 10px 14px; margin: 0 0 16px; font-size: 0.9rem; }
+nav.top { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin: 28px 0 28px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+nav.top a { font-weight: 500; font-size: 0.95rem; color: var(--text-muted); padding: 10px 16px; border-bottom: 3px solid transparent; margin-bottom: -1px; white-space: nowrap; text-decoration: none; }
+nav.top a:hover { color: var(--text); }
+nav.top a.on { color: var(--text); border-bottom-color: var(--gold-uwm); }
+section.page[hidden] { display: none; }
+body:not(.org) .org-only { display: none !important; }
+.viewsw { float: right; display: inline-flex; border: 1px solid var(--border-strong); border-radius: 999px; padding: 3px; margin-top: 10px; background: var(--surface); }
+.viewsw button { font: 500 0.8rem Inter, sans-serif; color: var(--text-muted); background: none; border: 0; border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+.viewsw button.on { background: var(--ink); color: var(--bg); }
+@media (max-width: 640px) { .viewsw { float: none; margin: 0 0 14px; } }
+.org-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin: 0 0 16px; }
+.org-bar .muted { font-size: 0.85rem; }
+.err { color: var(--red); font-size: 0.85rem; }
+.reqs, .orgruns { display: grid; gap: 12px; }
+.card.req { padding: 16px 18px; }
+.card.req .top { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; justify-content: space-between; }
+.card.req h3 { margin: 4px 0 2px; font-size: 1.1rem; }
+.card.req .meta { color: var(--text-muted); font-size: 0.85rem; }
+.card.req .kv2 { display: grid; grid-template-columns: max-content 1fr; gap: 3px 14px; font-size: 0.88rem; margin: 10px 0 0; }
+.card.req .kv2 span:nth-child(odd) { color: var(--text-muted); }
+.card.req .act { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+.card.req input, .modal input.pw { font: 0.88rem Inter, sans-serif; color: var(--text); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px; padding: 6px 10px; }
+.card.req input[type=number] { width: 72px; }
+.card.req input.reason { flex: 1 1 220px; min-width: 0; }
+.st { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border-strong); }
+.st.pending { color: var(--amber); border-color: var(--amber); }
+.st.approved { color: var(--green, #3f7d58); border-color: currentColor; }
+.st.rejected { color: var(--red); border-color: var(--red); }
+table.org { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+table.org th { text-align: left; font-weight: 600; color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; padding: 8px 10px; border-bottom: 1px solid var(--border-strong); white-space: nowrap; }
+table.org td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+table.org tr.hid td { color: var(--text-muted); }
+table.org td button.f { padding: 3px 9px; font-size: 0.78rem; }
+.statgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.keys { margin: 0 0 20px; }
+.keys form { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.keys input { flex: 1 1 280px; min-width: 0; font: 0.85rem ui-monospace, monospace; color: var(--text); background: var(--surface);
+  border: 1px solid var(--border-strong); border-radius: 8px; padding: 6px 10px; }
+.keys .mine { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.keys .msg { color: var(--red); font-size: 0.85rem; margin: 8px 0 0; }
+.tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 18px; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin: 8px 0 12px; }
+.controls > div { display: flex; flex-wrap: wrap; gap: 8px; }
+button.f { font: 500 0.85rem Inter, sans-serif; color: var(--text); background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: 8px; padding: 6px 12px; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+button.f:hover { background: var(--surface2); }
+button.f.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.dot { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid currentColor; display: inline-block; }
+button.f.on .dot { background: var(--gold-uwm); border-color: var(--gold-uwm); }
+.picker { position: relative; }
+.panel { display: none; position: absolute; right: 0; top: 110%; z-index: 20; background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: 10px; padding: 8px 12px; min-width: 200px; box-shadow: 0 8px 24px rgba(20,20,19,.12); }
+.panel.open { display: block; }
+.panel label { display: flex; gap: 8px; padding: 3px 0; font-size: 0.85rem; cursor: pointer; }
+.table-box { background: var(--bg-2); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.scroll { overflow-x: auto; scrollbar-color: var(--border-strong) transparent; }
+table { border-collapse: collapse; width: 100%; min-width: 820px; }
+th { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted);
+  text-align: left; padding: 12px 12px; border-bottom: 1px solid var(--border-strong); white-space: nowrap; cursor: pointer; background: var(--surface2); position: relative; }
+th.c, td.c { text-align: center; }
+th[data-tip]:hover::after { content: attr(data-tip); position: absolute; left: 0; top: 100%; z-index: 30; width: 260px; white-space: normal;
+  text-transform: none; letter-spacing: 0; font: 400 0.8rem/1.45 Inter, sans-serif; color: var(--text); background: var(--surface);
+  border: 1px solid var(--border-strong); border-radius: 8px; padding: 8px 10px; box-shadow: 0 8px 24px rgba(20,20,19,.12); }
+th .arrow { color: var(--gold); }
+td { padding: 12px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; font-size: 0.92rem; }
+tr:last-child td { border-bottom: 0; }
+tr.row { cursor: pointer; }
+tr.row:hover td { background: var(--surface2); }
+tr.row.sel td { background: color-mix(in srgb, var(--gold-uwm) 14%, transparent); }
+.rank { font-weight: 600; width: 36px; color: var(--text-muted); }
+.r1 { color: var(--gold); } .r2 { color: var(--silver); } .r3 { color: var(--bronze); }
+.pol { font-weight: 600; white-space: nowrap; }
+.team { color: var(--text-muted); font-size: 0.82rem; white-space: nowrap; }
+.tag { display: inline-block; font-size: 0.66rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; border-radius: 4px;
+  padding: 1px 6px; margin-left: 6px; vertical-align: 2px; border: 1px solid var(--border-strong); color: var(--text-muted); }
+.tag.mock { color: var(--amber); border-color: var(--amber); }
+.sr { font-weight: 600; font-size: 1.02rem; font-variant-numeric: tabular-nums; }
+.ci { color: var(--text-muted); font-size: 0.76rem; }
+.bar { position: relative; height: 5px; background: var(--surface2); border-radius: 3px; margin-top: 6px; width: 120px; }
+.bar i { position: absolute; top: 0; bottom: 0; background: color-mix(in srgb, var(--gold-uwm) 45%, transparent); border-radius: 3px; }
+.bar b { position: absolute; top: -2px; width: 3px; height: 9px; background: var(--ink); border-radius: 2px; }
+.badge { font-size: 0.74rem; font-weight: 500; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border-strong); white-space: nowrap; }
+.muted { color: var(--text-muted); }
+a { color: var(--text); text-decoration: underline; text-decoration-color: var(--gold-uwm); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+a:hover { text-decoration-color: var(--text); }
+tr.detail td { background: var(--surface2); padding: 16px 18px 20px; }
+.det { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 28px; }
+@media (max-width: 760px) { .det { grid-template-columns: 1fr; } }
+.lay { display: grid; grid-template-columns: 64px 1fr 80px; gap: 8px; align-items: center; font-size: 0.85rem; margin: 6px 0; }
+.lbar { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+.lbar i { display: block; height: 100%; background: var(--ink); }
+.strip { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.chip { width: 26px; height: 26px; border-radius: 6px; display: grid; place-items: center; font-size: 0.72rem; font-weight: 600; color: #141413; }
+.chip.f { outline: 2px solid var(--red); outline-offset: 1px; }
+.legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.78rem; color: var(--text-muted); margin-top: 8px; }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.links a { margin-right: 12px; font-size: 0.85rem; }
+.empty { padding: 48px; text-align: center; color: var(--text-muted); }
+.rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.rules .card p { margin: 6px 0 0; font-size: 0.9rem; }
+ol.stages, ul.stages { margin: 6px 0 0; padding-left: 18px; font-size: 0.9rem; } .stages li { margin: 3px 0; }
+.overlay { display: none; position: fixed; inset: 0; background: rgba(20,20,19,.5); z-index: 50; align-items: center; justify-content: center; padding: 16px; }
+.overlay.open { display: flex; }
+.modal { background: var(--bg-2); border: 1px solid var(--border-strong); border-radius: 14px; padding: 22px; width: min(640px, 100%); max-height: 90vh; overflow: auto; position: relative; }
+.modal .x { position: absolute; right: 12px; top: 8px; background: none; border: 0; color: var(--text-muted); font-size: 1.4rem; cursor: pointer; }
+.drow { display: grid; grid-template-columns: 1fr 64px 1fr; gap: 8px; align-items: center; margin: 7px 0; font-size: 0.85rem; }
+.drow .l { display: flex; justify-content: flex-end; } .drow .n { text-align: center; font-weight: 600; }
+.drow .l i, .drow .r i { display: block; height: 12px; border-radius: 3px; }
+.drow .l i { background: var(--text-muted); } .drow .r i { background: var(--gold-uwm); }
+.hint { color: var(--text-muted); font-size: 0.84rem; margin: 6px 0 0; }
+.steps { counter-reset: st; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; max-width: 860px; }
+.step { border-left: 3px solid var(--border-strong); padding: 2px 0 6px 20px; min-width: 0; overflow-wrap: anywhere; }
+.step h3 { margin: 0 0 6px; font-size: 1.12rem; }
+.step h3::before { counter-increment: st; content: counter(st) "."; color: var(--gold); margin-right: 8px; }
+.step p { font-size: 0.94rem; margin: 6px 0; }
+pre.cmd { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; overflow-x: auto;
+  font: 0.84rem/1.55 ui-monospace, "SF Mono", Menlo, monospace; margin: 10px 0 6px; position: relative; }
+pre.cmd button { position: absolute; top: 7px; right: 7px; font: 500 0.72rem Inter, sans-serif; background: var(--surface); color: var(--text-muted);
+  border: 1px solid var(--border-strong); border-radius: 6px; padding: 2px 8px; cursor: pointer; }
+table.kv { min-width: 0; width: 100%; border-collapse: collapse; font-size: 0.88rem; margin-top: 8px; }
+table.kv td { padding: 7px 10px 7px 0; border-bottom: 1px solid var(--border); vertical-align: top; }
+table.kv td:first-child { white-space: nowrap; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.82rem; width: 1%; padding-right: 18px; }
+.res-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+.res-grid[hidden] { display: none; }
+a.res-card { display: block; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+  color: var(--text); text-decoration: none; transition: border-color .15s, transform .15s; }
+a.res-card:hover { border-color: var(--border-strong); transform: translateY(-2px); }
+a.res-card svg { display: block; width: 100%; height: auto; background: var(--surface2); border-bottom: 1px solid var(--border); }
+a.res-card svg .ln { fill: none; stroke: var(--text-muted); stroke-width: 1.2; }
+a.res-card svg .ln.soft { stroke: var(--border-strong); stroke-width: 1; }
+a.res-card svg .ac { fill: none; stroke: var(--gold-uwm); stroke-width: 2; }
+a.res-card svg .pt { fill: var(--gold-uwm); }
+a.res-card svg .nd { fill: var(--surface); stroke: var(--text-muted); stroke-width: 1.2; }
+a.res-card .body { padding: 14px 16px 16px; }
+a.res-card h3 { margin: 0 0 4px; font-size: 1.15rem; }
+a.res-card p { margin: 0; color: var(--text-muted); font-size: 0.88rem; }
+a.res-card .tag { margin-left: 8px; vertical-align: 2px; }
+.cad-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; max-width: 760px; }
+.card.cad { padding: 18px 20px; display: flex; flex-direction: column; }
+.card.cad .links { margin-top: auto; }
+.card.cad h3 { margin: 4px 0 6px; font-size: 1.25rem; }
+.card.cad p { margin: 0 0 12px; }
+.card.cad .links .muted { margin: 0 18px 0 -6px; font-size: 0.8rem; }
+a.back { display: inline-block; margin: 0 0 18px; font-size: 0.88rem; }
+.faq { max-width: 760px; }
+.faq h3.faq-h { font-size: 1.15rem; margin: 30px 0 4px; }
+.faq h3.faq-h:first-child { margin-top: 0; }
+.faq details { border-bottom: 1px solid var(--border); padding: 12px 0; }
+.faq summary { cursor: pointer; font-weight: 600; list-style: none; display: flex; justify-content: space-between; gap: 12px; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: "+"; color: var(--text-muted); font-weight: 400; }
+.faq details[open] summary::after { content: "−"; }
+.faq details p { margin: 10px 0 0; }
+article.post { max-width: 720px; }
+article.post h2.title { font-size: clamp(1.6rem, 3.6vw, 2.1rem); margin: 0 0 4px; }
+article.post .dek { color: var(--text-muted); font-style: italic; margin: 0 0 8px; }
+article.post h3 { font-size: 1.2rem; margin: 36px 0 10px; }
+article.post p { margin: 0 0 14px; }
+article.post blockquote { margin: 0 0 12px; padding: 2px 0 2px 14px; border-left: 3px solid var(--gold-uwm); font-weight: 600; }
+/* a rollout's two camera views, played in sync (the blog) */
+article.post figure.roll { margin: 18px 0 26px; width: 85%; }
+.roll-v { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.roll-v .rv { position: relative; }
+.roll-v video { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 10px; background: #141413; }
+.roll-v .tag { position: absolute; left: 10px; bottom: 10px; font: 600 0.7rem Inter, sans-serif; letter-spacing: .05em; text-transform: uppercase; color: #fff; background: rgba(20,20,19,.6); padding: 3px 8px; border-radius: 4px; }
+.roll-v .big-play { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 64px; height: 64px; border-radius: 50%; border: 0; background: rgba(255,255,255,.9); color: #141413; font-size: 22px; display: grid; place-items: center; cursor: pointer; box-shadow: 0 2px 12px rgba(0,0,0,.25); padding-left: 4px; }
+.roll.playing .big-play { display: none; }
+.roll-bar { display: flex; align-items: center; gap: 12px; margin-top: 10px; font: 0.82rem Inter, sans-serif; color: var(--text-muted); }
+.roll-bar .pp { border: 0; background: none; color: var(--text); font-size: 16px; cursor: pointer; padding: 4px; display: grid; }
+.roll-bar .seek { flex: 1; accent-color: var(--gold-uwm); min-width: 60px; }
+.roll-bar .t { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.roll-bar .spd { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; padding: 2px; }
+.roll-bar .spd button { border: 0; background: none; color: var(--text-muted); font: 600 0.75rem Inter, sans-serif; padding: 3px 8px; border-radius: 999px; cursor: pointer; }
+.roll-bar .spd button.on { background: var(--text); color: var(--bg); }
+@media (max-width: 640px) { article.post figure.roll { width: 100%; } .roll-v { grid-template-columns: 1fr; } .roll-bar { flex-wrap: wrap; } .roll-bar .seek { flex-basis: 100%; order: 3; } }
+article.post pre.code { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; overflow-x: auto;
+  font: 0.84rem/1.5 ui-monospace, "SF Mono", Menlo, monospace; margin: 0 0 14px; }
+article.post table.kv td:first-child { font-family: Inter, sans-serif; font-weight: 600; font-size: 0.88rem; }
+article.post sup.cite { font-size: 0.7em; line-height: 0; margin-left: 1px; }
+article.post sup.cite a { text-decoration: none; }
+article.post ol.refs { padding-left: 20px; color: var(--text-muted); font-size: 0.88rem; }
+article.post ol.refs li { margin: 0 0 6px; }
+article.post .ask { font-family: "Source Serif 4", Georgia, serif; font-size: 1.15rem; font-weight: 600; }
+code { font: 0.86em ui-monospace, "SF Mono", Menlo, monospace; background: var(--surface2); padding: 1px 5px; border-radius: 4px; }
+.placeholder { color: var(--text-muted); padding: 40px 0; }
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 12px; margin-bottom: 20px; }
+@media (max-width: 760px) { .hero { grid-template-columns: 1fr; } }
+.hero .cards { grid-template-columns: 1fr 1fr; margin: 0; align-content: start; }
+.clip { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.clip video { width: 100%; aspect-ratio: 16 / 9; border-radius: 8px; background: #141413; display: block; object-fit: cover; }
+.clip .empty-clip { aspect-ratio: 16 / 9; border-radius: 8px; background: var(--surface2); display: grid; place-items: center; color: var(--text-muted); font-size: 0.88rem; text-align: center; padding: 16px; }
+.clip .cap { font-size: 0.8rem; color: var(--text-muted); display: flex; justify-content: space-between; gap: 8px; }
+.chip.v, .chip.v * { cursor: pointer; } .chip.v { box-shadow: inset 0 -3px 0 var(--ink); }
+.chip.v:hover { filter: brightness(0.92); }
+.modal.wide { width: min(1120px, 100%); }
+.vids { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; }
+@media (max-width: 760px) { .vids { grid-template-columns: 1fr; } }
+.vids figure { margin: 0; } .vids figcaption { font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; }
+.vids video { width: 100%; height: auto; background: #141413; border-radius: 6px; display: block; }
+.player { display: flex; gap: 10px; align-items: center; margin: 12px 0 6px; }
+.player input[type=range] { flex: 1; accent-color: var(--gold-uwm); }
+.plot { width: 100%; height: 180px; display: block; }
+.plot text { fill: var(--text-muted); font-size: 10px; font-family: Inter, sans-serif; }
+.modal h2 { font-size: 1.25rem; margin: 22px 0 8px; } .modal p { font-size: 0.93rem; }
+.modal h3.mh { font-family: Inter, sans-serif; font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin: 22px 0 6px; }
+.fmt { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; } @media (max-width: 640px) { .fmt { grid-template-columns: 1fr; } }
+.fmt .card p { margin: 6px 0 0; font-size: 0.9rem; }
+.fmt-k { font: 600 0.85rem ui-monospace, "SF Mono", Menlo, monospace; }
+ul.tight { margin: 4px 0 0; padding-left: 18px; font-size: 0.92rem; } ul.tight li { margin: 4px 0; }
+svg.flow { width: 100%; max-width: 860px; height: auto; display: block; margin: 8px 0 4px; }
+svg.flow .box { fill: var(--surface); stroke: var(--border-strong); stroke-width: 1.5; }
+svg.flow .box.hl { stroke: var(--gold-uwm); stroke-width: 2.5; }
+svg.flow .box.sim { fill: var(--surface2); stroke-dasharray: 5 4; }
+svg.flow .a.s { font-size: 13px; fill: var(--text-muted); }
+svg.flow .dash.gold { stroke: var(--gold-uwm); stroke-width: 3; }
+svg.flow .dash.green { stroke: var(--green); animation-duration: 3s; }
+svg.flow .handoff { stroke: var(--border-strong); stroke-width: 2; fill: none; }
+svg.flow .head.muted { fill: var(--border-strong); }
+svg.flow .head.green, svg.flow .dot.green { fill: var(--green); }
+svg.flow .h.s { font-size: 18px; }
+svg.flow .k.s { font-size: 11px; }
+svg.flow .head.gold { fill: var(--gold-uwm); }
+svg.flow .k { font: 600 13px Inter, sans-serif; letter-spacing: 0.08em; text-transform: uppercase; fill: var(--text-muted); }
+svg.flow .h { font: 600 24px "Source Serif 4", Georgia, serif; fill: var(--text); }
+svg.flow .a { font: 600 16px ui-monospace, "SF Mono", Menlo, monospace; fill: var(--text); }
+svg.flow .track { stroke: var(--border); stroke-width: 6; stroke-linecap: round; fill: none; }
+svg.flow .dash { stroke: var(--ink); stroke-width: 2.5; fill: none; stroke-dasharray: 10 10; animation: flow 0.9s linear infinite; }
+svg.flow .head { fill: var(--ink); }
+svg.flow .dot { fill: var(--gold-uwm); }
+svg.flow .link-dash { stroke: var(--gold-uwm); stroke-width: 2.5; stroke-dasharray: 6 6; fill: none; animation: flow 0.9s linear infinite; }
+svg.flow .base, svg.flow .seg { fill: var(--ink); }
+svg.flow .lnk { stroke: var(--gold-uwm); stroke-width: 14; stroke-linecap: round; fill: none; }
+svg.flow .lnk.thin { stroke: var(--ink); stroke-width: 4; }
+svg.flow .jnt { fill: var(--ink); }
+svg.flow .sway { transform-origin: 880px 180px; animation: sway 3.2s ease-in-out infinite; }
+svg.flow .sway2 { transform-origin: 870px 112px; animation: sway2 3.2s ease-in-out infinite; }
+@keyframes flow { to { stroke-dashoffset: -20; } }
+@keyframes sway { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(5deg); } }
+@keyframes sway2 { 0%, 100% { transform: rotate(6deg); } 50% { transform: rotate(-8deg); } }
+@media (prefers-reduced-motion: reduce) { svg.flow * { animation: none !important; } svg.flow .dot { display: none; } }
+footer { margin-top: 56px; padding-top: 16px; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; }
+footer p { margin: 0 0 4px; }
+.credits { display: flex; flex-wrap: wrap; gap: 18px 56px; margin-bottom: 14px; }
+.cg-h { font: 600 0.66rem Inter, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 7px; }
+.cg-l { color: var(--text-muted); font-size: 0.82rem; line-height: 1.6; }
+.cg-l a { color: var(--text-muted); text-decoration: none; transition: color .15s; }
+.cg-l a:hover { color: var(--text); text-decoration: underline; text-decoration-color: var(--gold-uwm); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+
+/* the header's animation: two arms push U, W, M and C, S, I into their words */
+.uwm-anim { width: 500px; max-width: 100%; margin: 4px 0 16px; }
+.uwm-push { display: block; width: 100%; height: auto; overflow: visible; }
+.uwm-push .tbl { stroke: var(--border-strong); stroke-width: 1.5; }
+.uwm-push .base { fill: var(--text); }
+.uwm-push .lk { stroke: var(--text); stroke-width: 6; stroke-linecap: round; }
+.uwm-push .jt { fill: var(--bg); stroke: var(--text); stroke-width: 2; }
+.uwm-push .fg { stroke: var(--text); stroke-width: 3; stroke-linecap: round; }
+.uwm-push .blk rect { fill: var(--gold-uwm); stroke: #141413; stroke-width: 1.5; }
+.uwm-push .blk text { font: 700 15px "Source Serif 4", Georgia, serif; fill: #141413; text-anchor: middle; dominant-baseline: central; }
+.uwm-push .slot { stroke: var(--border-strong); stroke-width: 1; stroke-dasharray: 3 3; fill: none; }
+
+/* the header: label and view switch, title, then the tagline beside the animation */
+.hd-top { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.hd-top .viewsw { margin-left: auto !important; }
+.hd-top > button.f { float: none !important; margin: 0 !important; }  /* Sign out, beside the switch */
+.hd-top .track { font: 600 0.74rem Inter, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); margin: 0; }
+.hd-top .viewsw { float: none; margin: 0; }
+.hd-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 32px; margin: 6px 0 8px; }
+.hd-row .sub { flex: 1; max-width: 520px; margin: 2px 0 0; }
+.hd-row .uwm-anim { flex: none; width: 460px; margin: 0; }
+@media (max-width: 640px) { .hd-top { flex-wrap: wrap; } .hd-top .track { order: 3; flex-basis: 100%; } .hd-top .viewsw { margin-left: 0 !important; } }
+@media (max-width: 760px) { .hd-row { flex-direction: column; align-items: stretch; gap: 14px; } .hd-row .uwm-anim { width: 100%; } }
+
+/* the Calendar tab */
+body.org .part-only { display: none !important; }
+.cal-me { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 6px 0 10px; }
+.cal-me input { font: 0.9rem ui-monospace, monospace; color: var(--text); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px; padding: 7px 10px; width: 200px; }
+.cal-me #cal-who { font-size: 0.88rem; }
+.cal-tools { margin: 6px 0 10px; }
+.cal-nav { display: flex; align-items: center; gap: 12px; margin: 14px 0 10px; }
+.cal-nav b { min-width: 190px; text-align: center; font-weight: 600; }
+.cal-wrap { overflow-x: auto; }
+table.cal { border-collapse: separate; border-spacing: 4px; width: 100%; min-width: 640px; table-layout: fixed; }
+table.cal th { font: 600 0.78rem Inter, sans-serif; color: var(--text-muted); padding: 2px 0 6px; }
+table.cal th.today { color: var(--text); }
+table.cal td.time { font: 0.78rem ui-monospace, monospace; color: var(--text-muted); text-align: right; padding-right: 6px; width: 54px; }
+table.cal td.c { height: 30px; padding: 0; }
+table.cal td.c button { width: 100%; height: 100%; min-height: 30px; border-radius: 6px; font: 500 0.75rem Inter, sans-serif; cursor: pointer;
+  border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); }
+table.cal td.c button:hover:not(:disabled) { border-color: var(--text); }
+table.cal td.c button.full, table.cal td.c button:disabled { color: var(--text-muted); background: var(--surface2); cursor: default; }
+table.cal td.c button.mine { background: var(--gold-uwm); border-color: var(--gold-uwm); color: #141413; font-weight: 600; }
+table.cal td.c button.closed { background: transparent; border-style: dashed; border-color: var(--border); color: transparent; }
+table.cal td.c button.closed:hover { color: var(--text-muted); }
+table.cal td.c .who { display: block; font-size: 0.7rem; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+table.cal td.c .who a { text-decoration: none; margin-left: 4px; font-weight: 700; }
+table.cal td.c .who a.ok { color: var(--green); } table.cal td.c .who a.no { color: var(--red); }
+table.cal td.c .who.pending { color: var(--amber); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hd-top">
+    <p class="track"><a href="https://uwm.edu/csi/nvidia-rockwell-hackathon-fall-2026/" target="_blank" rel="noopener">Track 3</a> · Act on it: teach the robot</p>
+    <div class="viewsw" id="viewsw" role="group" aria-label="View"><button data-v="participant" class="on">Participant</button><button data-v="organizer">Organizer</button></div>
+  </div>
+  <h1>Physical AI Hackathon for the Factory Floor (2026)</h1>
+  <div class="role"><span class="marks n1" id="marks"><span class="mark"></span></span><span id="role">Participant dashboard</span></div>
+  <div class="hd-row">
+    <p class="sub">An online platform for standardized submission, remote execution, and reproducible evaluation of robot policies on physical robots.</p>
+    <div class="uwm-anim"><svg class="uwm-push" viewBox="0 0 400 104" role="img" aria-label="Two robot arms push blocks into the words UWM and CSI">
+    <line class="tbl" x1="2" y1="100" x2="398" y2="100"/>
+    <g class="arm a-left"></g><g class="arm a-right" transform="translate(400 0) scale(-1 1)"></g>
+  </svg></div>
+  </div>
+  <nav class="top" id="nav">
+    <a href="#leaderboard" data-page="leaderboard" id="nav-lb">Leaderboard</a>
+    <a href="#submissions" data-page="submissions" class="org-only">Submissions</a>
+    <a href="#cell" data-page="cell" class="org-only">Cell</a>
+    <a href="#submission" data-page="submission">Submit a policy</a>
+    <a href="#faq" data-page="faq">FAQ</a>
+    <a href="#resources" data-page="resources">Resources</a>
+    <a href="#calendar" data-page="calendar">Calendar</a>
+  </nav>
+
+  <section class="page" id="page-leaderboard">
+    <div class="keys card" id="keys" hidden>
+      <div class="label">My results</div>
+      <p style="margin:6px 0 0;font-size:.9rem">Only your team sees its results. Open the link that <code>uv run run.py --status</code> prints, or paste it here. This browser remembers it. Rows marked <span class="tag">example</span> are our own runs, to show what results look like.</p>
+      <form id="key-form"><input id="key-in" placeholder="the link from run.py --status, or the 32-character key" autocomplete="off" spellcheck="false"><button class="f" type="submit">Show my results</button></form>
+      <p class="msg" id="key-msg" hidden></p>
+      <div class="mine" id="key-list"></div>
+    </div>
+    <div id="lb-main">
+    <div class="tabs" id="tabs"></div>
+    <div class="hero"><div class="cards" id="cards"></div><div class="card clip" id="clip"></div></div>
+    <div class="banner" id="banner" hidden></div>
+    <div class="controls">
+      <div>
+        <button class="f" id="b-mock"><span class="dot"></span>Hide mock runs</button>
+        <button class="f org-only" id="b-hidden"><span class="dot"></span>Show hidden runs</button>
+        <button class="f" id="b-cmp">Compare policies</button>
+      </div>
+      <div>
+        <button class="f" id="b-theme" title="Toggle light/dark">◐</button>
+        <div class="picker"><button class="f" id="b-cols" title="Columns">☰ Columns</button><div class="panel" id="p-cols"></div></div>
+      </div>
+    </div>
+    <p class="hint" id="cmp-hint" hidden>Select two rows to compare them layout by layout.</p>
+    <div class="table-box"><div class="scroll"><table id="lb"><thead><tr id="head"></tr></thead><tbody id="body"></tbody></table></div></div>
+    <h2>How a rollout is scored</h2>
+    <div class="rules" id="rules"></div>
+    </div>
+  </section>
+
+  <section class="page" id="page-submission" hidden>
+    <h2 style="margin-top:0">How we evaluate your policy in the real world</h2>
+    <p class="sub"><b>You choose the task</b>: any manipulation task on the cell, with its objects or your own.</p>
+    <p class="sub">You develop your policy your own way, for example in Isaac Sim with our starter and your own data. We then evaluate it on our real robot: our server sends your machine an observation (<code>obs</code>), your policy returns the next action, <code>act(obs)</code>, and this repeats until the rollout ends. The figure below shows the framework.</p>
+    <svg class="flow" viewBox="0 0 960 400" role="img" aria-label="Train in Isaac Sim with your data, bring the policy to your machine, and run it on our robot: the server sends obs, your machine returns act(obs)">
+  <!-- sim loop (secondary: smaller, green) -->
+  <rect x="40" y="26" width="170" height="68" rx="12" class="box sim"/>
+  <text x="125" y="52" class="k s" text-anchor="middle">Simulation</text>
+  <text x="125" y="78" class="h s" text-anchor="middle">Isaac Sim</text>
+  <rect x="340" y="26" width="170" height="68" rx="12" class="box sim"/>
+  <text x="425" y="52" class="k s" text-anchor="middle">Training</text>
+  <text x="425" y="78" class="h s" text-anchor="middle">Your data</text>
+  <path id="f-demo" d="M210 44 C250 26 300 26 340 44" class="track"/>
+  <path d="M210 44 C250 26 300 26 340 44" class="dash green"/>
+  <path d="M340 44 l-13 -2 l6 12 z" class="head green"/>
+  <text x="275" y="20" class="a s" text-anchor="middle">demos</text>
+  <path id="f-train" d="M340 76 C300 94 250 94 210 76" class="track"/>
+  <path d="M340 76 C300 94 250 94 210 76" class="dash green"/>
+  <path d="M210 76 l13 2 l-6 -12 z" class="head green"/>
+  <text x="264" y="112" class="a s" text-anchor="end">train · eval</text>
+  <circle r="4" class="dot green"><animateMotion dur="5s" repeatCount="indefinite"><mpath href="#f-demo"/></animateMotion></circle>
+  <circle r="4" class="dot green"><animateMotion dur="5s" begin="-2.5s" repeatCount="indefinite"><mpath href="#f-train"/></animateMotion></circle>
+
+  <!-- the trained policy: handed over once, so it does not move -->
+  <path d="M275 90 C275 160 155 158 155 220" class="handoff"/>
+  <path d="M155 230 l-7 -12 h14 z" class="head muted"/>
+  <circle cx="275" cy="90" r="3.5" class="head muted"/>
+  <text x="222" y="182" class="a s" text-anchor="start">trained policy</text>
+
+  <!-- real robot loop -->
+  <rect x="20" y="232" width="270" height="140" rx="14" class="box"/>
+  <text x="155" y="286" class="k" text-anchor="middle">Client</text>
+  <text x="155" y="318" class="h" text-anchor="middle">Your machine</text>
+  <rect x="510" y="232" width="270" height="140" rx="14" class="box hl"/>
+  <text x="645" y="286" class="k" text-anchor="middle">Server</text>
+  <text x="645" y="318" class="h" text-anchor="middle">Our machine</text>
+  <path id="f-obs" d="M500 276 L300 276" class="track"/>
+  <path d="M500 276 L300 276" class="dash"/>
+  <path d="M300 276 l12 -7 v14 z" class="head"/>
+  <text x="400" y="262" class="a" text-anchor="middle">obs</text>
+  <path id="f-act" d="M300 330 L500 330" class="track"/>
+  <path d="M300 330 L500 330" class="dash"/>
+  <path d="M500 330 l-12 -7 v14 z" class="head"/>
+  <text x="400" y="360" class="a" text-anchor="middle">act(obs)</text>
+  <circle r="5" class="dot"><animateMotion dur="1.6s" repeatCount="indefinite"><mpath href="#f-obs"/></animateMotion></circle>
+  <circle r="5" class="dot"><animateMotion dur="1.6s" begin="-0.8s" repeatCount="indefinite"><mpath href="#f-act"/></animateMotion></circle>
+
+  <path d="M782 303 L818 303" class="link-dash"/>
+  <g class="arm" transform="translate(880 396) scale(1.4) translate(-880 -208)">
+    <rect x="842" y="196" width="76" height="12" rx="3" class="base"/>
+    <rect x="860" y="176" width="40" height="22" rx="5" class="seg"/>
+    <g class="sway">
+      <path d="M880 180 L870 112" class="lnk"/>
+      <circle cx="880" cy="180" r="10" class="jnt"/>
+      <g class="sway2">
+        <path d="M870 112 L926 92" class="lnk"/>
+        <circle cx="870" cy="112" r="9" class="jnt"/>
+        <circle cx="926" cy="92" r="7" class="jnt"/>
+        <path d="M926 99 L926 122" class="lnk thin"/>
+        <path d="M918 122 L918 140 M934 122 L934 140" class="lnk thin grip"/>
+      </g>
+    </g>
+  </g>
+</svg>
+
+    <h2>What you prepare</h2>
+    <div class="steps">
+      <div class="step"><h3>Get the client package</h3>
+        <pre class="cmd">git clone https://github.com/SIDCLab/PhysicalAI-Hackathon-2026 && cd PhysicalAI-Hackathon-2026
+uv sync</pre></div>
+      <div class="step"><h3>Wrap your sim model</h3>
+        <p>Wrap the model you trained in simulation in <code>policy.py</code>. <a href="#" class="open-detail" data-detail="policy">Observation and action formats ↗</a></p></div>
+      <div class="step"><h3>Check formats and connection</h3>
+        <p>Runs your policy against a stand-in for the cell on your machine, with no robot. It ends with <b>✓ Ready for the real robot</b>, or tells you what to fix. Its images are synthetic: it checks the formats and the connection, not whether your policy succeeds.</p>
+        <pre class="cmd">uv run run.py --mock</pre></div>
+      <div class="step"><h3>Describe your task and submit</h3>
+        <p>Fill in <code>submission/submission.yaml</code>, and <code>submission/placement.yaml</code> unless your task uses our default scene (8 screws and the yellow bin, the same every rollout), then send it:</p>
+        <pre class="cmd">uv run run.py --submit</pre>
+        <p>Then pick a slot in the <a href="#calendar">Calendar</a> tab with the request id it prints; we approve your request for that slot. We keep adding available slots.</p></div>
+      <div class="step"><h3>Run during your slot</h3>
+        <p>Once we approve your request, your client picks up its token by itself and waits for the operator.</p>
+        <pre class="cmd">uv run run.py</pre>
+        <p>Every rollout is recorded and appears with its score and videos under <a href="#leaderboard">My results</a>. Only your team sees them: open the link that <code>uv run run.py --status</code> prints.</p></div>
+    </div>
+  </section>
+
+  <section class="page org-only" id="page-submissions" hidden>
+    <div class="org-bar"><span class="muted" id="req-sum"></span><button class="f" id="req-refresh">↻ Refresh</button></div>
+    <p class="err" id="req-err" hidden></p>
+    <div class="reqs" id="reqs"></div>
+  </section>
+
+  <section class="page org-only" id="page-cell" hidden>
+    <div class="org-bar"><span class="muted" id="cell-sum"></span><button class="f" id="cell-refresh">↻ Refresh</button></div>
+    <p class="err" id="cell-err" hidden></p>
+    <div class="statgrid" id="cell-stat"></div>
+    <div class="card" style="margin-bottom:20px"><div class="label">Public leaderboard</div>
+      <p style="margin:6px 0 10px" id="site-txt"></p><button class="f" id="b-reveal"></button></div>
+    <h2 style="margin-top:0">Runs</h2>
+    <p class="hint">Running and scoring rollouts stays in the lab: the Operate page, <code>http://127.0.0.1:9097</code> in the cell PC's browser (or <code>operator_console.py run &lt;run_id&gt;</code>).</p>
+    <div class="table-box" style="margin-top:10px"><div class="scroll"><table class="org"><thead><tr><th>Run</th><th>Team / policy</th><th>Task</th><th>Trials</th><th>Success</th><th></th></tr></thead><tbody id="orgruns"></tbody></table></div></div>
+  </section>
+
+  <section class="page" id="page-faq" hidden>
+    <div class="faq">
+      <h3 class="faq-h">Getting started</h3>
+      <details><summary>Does the client run on my computer?</summary>
+        <p>Yes, on Linux and macOS, Apple Silicon included: it needs <a href="https://docs.astral.sh/uv/" target="_blank" rel="noopener">uv</a> and git. Tell us if anything fails on your machine.</p></details>
+      <details><summary>Where does my policy run?</summary>
+        <p>On your own machine. The cell sends your policy an observation, your <code>act(obs)</code> returns the next action, and the cell plays it on the robot. This repeats until the rollout ends.</p></details>
+
+      <h3 class="faq-h">Observations and actions</h3>
+      <details><summary>What does my policy receive?</summary>
+        <p><code>obs["images"]</code>: the cameras you list in <code>CAMERAS</code>, from <code>table</code>, <code>side</code> and <code>wrist</code>, at the size you set in <code>IMAGE_SIZE</code> (default 640 × 360), as PNG or JPEG. Each image is the whole camera frame, resized (not cropped), and each observation carries each camera's latest frame.</p>
+        <p><code>obs["joints"]</code>: J1–J6 in degrees and the gripper (0 open, 1 closed). <code>obs["tcp_pose"]</code>: the fingertip <code>[x, y, z, w, p, r]</code> in mm and degrees. <code>obs["trial"]</code>: the current rollout, with its instruction.</p></details>
+      <details><summary>Do I need the camera calibration?</summary>
+        <p>Usually not. The cameras in the starter's Isaac Sim scene are already placed with it, so a policy trained there sees the cell as the real cameras do.</p>
+        <p>The copy under <code>calibration/</code> in the client package is optional: it is for code that turns real image pixels or depth into robot coordinates, such as a planner or a VLM pipeline. <code>cameras.json</code> holds each camera's intrinsics and pose, <code>FRAMES.md</code> defines the frames, and <code>geometry.py</code> maps a table-image pixel to a point on the table (<code>pixel_to_base</code>).</p></details>
+      <details><summary>Can my policy get depth?</summary>
+        <p>Yes, from the table and the wrist cameras. Set <code>DEPTH = ["table"]</code>, <code>["wrist"]</code> or both in <code>policy.py</code>: <code>obs["depth"]</code> then holds a <code>uint16</code> image per camera, in millimetres along that camera's optical axis (0 = no depth), refreshed about 10 times a second: 640 × 400 for the table, 848 × 480 for the wrist (the wrist colour image's view).</p>
+        <p><code>calibration.geometry.depth_to_base(load()["table_depth"], depth)</code> turns it into points in the robot base frame. The wrist camera moves with the arm: pass the same observation's joints too, <code>depth_to_base(load()["wrist_depth"], depth, joints=obs["joints"])</code>.</p>
+        <p>The table camera does not see screws: to find screws or small cubes in depth, use the wrist camera close up (fingertips within about 8 cm of the table). Depth is not recorded.</p></details>
+      <details><summary>In "tcp" mode, which frame and conventions?</summary>
+        <p>The fingertip (the controller's UTOOL1) in user frame UF0, in mm. x and y are the robot base's (x forward, y left); z<sub>UF0</sub> = z<sub>base</sub> − 330 mm, so the work surface is at about −335 mm. <code>w, p, r</code> are FANUC's rotations about x, y and z in degrees: <code>−180, 0, R</code> points the fingers straight down, and R turns them about z.</p>
+        <p>The gripper only opens and closes: 0 open, 1 closed (0.5 or more closes it). It switches once the arm has reached that row's target.</p></details>
+      <details><summary>When is act called, and how does a rollout end?</summary>
+        <p>After the arm has played the target(s) you returned, with a new observation. <code>act</code> has no time limit: the arm holds still while it runs. <code>act</code> may return up to 100 actions at once (an action chunk). Your policy cannot end a rollout: it ends when the operator scores or stops it, or on a controller fault. When your policy is done, hold still by returning the current pose.</p></details>
+      <details><summary>My policy was trained on the starter's 10 Hz data. Does the timing match?</summary>
+        <p>Each target you return plays as one 0.1 s step, as in that data. Rows that move faster than the cell's limits (see the next question) are spread over several steps.</p></details>
+      <details><summary>What should I know about how the real arm moves?</summary>
+        <p>The cell limits every action: the fingertip moves at most 100 mm/s, each row at most 12 mm from the previous target and at most 40 mm ahead of the arm, and turns at most 8° per row (joint actions: at most 8° per joint per row). A target further away is reached over several rows. Targets below z −333 mm are raised to −333 mm (about 2 mm above the table).</p>
+        <p>The real arm follows its targets a little behind, which the twin does not do, so <code>tcp_pose</code> lags the last target you sent. The gripper opens or closes only once the arm has reached that row's target. Keep targets within about 0.55 m of the base axis: beyond the arm's reach, the controller faults and the rollout ends.</p></details>
+      <details><summary>My machine is far from the cell. Anything I should set?</summary>
+        <p>Set <code>IMAGE_FORMAT = "jpeg"</code> in <code>policy.py</code>: the images become much smaller. If <code>act</code> returns many actions at once, set <code>PREFETCH = True</code> so the next actions are planned while these still play.</p></details>
+
+      <h3 class="faq-h">The cell</h3>
+      <details><summary>Which gripper and fingers?</summary>
+        <p>An SMC MHZL2-16D2 parallel gripper with custom aluminium fingers, not SMC's stock ones: 76 mm long, 12 mm wide and 6 mm thick, with a hook-shaped notch at the tip. Each jaw travels 6 mm: the straight faces are 12 mm apart when open. The gripper's STEP model is under <a href="#resources/cad-models">Resources → CAD Models</a>.</p></details>
+      <details><summary>Which objects and bins are there?</summary>
+        <p>M6 × 30 screws, 10 mm and 16 mm cubes, bins (50 × 50 × 55 mm) and a vial. Their models are under <a href="#resources/cad-models">Resources → CAD Models</a>.</p></details>
+      <details><summary>Can I use my own fingers, objects or bins?</summary>
+        <p>Describe them under <code>custom_hardware</code> in <code>submission.yaml</code> (e.g. 3D-printed fingers) and when you book. We review them with your request.</p></details>
+
+      <h3 class="faq-h">Runs, scoring and data</h3>
+      <details><summary>Who sets up each rollout?</summary>
+        <p>The operator, from your <code>submission/placement.yaml</code>: where each object goes in each rollout, and optionally the instruction your policy gets. If you send none and <code>objects</code> and <code>layout</code> are both <code>same</code>, every rollout gets our default scene (8 screws and the yellow bin, as in the twin); for any other objects or layout, list them. The operator sees those positions on the table camera and places the objects there. Anything that changes between rollouts, your policy has to find in the images.</p></details>
+      <details><summary>How long is a slot?</summary>
+        <p>Half an hour.</p></details>
+      <details><summary>Can I watch my runs?</summary>
+        <p>Come to the lab if you can, to watch your rollouts live. Every rollout is recorded either way: its videos and data appear under My results, and you can download them (see below).</p></details>
+      <details><summary>How is a rollout scored?</summary>
+        <p>The operator scores each rollout as a whole, success or failure (not per object). Interventions and controller faults are noted, and a successful rollout records its time from start to success.</p></details>
+      <details><summary>Who can see my results?</summary>
+        <p>Only your team. <code>uv run run.py --status</code> prints your results link; open it and My results shows your scores and videos.</p></details>
+      <details><summary>Can I get the data recorded during my rollouts?</summary>
+        <p>Yes. Every rollout is recorded as a LeRobotDataset episode: three cameras and the robot state, 10 times a second. Under My results, <b>dataset viewer</b> shows it frame by frame, and <b>download dataset</b> (or <code>uv run run.py --download</code>) gives you the whole dataset.</p></details>
+    </div>
+  </section>
+
+  <section class="page" id="page-calendar" hidden>
+    <h2 style="margin-top:0">Book a slot on the robot</h2>
+    <p class="sub part-only">Each slot is 30 minutes on the real robot, in Milwaukee time (Central). Enter the request id that <code>uv run run.py --submit</code> printed and pick a slot; we approve your request for it. Two teams can share a slot.</p>
+    <p class="sub org-only">Click a time to open or close it for booking. Each booking shows its team: ✓ approves the request for that slot, ✗ rejects it (its slot frees up), × cancels an approved team's booking.</p>
+    <div class="cal-me part-only">
+      <input id="cal-rid" placeholder="Request id, e.g. q3ac71f" autocomplete="off" spellcheck="false">
+      <button class="f" id="cal-find">Look up</button>
+      <span id="cal-who" class="muted"></span>
+    </div>
+    <div class="cal-tools org-only"><button class="f" id="cal-weekdays">Open Mon–Fri, 9:00–17:00 this week</button></div>
+    <p class="err" id="cal-err" hidden></p>
+    <div class="cal-nav"><button class="f" id="cal-prev" aria-label="Previous week">‹</button><b id="cal-week"></b><button class="f" id="cal-next" aria-label="Next week">›</button></div>
+    <div class="cal-wrap"><table class="cal" id="cal-grid"></table></div>
+  </section>
+
+  <section class="page" id="page-resources" hidden>
+    <div class="res-grid" id="res-index">
+      <a class="res-card" href="#resources/ai-plays-robotics">
+        <svg viewBox="0 0 320 170" role="img" aria-label="Abstract line drawing of a robot arm reaching for a point">
+          <path class="ln soft" d="M0 140 H320 M0 115 H320 M0 90 H320 M0 65 H320 M0 40 H320 M40 0 V170 M90 0 V170 M140 0 V170 M190 0 V170 M240 0 V170 M290 0 V170"/>
+          <path class="ln" d="M70 140 L105 75 L190 52 L232 92"/>
+          <circle class="nd" cx="70" cy="140" r="7"/><circle class="nd" cx="105" cy="75" r="6"/><circle class="nd" cx="190" cy="52" r="5"/>
+          <path class="ln" d="M232 92 L226 108 M232 92 L244 104"/>
+          <path class="ac" d="M262 128 C 250 100, 245 90, 232 92" stroke-dasharray="4 5"/>
+          <circle class="pt" cx="262" cy="128" r="4.5"/>
+          <path class="ac" d="M50 140 H90"/>
+        </svg>
+        <div class="body"><h3>AI Plays Robotics</h3><p>From instructions to physical actions: why a real robot is the test that matters.</p></div>
+      </a>
+      <a class="res-card" href="#resources/cad-models">
+        <svg viewBox="0 0 320 170" role="img" aria-label="Abstract wireframe of a cube and a cylinder">
+          <path class="ln soft" d="M20 150 L160 110 L300 150 M160 110 V20"/>
+          <path class="ln" d="M110 70 L160 48 L210 70 L160 92 Z M110 70 V125 L160 147 V92 M210 70 V125 L160 147"/>
+          <path class="ln soft" d="M110 125 L160 103 L210 125 M160 48 V103" stroke-dasharray="3 4"/>
+          <ellipse class="ln" cx="245" cy="62" rx="22" ry="8"/><path class="ln" d="M223 62 V108 M267 62 V108"/>
+          <path class="ln" d="M223 108 A22 8 0 0 0 267 108"/>
+          <path class="ac" d="M60 60 L95 45 M60 60 V95" /><circle class="pt" cx="60" cy="60" r="4"/>
+        </svg>
+        <div class="body"><h3>CAD Models</h3><p>Models of the cell: the gripper, the objects, the bin and the work surface texture.</p></div>
+      </a>
+    </div>
+    <div id="res-cad-models" class="res-view" hidden>
+      <a class="back" href="#resources">← Resources</a>
+      <h2 style="margin-top:0">CAD Models</h2>
+      <p class="sub">Models of the cell's hardware, for building your own simulation or planning around the real geometry. More parts will follow.</p>
+      <div class="cad-grid">
+      <div class="card cad">
+        <div class="label">Gripper</div>
+        <h3>SMC MHZL2-16D2</h3>
+        <p>The parallel gripper on the robot's wrist: SMC's standard model of the gripper body, as published by SMC.</p>
+        <div class="links">
+          <a href="files/SMC-MHZL2-16D2.step" download>Download STEP ↓</a><span class="muted">243 KB</span>
+          <a href="https://www.smcetech.com/CC_host/pages/custom/modules/SolidWorks/viewWebGl3DCC.cfm?title=MHZL2%2D16D2&amp;url=https://www.smcetech.com/modelCache/mhzl23171/MHZL2-16D2/3d/default/default/MHZL2-16D2.EASM" target="_blank" rel="noopener">3D view on SMC ↗</a>
+        </div>
+      </div>
+      <div class="card cad">
+        <div class="label">Object</div>
+        <h3>M6 × 30 countersunk screw</h3>
+        <p>The M6 screws on the cell: ISO 10642, 90° head, 4 mm hex socket. Threads are not modelled.</p>
+        <div class="links">
+          <a href="files/ISO10642-M6x30-countersunk-screw.step" download>STEP ↓</a><span class="muted">34 KB</span>
+          <a href="files/ISO10642-M6x30-countersunk-screw.stl" download>STL ↓</a><span class="muted">96 KB</span>
+        </div>
+      </div>
+      <div class="card cad">
+        <div class="label">Object</div>
+        <h3>Bin, 50 × 50 × 55 mm</h3>
+        <p>Every bin on the cell: 50 × 50 mm outside and 55 mm tall, with a 35 × 35 mm pocket 25 mm deep. The pocket's corner radius is approximate.</p>
+        <div class="links">
+          <a href="files/manipbench-bin-50x50x55.step" download>STEP ↓</a><span class="muted">44 KB</span>
+          <a href="files/manipbench-bin-50x50x55.stl" download>STL ↓</a><span class="muted">27 KB</span>
+        </div>
+      </div>
+      <div class="card cad">
+        <div class="label">Object</div>
+        <h3>Cubes, 10 mm and 16 mm</h3>
+        <p>The cell's cubes, with rounded edges: 1 mm on the 16 mm cube; the 10 mm cube's is approximate. Origin at the bottom face's centre.</p>
+        <div class="links">
+          <a href="files/manipbench-cube-10mm.step" download>10 mm STEP ↓</a><a href="files/manipbench-cube-10mm.stl" download>STL ↓</a>
+          <a href="files/manipbench-cube-16mm.step" download>16 mm STEP ↓</a><a href="files/manipbench-cube-16mm.stl" download>STL ↓</a>
+        </div>
+      </div>
+      <div class="card cad">
+        <div class="label">Object</div>
+        <h3>Vial</h3>
+        <p>Clear plastic vial, Ø27.18 × 203 mm, from its CAD (part 0890-01). USD in inches, as in the hackathon starter; STL in millimetres.</p>
+        <p class="muted">Starter v0.5 scales the vial down to Ø17 × 140 mm. To match the real one, set <code>VIAL_RADIUS = 0.02718 / 2</code> and <code>VIAL_LENGTH = 0.203</code> in the starter's <code>scene_config.py</code>; the cap is already the right size.</p>
+        <div class="links">
+          <a href="files/csi-vial.usda" download>USD ↓</a><span class="muted">46 KB</span>
+          <a href="files/csi-vial.stl" download>STL ↓</a><span class="muted">19 KB</span>
+        </div>
+      </div>
+      <div class="card cad">
+        <div class="label">Object</div>
+        <h3>Vial cap</h3>
+        <p>Yellow tapered plug with a Ø31.75 mm flange, 15.7 mm tall, from its CAD (MOCAP TWF.820/.930). USD in inches; STL in millimetres.</p>
+        <div class="links">
+          <a href="files/csi-vial-cap.usda" download>USD ↓</a><span class="muted">91 KB</span>
+          <a href="files/csi-vial-cap.stl" download>STL ↓</a><span class="muted">38 KB</span>
+        </div>
+      </div>
+      <div class="card cad">
+        <div class="label">Table surface</div>
+        <h3>Work surface texture</h3>
+        <p>The real work surface seen from above, for the tabletop in your simulation.</p>
+        <div class="links">
+          <a href="files/manipbench-table-surface.png" download>Download PNG ↓</a><span class="muted">3.2 MB</span>
+        </div>
+      </div>
+      </div>
+    </div>
+    <article class="post res-view" id="res-ai-plays-robotics" hidden>
+      <a class="back" href="#resources">← Resources</a>
+      <h2 class="title">AI Plays Robotics</h2>
+      <p class="dek">From Instructions to Physical Actions</p>
+
+      <h3>1. Easy to Say, Hard to Do</h3>
+      <p>Consider a task for a robotic arm:</p>
+      <blockquote>"Pick up the screws scattered across the table."</blockquote>
+      <figure class="roll" data-speed="4">
+        <div class="roll-v">
+          <div class="rv"><video muted playsinline loop preload="metadata" poster="/files/blog_screws_table.jpg" src="/files/blog_screws_table_v2.mp4"></video><span class="tag">Table camera</span></div>
+          <div class="rv"><video muted playsinline loop preload="metadata" poster="/files/blog_screws_side.jpg" src="/files/blog_screws_side.mp4"></video><span class="tag">Side camera</span></div>
+          <button class="big-play" aria-label="Play"><svg viewBox="0 0 96 96" width="1em" height="1em"><path fill="currentColor" d="M24 19.3c0-3.2 3.5-5.1 6.2-3.4l44.6 28.7c2.4 1.6 2.4 5.2 0 6.7L30.2 80c-2.7 1.7-6.2-.2-6.2-3.4z"/></svg></button>
+        </div>
+        <div class="roll-bar">
+          <button class="pp" aria-label="Play or pause"><svg viewBox="0 0 96 96" width="1em" height="1em"><path fill="currentColor" d="M24 19.3c0-3.2 3.5-5.1 6.2-3.4l44.6 28.7c2.4 1.6 2.4 5.2 0 6.7L30.2 80c-2.7 1.7-6.2-.2-6.2-3.4z"/></svg></button>
+          <input class="seek" type="range" min="0" max="1000" value="0" aria-label="Position">
+          <span class="t">0:00 / 0:00</span>
+          <span class="spd" role="group" aria-label="Playback speed"><button data-s="1">1×</button><button data-s="2">2×</button><button data-s="4">4×</button><button data-s="8">8×</button></span>
+        </div>
+      </figure>
+      <p>For a human, the instruction requires little explanation. We look at the objects, decide how to pick them up, and adjust our movements as we go.</p>
+      <p>For a robot, the details matter.</p>
+      <p>A screw's position and orientation may be different every time the robot looks at the table. Even identifying the right object does not guarantee a successful grasp.</p>
+      <p>This task illustrates a broader problem in robotics. A robot needs to understand its surroundings, decide what to do, and translate that decision into physical motion. In robotics, we often call these capabilities <b>perception, planning, and control</b>.</p>
+      <p>The difficulty is that the physical world rarely behaves exactly as expected.</p>
+      <p>So how should we build a robot that can handle it?</p>
+
+      <h3>2. What If We Let AI Decide?</h3>
+      <p>One approach is to program the robot explicitly.</p>
+      <p>For a known object at a known position, a program might look like this:</p>
+      <pre class="code">move_to(object_position)
+close_gripper()
+move_to(target_position)
+open_gripper()</pre>
+      <p>This works well when the environment is structured and the assumptions hold. Industrial robots have relied on this kind of programming for decades, often with remarkable precision and reliability.</p>
+      <p>But our task introduces uncertainty. A screw may appear somewhere the program did not expect.</p>
+      <p>We could add cameras, detection algorithms, grasping rules, and recovery procedures. For sufficiently constrained tasks, this can work very well. But each new variation may require another decision about how the robot should respond.</p>
+      <p>What if some of those decisions could instead be made by AI?</p>
+      <p>Recent advances in robot learning and foundation models<sup class="cite">[<a href="https://arxiv.org/abs/2410.24164" target="_blank" rel="noopener">1</a>, <a href="https://arxiv.org/abs/2503.20020" target="_blank" rel="noopener">2</a>]</sup> offer several ways to approach this. A robot might learn movements from demonstrations, use a vision-language model to reason about a scene, or predict the consequences of an action before executing it.</p>
+      <p>Rather than prescribing every movement, we can give the system observations and let it determine what actions to take.</p>
+      <p>This raises another question: <b>what should the AI actually look like?</b></p>
+
+      <h3>3. One Robot, Many Ways to Think</h3>
+      <p>There is no single architecture for turning AI decisions into robot actions.</p>
+      <p>Some systems learn to map camera images directly to movements. Others separate high-level reasoning from low-level execution. Still others use explicit planners or predictive models of the physical world.</p>
+      <p>Here are several approaches worth exploring:</p>
+      <table class="kv">
+        <tr><td>Visuomotor Policy</td><td>Learns actions from visual observations and demonstrations</td></tr>
+        <tr><td>VLA</td><td>Predicts robot actions from images and language instructions</td></tr>
+        <tr><td>VLM + BM</td><td>Uses a vision-language model to make decisions and a behavior model to execute them</td></tr>
+        <tr><td>TAMP + FMs</td><td>Combines foundation models with explicit task and motion planning</td></tr>
+        <tr><td>WAM</td><td>Uses predictions of future world states to guide actions</td></tr>
+        <tr><td>Your Architecture</td><td>Combines approaches or introduces something new</td></tr>
+      </table>
+      <p style="margin-top:14px">Each approach offers a different way to tackle the same underlying problem.</p>
+      <p>For picking screws, a vision-language system might identify the objects and choose grasping strategies, while a motion planner handles the robot's movements.</p>
+      <p>None of these choices guarantees success.</p>
+      <p>A model may correctly identify an object but fail to grasp it. A planner may produce a valid trajectory that does not account for an object slipping. A learned policy may perform well on familiar arrangements but struggle when the scene changes.</p>
+      <p>The interesting question is not just whether an AI can produce a plausible action.</p>
+      <p><b>Can it make that action work on a real robot?</b></p>
+
+      <h3>4. Let's Find Out</h3>
+      <p>We provide a shared industrial robotic testbed where you can <b>define your own manipulation task, build your AI policy, and test it on a real robot</b>.</p>
+      <p>Through a common interface, your AI receives observations and returns robot actions. We handle physical execution and evaluate whether your system completes the task.</p>
+      <p class="ask">What can your AI make a robot do?</p>
+
+      <h3>References</h3>
+      <ol class="refs">
+        <li>K. Black et al. <a href="https://arxiv.org/abs/2410.24164" target="_blank" rel="noopener">π<sub>0</sub>: A Vision-Language-Action Flow Model for General Robot Control</a>. arXiv:2410.24164, 2024.</li>
+        <li>Gemini Robotics Team. <a href="https://arxiv.org/abs/2503.20020" target="_blank" rel="noopener">Gemini Robotics: Bringing AI into the Physical World</a>. arXiv:2503.20020, 2025.</li>
+      </ol>
+    </article>
+  </section>
+  <footer>
+    <div class="credits">
+      <div class="cg"><div class="cg-h">Organizers</div><div class="cg-l"><a href="https://uwm.edu/csi/" target="_blank" rel="noopener">UW-Milwaukee Connected Systems Institute</a><br><a href="https://www.msoe.edu/" target="_blank" rel="noopener">Milwaukee School of Engineering</a></div></div>
+      <div class="cg"><div class="cg-h">Partners</div><div class="cg-l"><a href="https://www.nvidia.com/" target="_blank" rel="noopener">NVIDIA</a><br><a href="https://www.rockwellautomation.com/" target="_blank" rel="noopener">Rockwell Automation</a></div></div>
+      <div class="cg"><div class="cg-h">Platform Developer</div><div class="cg-l"><a href="https://www.sidclab.org/new/index.html" target="_blank" rel="noopener">SIDC Lab</a><br>UW-Milwaukee</div></div>
+    </div>
+  </footer>
+</div>
+
+<template id="detail-policy">
+  <h2 style="margin-top:0">Wrap your sim model</h2>
+  <p>Edit <code>policy.py</code> and implement <code>act(obs)</code>. Your policy receives the robot's observation and returns the next action. After the action finishes, we call <code>act(obs)</code> again.</p>
+
+  <h3 class="mh">What your policy receives</h3>
+  <table class="kv">
+    <tr><td>obs["images"]</td><td>RGB images from the cameras you select (table, side and/or wrist)</td></tr>
+    <tr><td>obs["joints"]</td><td>the robot's joint angles J1–J6 in degrees, and the gripper state (0 = open, 1 = closed)</td></tr>
+    <tr><td>obs["tcp_pose"]</td><td>the fingertip position and orientation <code>[x, y, z, w, p, r]</code>: position in mm, orientation in degrees</td></tr>
+    <tr><td>obs["trial"]</td><td>the current rollout, including the task instruction (your policy may ignore it)</td></tr>
+    <tr><td>obs["depth"]</td><td>only with <code>DEPTH</code>: depth images in mm from the table and/or wrist camera (see the FAQ)</td></tr>
+  </table>
+  <h3 class="mh">Settings at the top of policy.py</h3>
+  <table class="kv">
+    <tr><td>CAMERAS</td><td>the cameras you want: any of "table", "side", "wrist"</td></tr>
+    <tr><td>IMAGE_SIZE</td><td>(width, height) of the images you get, 640 × 360 by default: the whole 16:9 camera frame, resized (not cropped), as in the sim and the recorded datasets</td></tr>
+    <tr><td>IMAGE_FORMAT</td><td>"png", or "jpeg": about 7× smaller, for a slow connection</td></tr>
+    <tr><td>ACTION</td><td>"joints" or "tcp": what <code>act</code> returns (below)</td></tr>
+    <tr><td>DEPTH</td><td>[] by default; "table" and/or "wrist" for depth</td></tr>
+    <tr><td>PREFETCH</td><td>True: plan the next action chunk while this one still plays</td></tr>
+  </table>
+
+  <h3 class="mh">What your policy returns</h3>
+  <p>Choose <b>one</b> action format with <code>ACTION</code> in <code>policy.py</code>:</p>
+  <div class="fmt">
+    <div class="card"><div class="fmt-k">ACTION = "joints"</div><p><code>[J1, J2, J3, J4, J5, J6, gripper]</code></p><p>Move the robot with joint angles, in degrees (the v0.5 twin's convention). Recommended for learned robot policies.</p></div>
+    <div class="card"><div class="fmt-k">ACTION = "tcp"</div><p><code>[x, y, z, w, p, r, gripper]</code></p><p>Move the fingertip to a target position and orientation; the robot works out the joints. Recommended for planners and AI agents.</p><p class="muted">e.g. fingers pointing straight down: <code>w, p, r = −180, 0, R</code></p></div>
+  </div>
+
+</template>
+<div class="overlay" id="ov"><div class="modal"><button class="x" id="ov-x">×</button><div id="ov-body"></div></div></div>
+
+<script>
+const DATA = /*__DATA__*/null;
+const PRIVATE = DATA.mode === "private";  // no leaderboard: each team loads its own runs with its view key
+let TASK_IDS = Object.keys(DATA.tasks);  // in the order the builder lists them
+const S = { task: TASK_IDS[0], hideMock: false, compare: false, picked: [], open: null, sortKey: "success_rate", sortDir: -1, hidden: new Set(["latency_ms"]) };
+try { const h = JSON.parse(localStorage.getItem("lb-hidden2") || "null"); if (h) S.hidden = new Set(h); } catch (e) {}
+try { const t = new URLSearchParams(location.search).get("task"); if (t && DATA.tasks[t]) S.task = t; } catch (e) {}
+const T = () => DATA.tasks[S.task];
+const stageColor = s => `var(--stage${Math.round(4 * s / Math.max(1, T().success_stage))})`;
+const fmt = (v, d = 0) => v == null ? '<span class="muted">—</span>' : Number(v).toFixed(d);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const layoutIds = r => Object.keys(r.per_layout);
+const CAMS = ["table", "front", "side", "wrist"];
+const sameOrDiff = v => !v || !v.type ? null : (["same", "fixed"].includes(v.type) ? "same" : "different");
+const taskSpec = t => {  // "same objects · different layout", from the submission's objects / layout
+  const o = sameOrDiff(t.objects), l = sameOrDiff(t.layout);
+  const txt = `${o ? o + " objects" : "objects ?"} · ${l ? l + " layout" : "layout ?"}`;
+  return o || l ? txt[0].toUpperCase() + txt.slice(1) : '<span class="muted">—</span>';
+};
+const camsOf = t => Array.isArray(t.video) ? t.video : (t.video ? CAMS : []);  // older pages: true = unknown cameras
+function rolloutName(trialId) {  // "r…-t00" -> "Rollout 1"
+  const n = parseInt(String(trialId).split("-").pop().slice(1), 10);
+  return Number.isFinite(n) ? `Rollout ${n + 1}` : esc(trialId);
+}
+function nextCam(v) {  // a camera that was not recorded: try the next one
+  const left = (v.dataset.left || "").split(",").filter(Boolean);
+  if (!left.length) { v.closest(".clip, figure")?.classList.add("novid"); return; }
+  v.dataset.left = left.slice(1).join(","); v.src = clipUrl(v.dataset.run, v.dataset.trial, left[0]);
+}
+
+const COLS = [
+  { key: "rank", label: "#", fixed: true, sort: false },
+  { key: "policy", label: "Policy", fixed: true, get: r => r.policy.toLowerCase(),
+    cell: r => `<div class="pol">${esc(r.policy)}${r.example || r.showcase ? '<span class="tag">example</span>' : ""}${r.mock ? '<span class="tag mock">mock</span>' : ""}${r.hidden ? '<span class="tag">hidden</span>' : ""}${r.complete ? "" : '<span class="tag run">in progress</span>'}</div><div class="team">${esc(r.team)}</div>` },
+  { key: "success_rate", label: "Success rate %", fixed: true, tip: "Trials that reached the task's success stage with no intervention and no fault. Bar shows the Wilson 95% interval.",
+    cell: r => `<span class="sr">${fmt(r.success_rate)}</span> <span class="ci">${r.successes}/${r.trials} · [${fmt(r.ci[0])}, ${fmt(r.ci[1])}]</span><div class="bar"><i style="left:${r.ci[0]}%;width:${r.ci[1] - r.ci[0]}%"></i><b style="left:calc(${r.success_rate}% - 1px)"></b></div>` },
+  { key: "trials", label: "Rollouts", c: true, tip: "Scored rollouts / planned rollouts.", cell: r => `${r.trials}<span class="muted">/${r.trials_planned}</span>` },
+  { key: "cycle_time_s", label: "Cycle s", c: true, tip: "Mean time from rollout start to success, successful rollouts only.", cell: r => fmt(r.cycle_time_s, 1) },
+  { key: "faults", label: "Faults", c: true, tip: "Trials ended by a controller fault, plus operator interventions.", cell: r => `${r.faults}${r.interventions ? `<span class="muted"> +${r.interventions}i</span>` : ""}` },
+  { key: "model_type", label: "Model", c: true, cell: r => `<span style="white-space:nowrap">${esc(r.model_type)}</span>` },
+  { key: "action", label: "Actions", c: true, cell: r => `<span class="badge">${esc(r.action)}</span>` },
+  { key: "latency_ms", label: "Latency ms", c: true, tip: "Median time from serving an observation to receiving the next action chunk.", cell: r => fmt(r.latency_ms) },
+  { key: "date", label: "Date", c: true, cell: r => `<span class="muted" style="white-space:nowrap">${esc(new Date(r.date + "T12:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }))}</span>` },
+];
+
+function rows() {
+  let rs = DATA.rows.filter(r => r.task_id === S.task && shown(r));
+  const col = COLS.find(c => c.key === S.sortKey);
+  const get = col.get || (r => r[col.key] ?? -1e9);
+  rs.sort((a, b) => (get(a) > get(b) ? 1 : get(a) < get(b) ? -1 : 0) * S.sortDir || b.progress - a.progress || b.trials - a.trials);
+  return rs;
+}
+const visible = () => COLS.filter(c => c.fixed || !S.hidden.has(c.key));
+
+function render() {
+  const vc = visible();
+  document.getElementById("head").innerHTML = vc.map(c =>
+    `<th class="${c.c ? "c" : ""}" data-k="${c.key}" ${c.tip ? `data-tip="${esc(c.tip)}"` : ""}>${c.label}${S.sortKey === c.key ? ` <span class="arrow">${S.sortDir < 0 ? "↓" : "↑"}</span>` : ""}</th>`).join("");
+  const rs = rows();
+  const byRate = [...rs].sort((a, b) => b.success_rate - a.success_rate || b.progress - a.progress || b.trials - a.trials);
+  const body = document.getElementById("body");
+  if (!rs.length) { body.innerHTML = `<tr><td colspan="${vc.length}" class="empty">No scored runs yet.</td></tr>`; return; }
+  body.innerHTML = rs.map(r => {
+    const rank = byRate.indexOf(r) + 1;
+    const tds = vc.map(c => c.key === "rank" ? `<td class="rank r${rank}">${rank}</td>` : `<td class="${c.c ? "c" : ""}">${c.cell(r)}</td>`).join("");
+    const sel = S.compare ? S.picked.includes(r.run_id) : S.open === r.run_id;
+    return `<tr class="row ${sel ? "sel" : ""}" data-id="${r.run_id}">${tds}</tr>` + (!S.compare && S.open === r.run_id ? `<tr class="detail"><td colspan="${vc.length}">${detail(r)}</td></tr>` : "");
+  }).join("");
+}
+
+function detail(r) {
+  const lays = layoutIds(r).map(id => {
+    const p = r.per_layout[id], sr = 100 * p.success / p.n;
+    return `<div class="lay"><span class="label">${esc(id)}</span><div class="lbar"><i style="width:${sr}%"></i></div><span>${p.success}/${p.n} · ${p.progress.toFixed(0)}%</span></div>`;
+  }).join("");
+  const chips = r.strip.map((t, i) => `<div class="chip ${t.fault || t.intervention ? "f" : ""} ${camsOf(t).length ? "v" : ""}" ${camsOf(t).length ? `data-run="${esc(r.run_id)}" data-trial="${esc(t.trial_id)}"` : ""} style="background:${stageColor(t.stage)}" title="rollout ${i} · ${esc(t.layout)} · stage ${t.stage}${t.fault ? " · fault" : ""}${t.intervention ? " · intervention" : ""}${t.notes ? " · " + esc(t.notes) : ""}${camsOf(t).length ? " · click to watch" : ""}">${t.success ? "✓" : t.stage}</div>`).join("");
+  const legend = T().stages.map(s => `<span><i style="background:${stageColor(s.stage)}"></i>${s.stage} ${esc(s.name)}</span>`).join("") + '<span><i style="outline:2px solid var(--red)"></i>fault / intervention</span>';
+  const first = r.strip.find(t => t.episode != null), vz = vizUrl(r, first);
+  const links = [["code", r.code_url], ["weights", r.weights_url], ["data", r.data_url]].filter(x => x[1]).map(([k, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener">${k} ↗</a>`).join("")
+    + (vz ? `<a href="${vz}" target="_blank" rel="noopener">dataset viewer ↗</a>` : "")
+    + (vz ? `<a href="vizdata/download/${r.key}/${encodeURIComponent(r.run_id)}.tar" download>download dataset ↓</a>` : "");
+  return `<div class="det"><div><div class="label">Success by layout · success/rollouts · progress</div>${lays}</div>
+    <div><div class="label">Rollouts in order${r.strip.some(t => camsOf(t).length) ? " · click one to watch it" : ""}</div><div class="strip">${chips}</div><div class="legend">${legend}</div>
+    <div class="label" style="margin-top:14px">Setup</div><div style="font-size:.85rem">${esc(r.model_type)} · ${esc(r.action)} actions · cameras ${esc(r.cameras.join(", ") || "—")} · run <code>${esc(r.run_id)}</code></div>
+    <div class="links" style="margin-top:8px">${links}</div></div></div>`;
+}
+
+function compare() {
+  const [a, b] = S.picked.map(id => DATA.rows.find(r => r.run_id === id));
+  const sr = (r, id) => { const p = r.per_layout[id]; return p ? 100 * p.success / p.n : 0; };
+  const ids = [...new Set([...layoutIds(a), ...layoutIds(b)])];
+  const rowsH = [{ id: "All", a: a.success_rate, b: b.success_rate }, ...ids.map(id => ({ id, a: sr(a, id), b: sr(b, id) }))].map(x => {
+    const d = x.b - x.a;
+    return `<div class="drow"><div class="l">${d < 0 ? `<i style="width:${-d}%"></i>` : ""}</div><div class="n">${esc(x.id)}<div class="muted" style="font-weight:500">${d > 0 ? "+" : ""}${d.toFixed(0)}</div></div><div class="r">${d > 0 ? `<i style="width:${d}%"></i>` : ""}</div></div>`;
+  }).join("");
+  document.getElementById("ov-body").innerHTML = `<div class="label" style="text-align:center;margin-bottom:10px">Success rate difference by layout (percentage points)</div>
+    <div class="drow"><div class="l"><span class="badge">← ${esc(a.policy)} better</span></div><div class="n label">Layout</div><div><span class="badge">${esc(b.policy)} better →</span></div></div>${rowsH}`;
+  document.getElementById("ov").classList.add("open");
+}
+
+const shown = r => !(S.hideMock && r.mock) && (S.showHidden || !r.hidden);  // the rows the toggles leave visible
+function header() {
+  const ids = TASK_IDS.filter(id => DATA.rows.some(r => r.task_id === id && shown(r)));  // tasks with a row to show
+  if (ids.length && !ids.includes(S.task)) S.task = ids[0];
+  document.getElementById("tabs").innerHTML = ids.length > 1 ? ids.map(id =>
+    `<button class="f ${id === S.task ? "on" : ""}" data-task="${esc(id)}" title="${esc(DATA.tasks[id].title || id)}">${esc(id)} <span class="muted">${DATA.rows.filter(r => r.task_id === id && shown(r)).length}</span></button>`).join("") : "";
+  document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => { S.task = b.dataset.task; S.open = null; S.picked = []; header(); render(); });
+  const t = T(), rs = DATA.rows.filter(r => r.task_id === S.task);
+  if (!t) { document.getElementById("cards").innerHTML = '<div class="card"><div class="v">No scored runs yet.</div></div>'; return; }
+  const cards = [["Task", esc((t.title || t.task_id).replace(t.task_id + ": ", ""))], ["Rollouts", DATA.rows.filter(r => r.task_id === S.task).reduce((n, r) => n + r.trials, 0)],
+    ["Task spec", taskSpec(t)], ["Updated", DATA.built]];
+  const h = t.highlight, hr = h && DATA.rows.find(r => r.run_id === h.run_id);
+  document.getElementById("clip").innerHTML = h
+    ? `<video src="${clipUrl(h.run_id, h.trial_id, h.cam || CAMS[0])}" data-run="${esc(h.run_id)}" data-trial="${esc(h.trial_id)}" data-left="${h.cam ? "" : CAMS.slice(1).join(",")}" onerror="nextCam(this)" autoplay muted loop playsinline></video>
+       <div class="cap"><span>${esc(hr ? hr.policy : "")} · ${rolloutName(h.trial_id)}</span><a href="#" data-run="${esc(h.run_id)}" data-trial="${esc(h.trial_id)}" class="open-roll">All cameras ↗</a></div>`
+    : '<div class="empty-clip">Recorded rollouts of this task will play here.</div>';
+  const o = document.querySelector("#clip .open-roll");
+  if (o) o.onclick = e => { e.preventDefault(); openRollout(o.dataset.run, o.dataset.trial); };
+  document.getElementById("cards").innerHTML = cards.map(([k, v]) => `<div class="card"><div class="label">${k}</div><div class="v">${v}</div></div>`).join("");
+  const nMock = rs.filter(r => r.mock).length, nEx = rs.filter(r => r.example).length, b = document.getElementById("banner");
+  b.hidden = !(nMock || nEx);
+  b.innerHTML = [nEx ? `<b>Examples.</b> ${nEx} of ${rs.length} entries are illustrative examples that show how results will appear. They are not real-robot results.` : "",
+    nMock ? `<b>Preview.</b> ${nMock} of ${rs.length} entries were scored on the <b>mock backend</b>. They are not real-robot results.` : ""].filter(Boolean).join("<br>");
+  const setupRow = (k, v) => v ? `<p><b>${k}</b> <span class="badge">${esc(v.type || "—")}</span> ${esc(v.note)}</p>` : "";
+  const setup = setupRow("Objects", t.objects) + setupRow("Layout", t.layout);
+  document.getElementById("rules").innerHTML = `<div class="card"><div class="label">Score per rollout</div><ol class="stages" start="0">${t.stages.map(s => `<li><b>${esc(s.name)}</b>${s.rule ? ": " + esc(s.rule) : ""}${s.stage === t.success_stage && s.name !== "success" ? ' <span class="muted">(success)</span>' : ""}</li>`).join("")}</ol></div>
+    <div class="card"><div class="label">Metrics</div><p><b>Success</b>: the task done, with no intervention and no fault.</p><p><b>Interval</b>: Wilson 95% on the success rate.</p><p>Ranked by success rate; ties by fewer faults.</p></div>
+    ${setup ? `<div class="card"><div class="label">Setup for each rollout</div>${setup}</div>` : ""}`;
+}
+
+function cols() {
+  const p = document.getElementById("p-cols");
+  p.innerHTML = COLS.filter(c => !c.fixed).map(c => `<label><input type="checkbox" data-k="${c.key}" ${S.hidden.has(c.key) ? "" : "checked"}>${c.label}</label>`).join("");
+  p.querySelectorAll("input").forEach(i => i.onchange = () => {
+    i.checked ? S.hidden.delete(i.dataset.k) : S.hidden.add(i.dataset.k);
+    try { localStorage.setItem("lb-hidden2", JSON.stringify([...S.hidden])); } catch (e) {}
+    render();
+  });
+}
+
+for (const [id, key] of [["b-mock", "hideMock"], ["b-hidden", "showHidden"]]) {  // both change which tasks have rows
+  const el = document.getElementById(id);
+  el.onclick = () => { S[key] = !S[key]; el.classList.toggle("on", S[key]); S.open = null; S.picked = []; header(); render(); };
+}
+document.getElementById("b-cmp").onclick = e => { S.compare = !S.compare; S.picked = []; e.currentTarget.classList.toggle("on", S.compare); document.getElementById("cmp-hint").hidden = !S.compare; render(); };
+document.getElementById("b-cols").onclick = e => { e.stopPropagation(); document.getElementById("p-cols").classList.toggle("open"); };
+document.addEventListener("click", e => { if (!e.target.closest(".picker")) document.getElementById("p-cols").classList.remove("open"); });
+document.getElementById("b-theme").onclick = () => {
+  const root = document.documentElement, dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  root.dataset.theme = dark ? "light" : "dark";
+  try { localStorage.setItem("lb-theme", root.dataset.theme); } catch (e) {}
+};
+try { const t = localStorage.getItem("lb-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+document.getElementById("head").onclick = e => {
+  const th = e.target.closest("th"); if (!th) return;
+  const c = COLS.find(c => c.key === th.dataset.k); if (c.sort === false) return;
+  S.sortDir = S.sortKey === c.key ? -S.sortDir : -1; S.sortKey = c.key; render();
+};
+document.getElementById("body").onclick = e => {
+  const chip = e.target.closest(".chip.v");
+  if (chip) { openRollout(chip.dataset.run, chip.dataset.trial); return; }
+  if (e.target.closest("a")) return;
+  const tr = e.target.closest("tr.row"); if (!tr) return;
+  const id = tr.dataset.id;
+  if (S.compare) {
+    S.picked = S.picked.includes(id) ? S.picked.filter(x => x !== id) : [...S.picked, id].slice(-2);
+    render(); if (S.picked.length === 2) compare();
+  } else { S.open = S.open === id ? null : id; render(); }
+};
+const rollBase = run => (DATA.rows.find(r => r.run_id === run) || {}).base || "";  // results/<key>/ in My results
+const rollUrl = (run, trial, f) => `${rollBase(run)}rollouts/${encodeURIComponent(run)}/${encodeURIComponent(trial)}/${f}`;
+const clipUrl = (run, trial, f) => rollUrl(run, trial, f + ".mp4");
+const vizUrl = (row, t) => row && row.key && t && t.episode != null  // the dataset viewer, My results only
+  ? `viz/${row.key}/${encodeURIComponent(row.run_id)}/episode_${t.episode}` : null;
+
+async function openRollout(run, trial) {
+  const row = DATA.rows.find(r => r.run_id === run), st = row && row.strip.find(t => t.trial_id === trial);
+  const cams = st ? camsOf(st) : CAMS;
+  const ov = document.getElementById("ov-body");
+  ov.closest(".modal").classList.add("wide");
+  const vz = vizUrl(row, st);
+  ov.innerHTML = `<div class="label">${esc(row ? row.policy : run)} · ${rolloutName(trial)}${st ? ` · stage ${st.stage}${st.success ? " · success" : ""}` : ""}${vz ? ` · <a href="${vz}" target="_blank" rel="noopener">Open in dataset viewer ↗</a>` : ""}</div>
+    <div class="vids" style="margin-top:10px">${cams.map(c => `<figure><video data-cam="${c}" src="${clipUrl(run, trial, c)}" muted playsinline preload="auto"></video><figcaption>${c}</figcaption></figure>`).join("")}</div>
+    <div class="player"><button class="f" id="pp">▶ Play</button><input type="range" id="seek" min="0" max="1000" value="0"><span class="muted" id="tt">0.0 s</span></div>
+    <svg class="plot" id="plot" viewBox="0 0 1000 180" preserveAspectRatio="none"></svg>
+    <div class="legend" id="plot-legend"></div>`;
+  document.getElementById("ov").classList.add("open");
+  const vids = [...ov.querySelectorAll("video")].filter(v => { v.onerror = () => v.closest("figure").remove(); return true; });
+  const lead = () => vids.find(v => v.isConnected && v.duration) || vids[0];
+  const pp = document.getElementById("pp"), seek = document.getElementById("seek"), tt = document.getElementById("tt");
+  const sync = t => vids.forEach(v => { if (v.isConnected && Math.abs(v.currentTime - t) > 0.15) v.currentTime = t; });
+  pp.onclick = () => { const v = lead(); if (v.paused) { vids.forEach(x => x.isConnected && x.play()); pp.textContent = "❚❚ Pause"; } else { vids.forEach(x => x.pause()); pp.textContent = "▶ Play"; } };
+  seek.oninput = () => { const v = lead(); if (v.duration) sync(v.duration * seek.value / 1000); };
+  let trace = null;
+  const cursor = t => { const c = document.getElementById("cur"); if (c && trace) { const x = 1000 * t / Math.max(0.1, trace[trace.length - 1].t); c.setAttribute("x1", x); c.setAttribute("x2", x); } };
+  vids.forEach(x => {
+    x.ontimeupdate = () => { const v = lead(); if (x !== v || !v.duration) return; seek.value = 1000 * v.currentTime / v.duration; tt.textContent = v.currentTime.toFixed(1) + " s"; sync(v.currentTime); cursor(v.currentTime); };
+    x.onended = () => { if (x === lead()) pp.textContent = "▶ Play"; };
+  });
+  try {
+    trace = await (await fetch(rollUrl(run, trial, "trace.json"))).json();
+    const T = Math.max(0.1, trace[trace.length - 1].t), colors = ["#141413", "#6b6a63", "#a8693a", "#3f7d58", "#c99300", "#8a8a85"];
+    const lines = [0, 1, 2, 3, 4, 5].map(j => {
+      const v = trace.map(f => f.q[j]), lo = Math.min(...v), hi = Math.max(...v), span = Math.max(1, hi - lo);
+      return `<polyline fill="none" stroke="${colors[j]}" stroke-width="1.5" vector-effect="non-scaling-stroke" points="${trace.map((f, k) => `${(1000 * f.t / T).toFixed(1)},${(150 - 130 * (v[k] - lo) / span + 0).toFixed(1)}`).join(" ")}"/>`;
+    }).join("");
+    const grip = `<polyline fill="none" stroke="#ffbd00" stroke-width="3" vector-effect="non-scaling-stroke" points="${trace.map(f => `${(1000 * f.t / T).toFixed(1)},${(172 - 14 * (f.q[6] >= 0.5 ? 1 : 0)).toFixed(1)}`).join(" ")}"/>`;
+    document.getElementById("plot").innerHTML = lines + grip + '<line id="cur" x1="0" x2="0" y1="0" y2="180" stroke="#141413" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>';
+    document.getElementById("plot-legend").innerHTML = ["J1", "J2", "J3", "J4", "J5", "J6"].map((n, j) => `<span><i style="background:${colors[j]}"></i>${n}</span>`).join("") + '<span><i style="background:#ffbd00"></i>gripper closed</span><span>each joint scaled to its own range</span>';
+  } catch (e) { document.getElementById("plot").remove(); }
+}
+
+document.querySelectorAll(".open-detail").forEach(a => a.onclick = e => {
+  e.preventDefault();
+  const ov = document.getElementById("ov-body");
+  ov.innerHTML = document.getElementById("detail-" + a.dataset.detail).innerHTML;
+  ov.closest(".modal").classList.add("wide");
+  ov.querySelectorAll("pre.cmd").forEach(pre => {
+    const b = document.createElement("button"); b.textContent = "Copy";
+    b.onclick = () => { try { navigator.clipboard.writeText(pre.firstChild.textContent.trim()); b.textContent = "Copied"; setTimeout(() => b.textContent = "Copy", 1200); } catch (err) {} };
+    pre.appendChild(b);
+  });
+  document.getElementById("ov").classList.add("open");
+});
+const close = () => { document.getElementById("ov").classList.remove("open"); document.querySelectorAll("#ov video").forEach(v => v.pause()); document.querySelector("#ov .modal").classList.remove("wide"); };
+document.getElementById("ov-x").onclick = close;
+document.getElementById("ov").onclick = e => { if (e.target.id === "ov") close(); };
+function route() {
+  const [page, sub] = (location.hash || (PRIVATE && !KEYS.length ? "#submission" : "#leaderboard")).slice(1).split("/");
+  const pages = ["leaderboard", "submission", "faq", "resources", "calendar"].concat(ORG ? ["submissions", "cell"] : []);
+  const known = pages.includes(page) ? page : "leaderboard";
+  if (ORG && known === "submissions") loadRequests();
+  if (ORG && known === "cell") loadCell();
+  if (known === "calendar") setTimeout(() => (document.getElementById("cal-rid").value && !ORG ? calFind(true) : loadCalendar()));
+  if (known === "resources") {  // #resources: the cards; #resources/<name>: one of them
+    const view = sub && document.getElementById("res-" + sub);
+    document.getElementById("res-index").hidden = !!view;
+    document.querySelectorAll(".res-view").forEach(v => v.hidden = v !== view);
+    if (view) window.scrollTo(0, 0);
+  }
+  document.querySelectorAll("section.page").forEach(sec => sec.hidden = sec.id !== "page-" + known);
+  document.querySelectorAll("#nav a").forEach(a => a.classList.toggle("on", a.dataset.page === known));
+}
+window.addEventListener("hashchange", route);
+document.querySelectorAll("pre.cmd").forEach(pre => {
+  const b = document.createElement("button"); b.textContent = "Copy";
+  b.onclick = () => { try { navigator.clipboard.writeText(pre.firstChild.textContent.trim()); b.textContent = "Copied"; setTimeout(() => b.textContent = "Copy", 1200); } catch (e) {} };
+  pre.appendChild(b);
+});
+// ---- My results (private mode): the runs whose view keys this browser holds ----
+const KEY_RE = /[0-9a-f]{32}/;
+let KEYS = [];
+try { KEYS = JSON.parse(localStorage.getItem("mb-keys") || "[]").filter(k => KEY_RE.test(k)); } catch (e) {}
+const saveKeys = () => { try { localStorage.setItem("mb-keys", JSON.stringify(KEYS)); } catch (e) {} };
+const keyMsg = t => { const m = document.getElementById("key-msg"); m.hidden = !t; m.textContent = t || ""; };
+function addKey(k) { if (k && !KEYS.includes(k)) { KEYS.push(k); saveKeys(); } }
+async function loadKeys() {
+  const SC = DATA.showcase || { tasks: {}, rows: [] };  // our example runs, for everyone
+  DATA.tasks = { ...SC.tasks }; DATA.rows = [...SC.rows];
+  const bad = [];
+  for (const k of KEYS) {
+    try {
+      const r = await fetch(`results/${k}.json`, { cache: "no-store" });
+      if (r.status === 404) { bad.push(k); continue; }
+      if (!r.ok) throw new Error(r.status);
+      const d = await r.json();
+      for (const [id, t] of Object.entries(d.tasks)) if (!DATA.tasks[id]) DATA.tasks[id] = t;
+      d.rows.forEach(row => DATA.rows.push({ ...row, base: `results/${k}/`, key: k }));
+      DATA.built = d.built;
+    } catch (e) { keyMsg("Your results could not be loaded right now. Try again in a few minutes."); }
+  }
+  if (bad.length) { KEYS = KEYS.filter(k => !bad.includes(k)); saveKeys(); keyMsg("That link does not open any results. Check that you copied all of it."); }
+  TASK_IDS = Object.keys(DATA.tasks);
+  if (!DATA.tasks[S.task]) S.task = TASK_IDS[0];
+  S.open = null; S.picked = [];
+  document.getElementById("key-list").innerHTML = KEYS.map(k => {
+    const rs = DATA.rows.filter(r => r.key === k);
+    const name = rs.length ? `${esc(rs[0].team)} · ${esc(rs[0].policy)}` : `${k.slice(0, 6)}… <span class="muted">no scored rollouts yet</span>`;
+    return `<button class="f" data-forget="${k}" title="Forget this link in this browser">${name} ✕</button>`;
+  }).join("");
+  document.querySelectorAll("[data-forget]").forEach(b => b.onclick = () => { KEYS = KEYS.filter(k => k !== b.dataset.forget); saveKeys(); keyMsg(""); loadKeys(); });
+  document.getElementById("lb-main").hidden = !DATA.rows.length && !KEYS.length;
+  header(); render();
+}
+if (PRIVATE) {
+  document.getElementById("key-in").placeholder = `${location.origin}/#key=… or the 32-character key`;
+  document.getElementById("nav-lb").textContent = "My results";
+  document.getElementById("keys").hidden = false;
+  document.getElementById("b-mock").style.display = "none";  // button.f sets display, so [hidden] would not hide it
+  const fromHash = () => {  // a results link (#key=...): remember the key, and take it out of the address bar
+    const m = location.hash.match(/^#key=([0-9a-f]{32})/);
+    if (!m) return false;
+    addKey(m[1]); history.replaceState(null, "", location.pathname + location.search + "#leaderboard");
+    return true;
+  };
+  fromHash();
+  window.addEventListener("hashchange", () => { if (fromHash()) { keyMsg(""); route(); loadKeys(); } });  // opened in a tab already on the site
+  document.getElementById("key-form").onsubmit = e => {
+    e.preventDefault();
+    const m = document.getElementById("key-in").value.match(KEY_RE);
+    if (!m) { keyMsg("Paste the whole link, or the 32-character key in it."); return; }
+    document.getElementById("key-in").value = ""; keyMsg(""); addKey(m[0]); loadKeys();
+  };
+}
+// ---- Organizer view: password session with the cell (/org); nothing here moves the arm ----
+let ORG = false;
+const ORIG = JSON.parse(JSON.stringify(DATA));  // the page's own data: the leaderboard, or none (private)
+const fmtTime = t => new Date(t * 1000).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
+const showErr = (id, e) => { const el = document.getElementById(id); el.hidden = !e; el.textContent = e ? (e.status === 502 ? "The cell is offline: the Organizer view needs the cell server running." : String(e.message || e)) : ""; };
+async function org(method, path, body) {
+  const r = await fetch(`org/${path}`, { method, cache: "no-store", credentials: "same-origin", body: body ? JSON.stringify(body) : undefined,
+    headers: method === "POST" ? { "Content-Type": "application/json", "X-Requested-With": "manipbench" } : {} });
+  let d = null; try { d = await r.json(); } catch (e) {}
+  if (!r.ok) { const e = new Error((d && d.error) || `HTTP ${r.status}`); e.status = r.status; throw e; }
+  return d;
+}
+function signIn() {
+  return new Promise(resolve => {
+    const ov = document.getElementById("ov-body");
+    ov.closest(".modal").classList.remove("wide");
+    ov.innerHTML = `<h2 style="margin-top:0">Organizer</h2><p class="muted" style="margin-top:0">The organizers' password.</p>
+      <form id="pw-form" style="display:flex;gap:8px;flex-wrap:wrap"><input class="pw" type="password" id="pw" autocomplete="current-password" style="flex:1 1 220px" required>
+      <button class="f" type="submit">Sign in</button></form><p class="err" id="pw-err" hidden></p>`;
+    document.getElementById("ov").classList.add("open");
+    let done = false;
+    const finish = ok => { if (done) return; done = true; document.getElementById("ov").classList.remove("open"); resolve(ok); };
+    document.getElementById("ov-x").addEventListener("click", () => finish(false), { once: true });
+    document.getElementById("ov").addEventListener("click", e => { if (e.target.id === "ov") finish(false); });
+    document.getElementById("pw").focus();
+    document.getElementById("pw-form").onsubmit = async e => {
+      e.preventDefault();
+      try { await org("POST", "login", { password: document.getElementById("pw").value }); finish(true); }
+      catch (err) { showErr("pw-err", err.status === 502 ? err : (err.message || err)); }
+    };
+  });
+}
+async function setView(v, land = true) {  // land: show the results page (not when restoring the view on load)
+  if (v === "organizer" && !ORG) {
+    let ok = false;
+    try { ok = (await org("GET", "session")).organizer; } catch (e) { if (e.status === 502) { alert("The cell is offline: the Organizer view needs the cell server running."); return; } }
+    if (!ok && !(await signIn())) return;
+  }
+  ORG = v === "organizer";
+  try { localStorage.setItem("mb-view", ORG ? "organizer" : "participant"); } catch (e) {}
+  document.body.classList.toggle("org", ORG);
+  document.querySelectorAll("#viewsw button").forEach(b => b.classList.toggle("on", b.dataset.v === (ORG ? "organizer" : "participant")));
+  document.getElementById("nav-lb").textContent = ORG ? "All results" : PRIVATE ? "My results" : "Leaderboard";
+  const marks = document.getElementById("marks");
+  marks.innerHTML = '<span class="mark"></span>'.repeat(ORG ? 2 : 1); marks.className = `marks n${ORG ? 2 : 1}`;
+  document.getElementById("role").textContent = ORG ? "Organizer dashboard" : "Participant dashboard";
+  document.title = `Physical AI Hackathon for the Factory Floor (2026) · ${ORG ? "Organizer" : "Participant"} dashboard`;
+  document.getElementById("keys").hidden = ORG || !PRIVATE;
+  document.getElementById("b-mock").style.display = ORG || !PRIVATE ? "" : "none";
+  S.open = null; S.picked = [];
+  if (ORG) await loadOrgResults();
+  else if (PRIVATE) await loadKeys();
+  else { DATA.tasks = ORIG.tasks; DATA.rows = ORIG.rows; DATA.built = ORIG.built; TASK_IDS = Object.keys(DATA.tasks); if (!DATA.tasks[S.task]) S.task = TASK_IDS[0]; header(); render(); }
+  if (location.hash.startsWith("#calendar")) setTimeout(() => loadCalendar());
+  if (ORG ? land && !["submissions", "cell", "calendar"].includes(location.hash.slice(1))
+          : ["submissions", "cell"].includes(location.hash.slice(1))) location.hash = "#leaderboard";  // land on (All/My) results
+  route();
+}
+async function loadOrgResults() {
+  try {
+    const d = await org("GET", "results");
+    DATA.tasks = d.tasks; DATA.rows = d.rows; DATA.built = d.built;
+  } catch (e) {
+    if (e.status === 401) return setView("participant");
+    DATA.tasks = {}; DATA.rows = [];
+  }
+  TASK_IDS = Object.keys(DATA.tasks);
+  if (!DATA.tasks[S.task]) S.task = TASK_IDS[0];
+  document.getElementById("lb-main").hidden = false;
+  document.getElementById("b-hidden").innerHTML = `<span class="dot"></span>Show hidden runs (${DATA.rows.filter(r => r.hidden).length})`;
+  header(); render();
+}
+const setupTxt = v => !v ? "—" : typeof v === "string" ? v : `${v.type || "—"}${v.note ? " · " + v.note : ""}`;
+async function loadRequests() {
+  let reqs;
+  try { reqs = await org("GET", "requests"); showErr("req-err", null); } catch (e) { if (e.status === 401) return setView("participant"); showErr("req-err", e); return; }
+  reqs.sort((a, b) => (a.status === "pending") - (b.status === "pending") || a.created - b.created).reverse();
+  const n = reqs.filter(r => r.status === "pending").length;
+  document.getElementById("req-sum").textContent = `${reqs.length} requests · ${n} waiting for approval`;
+  document.getElementById("reqs").innerHTML = reqs.length ? reqs.map(r => {
+    const s = r.submission || {}, asked = Number.isInteger(s.rollouts) && s.rollouts >= 1 && s.rollouts <= 50 ? s.rollouts : 10;
+    const act = r.status === "pending"
+      ? `<div class="act"><input type="number" min="1" max="50" value="${asked}" data-trials="${esc(r.id)}" aria-label="rollouts"><span class="muted">rollouts</span>
+          <button class="f" data-approve="${esc(r.id)}">Approve</button><input class="reason" data-reason="${esc(r.id)}" placeholder="reason, shown to the team"><button class="f" data-reject="${esc(r.id)}">Reject</button></div>`
+      : r.status === "approved" ? `<div class="act muted">Run <code>${esc(r.run_id)}</code>. The team's client picks up its token by itself.</div>`
+      : `<div class="act muted">Rejected: ${esc(r.reason || "—")}</div>`;
+    return `<div class="card req"><div class="top"><span class="meta"><code>${esc(r.id)}</code> · ${fmtTime(r.created)} · from ${esc(r.ip)}</span><span class="st ${esc(r.status)}">${esc(r.status)}</span></div>
+      <h3>${esc(s.team)} / ${esc(s.policy)}</h3><div class="meta">${esc(s.task_id)}: ${esc(s.task)}</div>
+      <div class="kv2"><span>Model</span><span>${esc(s.model_type)} · ${esc(s.action)} actions · cameras ${esc((s.cameras || []).join(", ") || "—")}${(s.depth || []).length ? ` · depth ${esc(s.depth.join(", "))}` : ""}</span>
+        <span>Objects</span><span>${esc(setupTxt(s.objects))}</span><span>Layout</span><span>${esc(setupTxt(s.layout))}</span>
+        <span>Rollouts</span><span>${esc(s.rollouts ?? 10)}</span><span>Hardware</span><span>${esc(s.custom_hardware || "none")}</span><span>Contact</span><span>${esc(s.contact || "—")}</span><span>Placement</span><span>${s.placement ? `the team's, ${s.placement.rollouts.length} ${s.placement.rollouts.length === 1 ? "entry" : "entries"}` : "default (8 screws and the bin)"}</span></div>${act}</div>`;
+  }).join("") : '<p class="placeholder">No requests yet.</p>';
+  document.querySelectorAll("[data-approve]").forEach(b => b.onclick = async () => {
+    const id = b.dataset.approve, n = parseInt(document.querySelector(`[data-trials="${id}"]`).value, 10);
+    if (!(n >= 1 && n <= 50)) return showErr("req-err", "Trials must be 1 to 50.");
+    if (!confirm(`Approve ${id} with ${n} rollouts?`)) return;
+    try { await org("POST", `requests/${id}/approve`, { trials: n }); } catch (e) { showErr("req-err", e); }
+    loadRequests(); loadOrgResults();
+  });
+  document.querySelectorAll("[data-reject]").forEach(b => b.onclick = async () => {
+    const id = b.dataset.reject, reason = document.querySelector(`[data-reason="${id}"]`).value.trim();
+    if (!reason) return showErr("req-err", "Give the team a reason.");
+    if (!confirm(`Reject ${id}? The team sees: ${reason}`)) return;
+    try { await org("POST", `requests/${id}/reject`, { reason }); } catch (e) { showErr("req-err", e); }
+    loadRequests();
+  });
+}
+async function loadCell() {
+  let st, site, runs;
+  try { [st, site, runs] = await Promise.all([org("GET", "status"), org("GET", "site"), org("GET", "runs")]); showErr("cell-err", null); }
+  catch (e) { if (e.status === 401) return setView("participant"); showErr("cell-err", e); document.getElementById("cell-stat").innerHTML = ""; return; }
+  document.getElementById("cell-sum").textContent = `Updated ${new Date().toLocaleTimeString("en-US", { hour12: false })}`;
+  const stat = [["Cell", st.backend === "MockBackend" ? "mock (no arm)" : "FANUC ER-4iA"], ["State", st.state], ["Active trial", st.active ? st.active.trial_id : "—"],
+    ["Queued actions", st.queued], ["TCP floor", st.z_min_mm != null ? `${st.z_min_mm} mm` : "—"]];
+  document.getElementById("cell-stat").innerHTML = stat.map(([k, v]) => `<div class="card"><div class="label">${k}</div><div class="v">${esc(v)}</div></div>`).join("");
+  document.getElementById("site-txt").textContent = site.reveal ? "Revealed: everyone sees every visible run on the site." : "Hidden: each team sees only its own runs, under My results.";
+  const br = document.getElementById("b-reveal");
+  br.textContent = site.reveal ? "Hide the leaderboard" : "Reveal the leaderboard";
+  br.onclick = async () => {
+    if (!confirm(site.reveal ? "Hide the leaderboard again? Teams will see only their own runs." : "Reveal the leaderboard? Everyone will see every visible run.")) return;
+    try { await org("POST", "site", { reveal: !site.reveal }); } catch (e) { showErr("cell-err", e); }
+    loadCell();
+  };
+  document.getElementById("orgruns").innerHTML = runs.map(r => `<tr class="${r.hidden ? "hid" : ""}">
+    <td><code>${esc(r.run_id)}</code><div class="muted">${fmtTime(r.created)}${r.backend === "MockBackend" ? ' · <span class="tag mock">mock</span>' : ""}${r.hidden ? ' · <span class="tag">hidden</span>' : ""}</div></td>
+    <td>${esc(r.team)}<div class="muted">${esc(r.policy)}</div></td><td>${esc(r.task_id)}</td>
+    <td>${r.scored}/${r.trials}${r.open ? `<div class="muted">${r.open} to run</div>` : ""}</td><td>${r.successes}</td>
+    <td style="white-space:nowrap"><button class="f" data-link="${esc(r.view_key)}" title="The team's My results link: send it to them privately">Copy team link</button>
+      <button class="f" data-hide="${esc(r.run_id)}" data-to="${r.hidden ? "show" : "hide"}">${r.hidden ? "Show" : "Hide"}</button></td></tr>`).join("");
+  document.querySelectorAll("[data-link]").forEach(b => b.onclick = () => {
+    const url = `${location.origin}/#key=${b.dataset.link}`;
+    try { navigator.clipboard.writeText(url); b.textContent = "Copied"; } catch (e) { prompt("The team's link", url); }
+    setTimeout(() => b.textContent = "Copy team link", 1500);
+  });
+  document.querySelectorAll("[data-hide]").forEach(b => b.onclick = async () => {
+    try { await org("POST", `runs/${b.dataset.hide}/${b.dataset.to}`); } catch (e) { showErr("cell-err", e); }
+    loadCell(); loadOrgResults();
+  });
+}
+document.getElementById("req-refresh").onclick = loadRequests;
+document.getElementById("cell-refresh").onclick = () => { loadCell(); loadOrgResults(); };
+document.querySelectorAll("#viewsw button").forEach(b => b.onclick = () => setView(b.dataset.v));
+const signOut = document.createElement("button");
+signOut.className = "f org-only"; signOut.textContent = "Sign out"; signOut.style.marginLeft = "8px";
+signOut.onclick = async () => { try { await org("POST", "logout"); } catch (e) {} setView("participant"); };
+document.getElementById("viewsw").after(signOut); signOut.style.float = "right"; signOut.style.marginTop = "12px";
+
+route(); header(); cols(); render();
+if (PRIVATE) loadKeys();
+try { if (localStorage.getItem("mb-view") === "organizer") setView("organizer", false); } catch (e) {}
+// The blog's rollout videos: both camera views play in sync, at a chosen speed; they play while on screen.
+document.querySelectorAll("figure.roll").forEach(fig => {
+  const [a, b] = fig.querySelectorAll("video"), seek = fig.querySelector(".seek"), t = fig.querySelector(".t");
+  const pp = fig.querySelector(".pp"), PLAY = '<svg viewBox="0 0 96 96" width="1em" height="1em"><path fill="currentColor" d="M24 19.3c0-3.2 3.5-5.1 6.2-3.4l44.6 28.7c2.4 1.6 2.4 5.2 0 6.7L30.2 80c-2.7 1.7-6.2-.2-6.2-3.4z"/></svg>', PAUSE = '<svg viewBox="0 0 96 96" width="1em" height="1em"><rect x="22" y="16" width="18" height="64" rx="4" fill="currentColor"/><rect x="56" y="16" width="18" height="64" rx="4" fill="currentColor"/></svg>';
+  const mmss = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+  let speed = +fig.dataset.speed || 1, wanted = false;
+  const setSpeed = s => {
+    speed = s; a.playbackRate = b.playbackRate = s;
+    fig.querySelectorAll(".spd button").forEach(x => x.classList.toggle("on", +x.dataset.s === s));
+  };
+  const play = () => { wanted = true; b.currentTime = a.currentTime; a.play().catch(() => {}); b.play().catch(() => {}); };
+  const pause = () => { wanted = false; a.pause(); b.pause(); };
+  const show = () => { const on = !a.paused; fig.classList.toggle("playing", on); pp.innerHTML = on ? PAUSE : PLAY; };
+  a.addEventListener("play", show); a.addEventListener("pause", show);
+  a.addEventListener("loadedmetadata", () => { setSpeed(speed); t.textContent = `0:00 / ${mmss(a.duration)}`; });
+  a.addEventListener("timeupdate", () => {
+    if (!a.duration) return;
+    seek.value = Math.round(1000 * a.currentTime / a.duration);
+    t.textContent = `${mmss(a.currentTime)} / ${mmss(a.duration)}`;
+    if (Math.abs(b.currentTime - a.currentTime) > 0.25) b.currentTime = a.currentTime;  // keep the two views together
+  });
+  seek.addEventListener("input", () => { if (a.duration) a.currentTime = b.currentTime = seek.value / 1000 * a.duration; });
+  fig.querySelector(".big-play").onclick = play;
+  pp.onclick = () => (a.paused ? play() : pause());
+  fig.querySelectorAll(".spd button").forEach(x => x.onclick = () => setSpeed(+x.dataset.s));
+  setSpeed(speed);
+  if ("IntersectionObserver" in window)  // play while at least half of it is on screen, as long as nobody paused it
+    new IntersectionObserver(es => es.forEach(e => {
+      if (e.isIntersecting && (wanted || !fig.dataset.seen)) { fig.dataset.seen = 1; play(); }
+      else if (!e.isIntersecting && !a.paused) { a.pause(); b.pause(); }
+    }), { threshold: 0.5 }).observe(fig);
+});
+
+// The header's animation: two two-link arms (inverse kinematics) push U, W, M and, mirrored, C, S, I into their slots,
+// hold the words UWM CSI, then the blocks return. With reduced motion, the words just stand there.
+(function () {
+  const svg = document.querySelector("svg.uwm-push");
+  if (!svg) return;
+  const NS = "http://www.w3.org/2000/svg";
+  const BASE = [20, 86], L1 = 74, L2 = 74, S = 24, FLOOR = 100, GAP = S / 2 + 4, REST = [70, 30], UP = 40, LOW = FLOOR - 9;
+  const START = [66, 100, 160], SLOT = [120, 148, 176];  // in each arm's own frame; the right arm is drawn mirrored
+  const keys = [{ p: REST, t: 0 }];
+  let t = 0;
+  for (const i of [2, 1, 0]) {  // the block farthest out first, so nothing collides
+    keys.push({ p: [START[i] - GAP, UP], t: t += 0.9 }, { p: [START[i] - GAP, LOW], t: t += 0.55 },
+              { p: [SLOT[i] - GAP, LOW], t: t += 1.0, push: i }, { p: [SLOT[i] - GAP, UP], t: t += 0.5 });
+  }
+  keys.push({ p: REST, t: t += 0.9 }, { p: REST, t: t += 2.4 }, { p: REST, t: t += 0.6, reset: true });
+  const T = t, ease = u => u < .5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2, R = keys.findIndex(k => k.reset);
+  const set = (el, a) => Object.entries(a).forEach(([k, v]) => el.setAttribute(k, v));
+  const el = (parent, tag, attrs) => { const e = document.createElementNS(NS, tag); set(e, attrs); parent.appendChild(e); return e; };
+  const arms = [["a-left", "UWM", false], ["a-right", "ISC", true]].map(([cls, letters, mirrored]) => {
+    const g = svg.querySelector("." + cls), a = { blocks: [] };
+    SLOT.forEach(x => el(g, "rect", { class: "slot", x: x - S / 2, y: FLOOR - S, width: S, height: S, rx: 2 }));
+    [...letters].forEach((ch, i) => {
+      const b = el(g, "g", { class: "blk" });
+      b.innerHTML = `<rect x="${-S / 2}" y="${-S}" width="${S}" height="${S}" rx="2"/><text x="0" y="${-S / 2}"${mirrored ? ' transform="scale(-1 1)"' : ""}>${ch}</text>`;
+      a.blocks.push(b);
+    });
+    el(g, "rect", { class: "base", x: 7, y: 88, width: 26, height: 12, rx: 2 });
+    for (const c of ["l1", "l2", "f1", "f2"]) a[c] = el(g, "line", { class: c[0] === "l" ? "lk" : "fg" });
+    for (const [c, r] of [["j0", 5], ["j1", 4.5], ["j2", 3.5]]) a[c] = el(g, "circle", { class: "jt", r });
+    return a;
+  });
+  function ik([x, y]) {
+    const dx = x - BASE[0], dy = y - BASE[1], r = Math.hypot(dx, dy), d = Math.min(r, L1 + L2 - 0.01);
+    const a = Math.atan2(dy, dx), b = Math.acos((L1 * L1 + d * d - L2 * L2) / (2 * L1 * d));
+    return [[BASE[0] + L1 * Math.cos(a - b), BASE[1] + L1 * Math.sin(a - b)], [BASE[0] + dx / r * d, BASE[1] + dy / r * d]];
+  }
+  const LAG = [0, 0.8];  // seconds: the right arm starts a little after the left, like a second robot
+  function draw(now) { arms.forEach((a, n) => drawArm(a, ((now - LAG[n]) % T + T) % T)); }
+  function drawArm(a, s) {
+    let k = 1; while (k < keys.length - 1 && keys[k].t < s) k++;
+    const A = keys[k - 1], B = keys[k], u = ease(Math.min(1, Math.max(0, (s - A.t) / (B.t - A.t))));
+    const tip = [A.p[0] + (B.p[0] - A.p[0]) * u, A.p[1] + (B.p[1] - A.p[1]) * u];
+    const back = s >= keys[R - 1].t, v = back ? (s - keys[R - 1].t) / (keys[R].t - keys[R - 1].t) : 0;
+    const [e, w] = ik(tip);
+    {
+      a.blocks.forEach((b, i) => {
+        const pk = keys.findIndex(x => x.push === i);
+        const x = back ? SLOT[i] + (START[i] - SLOT[i]) * ease(v) : k === pk ? tip[0] + GAP : s >= keys[pk].t ? SLOT[i] : START[i];
+        b.setAttribute("transform", `translate(${x} ${FLOOR})`);
+        b.style.opacity = back ? 1 - 0.6 * Math.sin(Math.PI * v) : 1;
+      });
+      set(a.l1, { x1: BASE[0], y1: BASE[1], x2: e[0], y2: e[1] }); set(a.l2, { x1: e[0], y1: e[1], x2: w[0], y2: w[1] });
+      set(a.j0, { cx: BASE[0], cy: BASE[1] }); set(a.j1, { cx: e[0], cy: e[1] }); set(a.j2, { cx: w[0], cy: w[1] });
+      set(a.f1, { x1: w[0] - 3, y1: w[1], x2: w[0] - 3, y2: w[1] + 8 }); set(a.f2, { x1: w[0] + 3, y1: w[1], x2: w[0] + 3, y2: w[1] + 8 });
+    }
+  }
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) { arms.forEach(a => drawArm(a, keys[R - 2].t)); return; }
+  const loop = now => { if (!document.hidden) draw(now / 1000); requestAnimationFrame(loop); };
+  requestAnimationFrame(loop);
+})();
+
+// ---- Calendar: open slots and bookings, by week (times are the cell's local time, America/Chicago) ----
+const CAL = { week: 0, data: null, req: null };
+const pad2 = n => String(n).padStart(2, "0");
+const calDate = s => new Date(Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10), +s.slice(11, 13) || 0, +s.slice(14, 16) || 0));
+const calKey = d => `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}T${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}`;
+const calDay = d => d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+async function calApi(method, path, body) {
+  const r = await fetch(`api/v1/calendar${path}`, { method, cache: "no-store", body: body ? JSON.stringify(body) : undefined,
+    headers: body ? { "Content-Type": "application/json" } : {} });
+  let d = null; try { d = await r.json(); } catch (e) {}
+  if (!r.ok) throw new Error(r.status === 404 ? "No request with that id." : (d && d.error) || `HTTP ${r.status}`);
+  return d;
+}
+function calErr(e) { const p = document.getElementById("cal-err"); p.hidden = !e; p.textContent = e ? String(e.message || e) : ""; }
+async function loadCalendar(keepErr) {
+  if (!keepErr) calErr(null);
+  try { CAL.data = ORG ? await org("GET", "calendar") : await calApi("GET", ""); } catch (e) { CAL.data = null; calErr(e); }
+  drawCalendar();
+}
+function weekStart() {  // Monday 00:00 of the shown week, from the cell's clock
+  const now = calDate((CAL.data && CAL.data.now) || calKey(new Date()));
+  const d = new Date(now); d.setUTCHours(0, 0, 0, 0); d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7) + 7 * CAL.week);
+  return d;
+}
+function drawCalendar() {
+  const grid = document.getElementById("cal-grid"), d0 = weekStart(), D = CAL.data;
+  const days = [...Array(7)].map((_, i) => { const d = new Date(d0); d.setUTCDate(d.getUTCDate() + i); return d; });
+  const d6 = days[6];
+  document.getElementById("cal-week").textContent = `${calDay(d0)} – ${calDay(d6)}`;
+  document.getElementById("cal-prev").disabled = CAL.week <= 0;
+  if (!D) { grid.innerHTML = ""; return; }
+  const inWeek = t => t >= calKey(d0) && t < calKey(new Date(d6.getTime() + 864e5));
+  const left = Object.fromEntries((D.slots || []).map(s => [s.t, s.left]));
+  const open = new Set(ORG ? D.open : (D.slots || []).map(s => s.t));
+  const booked = {}; for (const b of (ORG ? D.bookings : [])) (booked[b.t] = booked[b.t] || []).push(b);
+  const mine = CAL.req && CAL.req.booking;
+  let times;
+  if (ORG) times = [...Array(26)].map((_, i) => `${pad2(7 + (i >> 1))}:${i % 2 ? "30" : "00"}`);  // 7:00 to 19:30
+  else times = [...new Set([...open].filter(inWeek).map(t => t.slice(11)))].sort();
+  const today = (D.now || "").slice(0, 10);
+  if (!ORG && !times.length) { grid.innerHTML = `<tr><td class="muted" style="padding:18px 4px">No open slots this week.${CAL.week < 4 ? " Try the next week." : ""}</td></tr>`; return; }
+  const head = `<tr><th></th>${days.map(d => `<th class="${calKey(d).slice(0, 10) === today ? "today" : ""}">${calDay(d)}</th>`).join("")}</tr>`;
+  const rows = times.map(hm => `<tr><td class="time">${hm}</td>${days.map(d => {
+    const t = `${calKey(d).slice(0, 10)}T${hm}`, past = t < (D.now || "");
+    if (ORG) {
+      const bs = booked[t] || [], isOpen = open.has(t);
+      const who = bs.map(b => b.status === "pending"
+        ? `<span class="who pending" title="${esc(b.request_id)} · pending: approve or reject">${esc(b.team)}<a href="#" class="ok" data-approve="${esc(b.request_id)}" data-n="${esc(b.rollouts)}" data-team="${esc(b.team)}" title="Approve for this slot">✓</a><a href="#" class="no" data-reject="${esc(b.request_id)}" title="Reject">✗</a></span>`
+        : `<span class="who" title="${esc(b.request_id)} · ${esc(b.status)}">${esc(b.team)}<a href="#" class="no" data-cancel="${esc(b.request_id)}" title="Cancel this booking">×</a></span>`).join("");
+      return `<td class="c"><button class="${isOpen ? "" : "closed"}" data-t="${t}" ${past ? "disabled" : ""}>${who || (isOpen ? "open" : "+")}</button></td>`;
+    }
+    if (!open.has(t)) return `<td class="c"></td>`;
+    if (t === mine) return `<td class="c"><button class="mine" disabled>Your slot</button></td>`;
+    const n = left[t] ?? 0;
+    return `<td class="c"><button class="${n ? "" : "full"}" data-t="${t}" ${n && !past ? "" : "disabled"}>${n ? `${n} left` : "Full"}</button></td>`;
+  }).join("")}</tr>`).join("");
+  grid.innerHTML = head + rows;
+  grid.querySelectorAll("button[data-t]").forEach(b => b.onclick = () => calClick(b.dataset.t));
+  grid.querySelectorAll("a[data-approve]").forEach(a => a.onclick = async e => {
+    e.preventDefault(); e.stopPropagation();
+    const n = parseInt(a.dataset.n, 10) || 10;
+    if (!confirm(`Approve ${a.dataset.team} (${a.dataset.approve}) with ${n} rollouts?`)) return;
+    try { await org("POST", `requests/${a.dataset.approve}/approve`, { trials: n }); } catch (err) { calErr(err); }
+    loadCalendar(true);
+  });
+  grid.querySelectorAll("a[data-reject]").forEach(a => a.onclick = async e => {
+    e.preventDefault(); e.stopPropagation();
+    const reason = prompt(`Reject ${a.dataset.reject}? The team sees this reason:`);
+    if (!reason) return;
+    try { await org("POST", `requests/${a.dataset.reject}/reject`, { reason }); } catch (err) { calErr(err); }
+    loadCalendar(true);
+  });
+  grid.querySelectorAll("a[data-cancel]").forEach(a => a.onclick = async e => {
+    e.preventDefault(); e.stopPropagation();
+    if (!confirm(`Cancel the booking of ${a.dataset.cancel}?`)) return;
+    try { await org("POST", "calendar/cancel", { request_id: a.dataset.cancel }); } catch (err) { calErr(err); }
+    loadCalendar();
+  });
+}
+const calLabel = t => `${calDay(calDate(t))}, ${t.slice(11)}–${calKey(new Date(calDate(t).getTime() + 18e5)).slice(11)} (Central)`;
+async function calClick(t) {
+  calErr(null);
+  if (ORG) {
+    const isOpen = CAL.data.open.includes(t);
+    try { const r = await org("POST", "calendar/open", { times: [t], open: !isOpen });
+          if (r.kept_booked && r.kept_booked.length) calErr("That slot has bookings: cancel them first."); else calErr(null); } catch (e) { calErr(e); }
+    return loadCalendar(true);
+  }
+  if (!CAL.req) return calErr("Enter your request id first.");
+  if (!["pending", "approved"].includes(CAL.req.status)) return calErr(`Request ${CAL.req.request_id} was ${CAL.req.status}: submit again to book a slot.`);
+  const move = CAL.req.booking ? ` This replaces your slot on ${calLabel(CAL.req.booking)}.` : "";
+  if (!confirm(`Book ${calLabel(t)} for ${CAL.req.team}?${move}`)) return;
+  try { await calApi("POST", "/book", { request_id: CAL.req.request_id, t }); } catch (e) { calErr(e); }
+  await calFind(true);
+}
+async function calFind(quiet) {
+  const rid = document.getElementById("cal-rid").value.trim().toLowerCase(), who = document.getElementById("cal-who");
+  if (!quiet) calErr(null);
+  if (!rid) { CAL.req = null; who.textContent = ""; return loadCalendar(true); }
+  try {
+    CAL.req = await calApi("GET", `/requests/${encodeURIComponent(rid)}`);
+    try { localStorage.setItem("mb-rid", rid); } catch (e) {}
+    const r = CAL.req;
+    const state = r.status === "pending" ? (r.booking ? "waiting for our approval" : "pick a slot below") : r.status === "approved" ? "approved" : `${r.status}: submit again`;
+    who.innerHTML = `${esc(r.team)} / ${esc(r.policy)} · ${esc(state)}` + (r.booking
+      ? ` · <b>your slot: ${esc(calLabel(r.booking))}</b> <a href="#" id="cal-cancel">cancel</a>`
+      : r.status === "approved" ? " · pick a slot below" : "");
+    const c = document.getElementById("cal-cancel");
+    if (c) c.onclick = async e => {
+      e.preventDefault();
+      if (!confirm("Cancel your slot?")) return;
+      try { await calApi("POST", "/cancel", { request_id: r.request_id }); } catch (err) { calErr(err); }
+      calFind(true);
+    };
+  } catch (e) { CAL.req = null; who.textContent = ""; calErr(e); }
+  loadCalendar(true);
+}
+document.getElementById("cal-find").onclick = () => calFind();
+document.getElementById("cal-rid").onkeydown = e => { if (e.key === "Enter") calFind(); };
+document.getElementById("cal-prev").onclick = () => { CAL.week = Math.max(0, CAL.week - 1); drawCalendar(); };
+document.getElementById("cal-next").onclick = () => { CAL.week += 1; drawCalendar(); };
+document.getElementById("cal-weekdays").onclick = async () => {
+  const d0 = weekStart(), times = [];
+  for (let i = 0; i < 5; i++) for (let h = 9; h < 17; h++) for (const m of ["00", "30"]) {
+    const d = new Date(d0); d.setUTCDate(d.getUTCDate() + i); const t = `${calKey(d).slice(0, 10)}T${pad2(h)}:${m}`;
+    if (t > ((CAL.data && CAL.data.now) || "")) times.push(t);
+  }
+  if (!confirm(`Open ${times.length} slots (Mon–Fri, 9:00–17:00, the week shown)?`)) return;
+  try { await org("POST", "calendar/open", { times, open: true }); } catch (e) { calErr(e); }
+  loadCalendar();
+};
+try { const rid = localStorage.getItem("mb-rid"); if (rid) document.getElementById("cal-rid").value = rid; } catch (e) {}
+</script>
+</body>
+</html>

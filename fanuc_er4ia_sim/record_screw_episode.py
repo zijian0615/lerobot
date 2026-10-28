@@ -283,7 +283,7 @@ def segments_for(head_xy, yaw, start):
         ("approach", np.array(start), up_p, 1.1, OPEN, OPEN, spread),
         ("descend", up_p, pick, 0.7, OPEN, OPEN, spread),
         ("close", pick, pick, 0.5, OPEN, shut, spread),
-        ("grip", pick, pick, 0.3, shut, shut, spread),
+        ("grip", pick, pick, 0.8, shut, shut, spread),  # CAD gripper: let the jaws reach the shank before the lift
         ("lift", pick, up_p, 0.6, shut, shut, spread),
         ("carry", up_p, up_b, 1.2, shut, shut, drop_spread),
         ("lower", up_b, drop, 0.5, shut, shut, drop_spread),

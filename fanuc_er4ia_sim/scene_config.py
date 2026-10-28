@@ -180,6 +180,78 @@ JAW_MAX_FORCE     = 180.0
 TOOL_AXIS          = (1.0, 0.0, 0.0)
 FINGER_SPREAD_AXIS = (0.0, 1.0, 0.0)
 
+# ---- CAD GRIPPER (2026-10-09). Merged from the hackathon starter: SMC MHZL2-16D2 body and jaws from the
+# supplied STEP (assets/gripper/smc_mhzl2_16d2.json), blades reconstructed from photos
+# (assets/gripper/photo_finger_detail.json, gripper_geometry.py). Overrides the estimated stack above.
+# Lengths are the real cell's: the stack starts at the J6 faceplate, FLANGE_OFFSET out from the J6_link
+# origin (wrist centre), and faceplate -> fingertip is 223 mm (UTOOL1 Z, ruler), so TOOL_LENGTH = 293 mm.
+GRIPPER_MODEL = "SMC MHZL2-16D2"
+GRIPPER_CAD = "assets/gripper/smc_mhzl2_16d2.json"
+SHOW_TOOL_DETAIL = True
+FLANGE_OFFSET = 0.070
+ADAPTER_R = 0.026
+ADAPTER_T = 0.012
+ZCYL_R = 0.023
+ZCYL_RECTANGULAR = False
+ZCYL_BODY_W = 0.038
+ZCYL_BODY_D = 0.034
+COLLAR_R = 0.028
+COLLAR_T = 0.010
+COLLAR_AT = 0.004
+ZFLANGE_R = 0.013
+ZFLANGE_T = 0.010
+BODY_LEN = 0.0527          # CAD body
+BODY_W = 0.047
+BODY_D = 0.0236
+PLATE_T = 0.0              # part of the CAD body
+PLATE_W = 0.042
+PLATE_D = 0.028
+CARRIAGE_LEN = 0.02115
+CARRIAGE_W = 0.0155
+CARRIAGE_D = 0.008
+CARRIAGE_OVERLAP = 0.02115  # the blade starts at the CAD body front
+FINGER_LENGTH = 0.076      # REAL: 76 mm below the SMC jaw (measured)
+FINGER_WIDTH = 0.012
+FINGER_THICK = 0.006
+FINGER_TIP_BEVEL = 0.014
+FINGER_TIP_WIDTH = 0.0075
+FINGER_EDGE_BREAK = 0.0006
+FINGER_MOUNT_HOLES = (0.010, 0.023)
+FINGER_TAPE = False
+AA_DIAMETER = 0.01450
+AA_POCKET_CLEARANCE = 0.0
+SCALLOP_R = (AA_DIAMETER + AA_POCKET_CLEARANCE) / 2
+# The inner hook sets the fingertip gap: 2 * (jaw + sqrt(R^2 - d^2)). d = 6.97 mm gives 4 mm closed and
+# 16 mm open, the real cell's 4 +- 1 / 15 +- 2 mm between the blade tips (the starter's 6.5 mm gave 6.4 /
+# 18.4 mm, and a 6.4 mm closed gap cannot pinch the 6 mm screw shank).
+SCALLOP_ABOVE_TIP = 0.00697
+SCALLOP_AT = 1.0 - SCALLOP_ABOVE_TIP / FINGER_LENGTH
+FINGER_INNER_TIP = (SCALLOP_R**2 - SCALLOP_ABOVE_TIP**2) ** 0.5
+SOFT_TIP_LENGTH = 0.032
+FINGER_COLLIDER_T = 0.006   # straight collision blade, inner face at the fingertip gap (visual profile is separate)
+SOFT_TIP_STATIC_FRIC = 1.5
+SOFT_TIP_DYNAMIC_FRIC = 1.3
+JAW_STROKE = 0.006         # SMC catalogue: 12 mm across both jaws
+JAW_CLOSED = 0.0           # straight-face half gap; the tips sit FINGER_INNER_TIP further out
+JAW_OPEN = JAW_CLOSED + JAW_STROKE
+JAW_MASS = 0.032
+LASER_LENGTH = 0.032
+LASER_RADIUS = 0.0035
+CAMBODY = (0.050, 0.050, 0.032)
+CAMBODY_GREY = (0.50, 0.50, 0.52)
+CAM_CORNER_R = 0.005
+CAM_LID_T = 0.002
+BRACKET_T = 0.004
+WRISTCAM_ROLL_DEG = 90.0
+ZCYL_LEN = 0.0723          # takes up the rest of the 223 mm faceplate -> fingertip
+TOOL_LENGTH = (FLANGE_OFFSET + ADAPTER_T + ZCYL_LEN + ZFLANGE_T + BODY_LEN + PLATE_T
+               + CARRIAGE_LEN - CARRIAGE_OVERLAP + FINGER_LENGTH)
+assert abs(TOOL_LENGTH - 0.293) < 1e-6, TOOL_LENGTH
+# The wrist camera housing follows the calibrated lens (WRIST_CAM eye below: 0.1633, 0.0125, 0.0971).
+WRISTCAM_DIR = (0.0, 0.1277, 0.9918)
+WRISTCAM_LATERAL = 0.0979
+CAM_ABOVE_TIP = TOOL_LENGTH + 0.006 - 0.1633
+
 # ------------------------------------------------------------------ wrist camera
 # VIDEO: a FANUC SC130EF2 (Kowa-made, 1/1.8" 1.3 MP mono) sits ON TOP of a
 # Banner LEDRR70X70-78587 red LED ring light and looks straight down through it,
@@ -255,12 +327,14 @@ SCREWS            = [(0.416, -0.139,   37.9),
 # REAL (2026-10-08, testbed rebuilt): a smaller yellow bin, axis-aligned, its pose and outer size fitted to
 # the table and side silhouettes (locate_objects.py --bin-height 0.055 on the -5.1 mm surface, IoU 0.87); the 2026-10-07 bin was
 # 60 x 60 x 60 mm at (0.3313, 0.2547). The pocket is not measured: scaled with the outer size.
+# REAL (2026-10-17): every bin is 50 x 50 x 55 mm, its pocket 35 x 35 mm and 25 mm deep (the organizers'
+# measurement; the silhouette fit above gave 47 mm).
 BIN_XY            = (0.5110, 0.1076)
-BIN_OUTER         = (0.047, 0.047)
+BIN_OUTER         = (0.050, 0.050)
 BIN_WALL_H        = 0.055       # REAL: measured with a ruler
-BIN_POCKET        = 0.028       # square pocket opening (GUESS: 0.6 x outer, as the old bin)
+BIN_POCKET        = 0.035       # square pocket opening (REAL)
 BIN_POCKET_R      = 0.0062      # its corner radius
-BIN_FLOOR_T       = 0.015       # GUESS: pocket depth is not visible
+BIN_FLOOR_T       = 0.030       # REAL: 55 mm tall, pocket 25 mm deep
 BIN_WALL_T        = (BIN_OUTER[0] - BIN_POCKET) / 2
 BIN_SIZE          = (BIN_POCKET, BIN_POCKET)   # usable interior, for drops
 BIN_RELEASE_Z     = SURFACE_DZ + BIN_WALL_H + 0.030  # fingertip at release: 30 mm above the rim

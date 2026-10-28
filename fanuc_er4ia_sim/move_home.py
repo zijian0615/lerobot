@@ -50,6 +50,9 @@ def home_joints(episode: Path = HERE / "data" / "screw_v4" / "episode_00" / "fra
 
 
 def live_joints(robot: Fanuc) -> np.ndarray:
+    # The controller's joint stream, not get_observation(): homing must not depend on the cameras.
+    if robot._latest_joints is not None:
+        return np.array(sim_from_controller_deg(robot._latest_joints), float)
     obs = robot.get_observation()
     return np.array([obs[n] for n in NAMES], float)
 
@@ -76,6 +79,9 @@ def go_home(robot: Fanuc, goal: np.ndarray | None = None, dry_run: bool = False,
         t_next += 0.1
         time.sleep(max(0.0, t_next - time.perf_counter()))
         now = live_joints(robot)
+        if getattr(robot, "reject_streak", 0) >= 10:
+            raise SystemExit(f"[home] the controller refused {robot.reject_streak} motions in a row "
+                             f"(last {robot._last_ack}): clear the pendant (RESET, STEP off), then recover")
         if q is goal and np.max(np.abs(now - goal)) < 0.3 and np.linalg.norm(tip(now) - tip(goal)) < 0.002:
             break
         if time.perf_counter() - t_start > len(path) / 10 + timeout_s:

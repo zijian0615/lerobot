@@ -33,13 +33,13 @@ from lerobot.cameras.opencv import OpenCVCamera, OpenCVCameraConfig  # noqa: E40
 # the USB interface 1.4 by-path links (by-id index0 is not stable across reboots).
 CAMERAS = {
     "table": OpenCVCameraConfig(
-        index_or_path="/dev/v4l/by-path/platform-NVDA8000:00-usb-0:1.1.1:1.4-video-index0",
+        index_or_path="/dev/v4l/by-path/platform-NVDA8000:00-usb-0:1.2.4.2:1.4-video-index0",
         width=1920, height=1080, fps=30, fourcc="MJPG"),
     "side": OpenCVCameraConfig(
         index_or_path="/dev/v4l/by-id/usb-SHENZHEN_AONI_ELECTRONIC_CO.__LTD_Full_HD_webcam_20200729001-video-index0",
         width=1920, height=1080, fps=30, fourcc="MJPG", exposure=65),
     "wrist": OpenCVCameraConfig(
-        index_or_path="/dev/v4l/by-path/platform-NVDA8000:00-usb-0:1.1.3:1.4-video-index0",
+        index_or_path="/dev/v4l/by-path/platform-NVDA8000:00-usb-0:1.2.3:1.4-video-index0",
         width=1280, height=720, fps=30, fourcc="MJPG"),
 }
 

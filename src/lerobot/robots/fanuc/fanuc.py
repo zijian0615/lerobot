@@ -37,6 +37,7 @@ from .pose import (
     controller_degrees,
     decode_fanuc_pose_dict,
     raw_fanuc_pose_dict,
+    rotation_matrix_from_wpr,
     wpr_from_rotation_matrix,
     wrap_w_degrees,
 )
@@ -125,6 +126,8 @@ class Fanuc(Robot):
         self._joint_target_m: np.ndarray | None = None
         # Joint mode: the last joint target (sim degrees) actually sent; each step is limited against it.
         self._joint_target_deg: np.ndarray | None = None
+        # Joint / TCP mode: the last tool orientation actually sent (UF rotation matrix); TCP steps are limited against it.
+        self._tcp_target_rot: np.ndarray | None = None
         self._uframe_data: tuple[float, ...] | None = None
         self._latest_t: float | None = None
         self._latest_tick: int | None = None
@@ -145,6 +148,9 @@ class Fanuc(Robot):
         self._poll_enabled.set()
         self._uframe_applied = False
         self._last_ack: dict[str, Any] | None = None
+        self._gripper_waiting = False
+        self._rmi_session = False  # True once FRC_Initialize succeeded on the open connection
+        self.reject_streak = 0  # motions refused in a row by the controller (reset by an accepted one / recover)
         self._last_unhandled: dict[str, Any] | None = None
         self._stream_sent_mono: float | None = None
         self._last_stream_j7: float | None = None
@@ -182,12 +188,7 @@ class Fanuc(Robot):
                 "RMI handshake timed out; leftover RMI_MOVE from a killed twin is likely. "
                 "Aborting and retrying once."
             )
-            try:
-                self._send_json({"Command": "FRC_Abort"})
-                self._send_json({"Communication": "FRC_Disconnect"})
-            except Exception:
-                pass
-            self._close_socket()
+            self._close_socket()  # sends FRC_Abort only if this connection holds a session
             time.sleep(1.0)
             try:
                 dynamic_port = self._open_tcp_session()
@@ -240,6 +241,14 @@ class Fanuc(Robot):
         logger.info("Fanuc connected to %s:%s with UF=%s, UT=%s", self._host, dynamic_port, self._uframe, self._utool)
 
     def disconnect(self) -> None:
+        if self._connected and self._sock is not None:
+            # End RMI_MOVE and wait for the controller to confirm: a session left running blocks the next Initialize.
+            try:
+                self._command_replies.pop("FRC_Abort", None)
+                self._send_json({"Command": "FRC_Abort"})
+                logger.info("Fanuc disconnect: FRC_Abort -> %s", self._await_reply("FRC_Abort", 3.0))
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("FRC_Abort on disconnect failed: %s", exc)
         self._connected = False
         with self._pending_lock:
             for fut in self._pending_futures.values():
@@ -282,12 +291,35 @@ class Fanuc(Robot):
                 return int(raw)
         return None
 
-    def recover_after_fault(self) -> None:
-        """Abort leftover motion, RESET the controller, re-init RMI after SystemFault.
+    def _await_reply(self, cmd: str, timeout_s: float = 2.0) -> dict[str, Any] | None:
+        deadline = time.time() + timeout_s
+        while time.time() < deadline:
+            reply = self._command_replies.get(cmd)
+            if reply is not None:
+                return reply
+            time.sleep(0.02)
+        return None
 
-        After ``FRC_SystemFault`` the socket still accepts ``FRC_LinearMotion``,
-        but the arm stays in HOLD until Abort+Reset. Abort is only valid once a
-        session already exists — do not send it before the first Initialize.
+    @staticmethod
+    def _pendant_problem(status: dict[str, Any] | None) -> str | None:
+        """What on the pendant still blocks RMI, from FRC_GetStatus (None: nothing visible)."""
+        if not status:
+            return None
+        problems = []
+        if status.get("TPMode") == 1:
+            problems.append("teach pendant enabled (switch it OFF)")
+        if status.get("SingleStepMode") == 1:
+            problems.append("STEP mode on (press STEP so its LED is off)")
+        if status.get("ServoReady") == 0:
+            problems.append("servos not ready (clear the alarm and press RESET)")
+        return "; ".join(problems) or None
+
+    def recover_after_fault(self) -> None:
+        """Bring RMI back after a SystemFault / collision / joint-limit alarm, once the pendant is cleared.
+
+        First Abort + Reset + Initialize on the open session, and check that Initialize really succeeded. If it
+        did not (sequence desync, stale session), reconnect the RMI session in place: the same as restarting the
+        process, but the cameras stay open. Raises with the reason if the pendant still blocks RMI.
         """
         self._require_connected()
         self.pause_state_poll()
@@ -298,38 +330,66 @@ class Fanuc(Robot):
                         fut.set_result(-1)
                 self._pending_futures.clear()
             logger.info("Fanuc recover: FRC_Abort + FRC_Reset + FRC_Initialize")
+            self.reject_streak = 0
             self._clear_leftover_rmi()
-            self._command_replies.pop("FRC_Initialize", None)
-            self._send_json({"Command": "FRC_Initialize", "GroupMask": self._group})
-            time.sleep(0.4)
-            # Initialize resets the controller SequenceID to 1 (RMIT-029 / 2556957
-            # if the PC keeps counting from the pre-Abort value).
-            self.seq_id = 1
             self._command_replies.pop("FRC_GetStatus", None)
             self._send_json({"Command": "FRC_GetStatus"})
-            time.sleep(0.3)
-            status = self._command_replies.get("FRC_GetStatus")
-            nxt = self._status_next_seq(status)
-            if nxt is not None:
-                self.seq_id = max(1, nxt)
-            logger.info(
-                "Fanuc recover SequenceID=%s init=%s status=%s",
-                self.seq_id,
-                self._command_replies.get("FRC_Initialize"),
-                status,
-            )
-            self._send_json(
-                {
-                    "Command": "FRC_SetUFrameUTool",
-                    "UFrameNumber": int(self._uframe),
-                    "UToolNumber": int(self._utool),
-                    "Group": int(self._group),
-                }
-            )
-            time.sleep(0.2)
-            self._uframe_applied = True
+            problem = self._pendant_problem(self._await_reply("FRC_GetStatus"))
+            if problem:
+                raise RuntimeError(f"recover: {problem}")
+            self._command_replies.pop("FRC_Initialize", None)
+            self._send_json({"Command": "FRC_Initialize", "GroupMask": self._group})
+            init = self._await_reply("FRC_Initialize", 5.0)  # after a fault the controller can take a few seconds
+            init_ok = init is not None and int(init.get("ErrorID", -1)) in (0, _FRC_ALREADY_INITIALIZED)
+            if init_ok:
+                # Initialize resets the controller SequenceID (RMIT-029 / 2556957 if the PC keeps counting).
+                self.seq_id = 1
+                self._command_replies.pop("FRC_GetStatus", None)
+                self._send_json({"Command": "FRC_GetStatus"})
+                status = self._await_reply("FRC_GetStatus")
+                nxt = self._status_next_seq(status)
+                if nxt is not None:
+                    self.seq_id = max(1, nxt)
+                logger.info("Fanuc recover SequenceID=%s init=%s status=%s", self.seq_id, init, status)
+                self._send_json({"Command": "FRC_SetUFrameUTool", "UFrameNumber": int(self._uframe),
+                                 "UToolNumber": int(self._utool), "Group": int(self._group)})
+                time.sleep(0.2)
+                self._uframe_applied = True
+                self._joint_target_m = self._joint_target_deg = self._tcp_target_rot = None
+                self._last_ack = None
+                return
+            logger.warning("Fanuc recover: Initialize gave %s; reconnecting the RMI session", init)
         finally:
             self.resume_state_poll()
+        self.reconnect_rmi()
+
+    def reconnect_rmi(self) -> None:
+        """Close and reopen the RMI session (what a process restart does), keeping the cameras open."""
+        self._connected = False
+        with self._pending_lock:
+            for fut in self._pending_futures.values():
+                if not fut.done():
+                    fut.set_result(-1)
+            self._pending_futures.clear()
+        self._close_socket()
+        for th in (self._recv_thread, self._state_thread):
+            if th is not None:
+                th.join(timeout=2.0)
+        self._recv_thread = self._state_thread = None
+        time.sleep(1.0)
+        self.seq_id = 1
+        self.reject_streak = 0
+        self._last_ack = None
+        self._latest_pose = None
+        self._uframe_applied = False
+        self._command_replies.clear()
+        self._joint_target_m = self._joint_target_deg = self._tcp_target_rot = None
+        cameras, self.cameras = self.cameras, {}  # already open and streaming: do not reopen them
+        try:
+            self.connect()
+        finally:
+            self.cameras = cameras
+        logger.info("Fanuc RMI session reconnected")
 
     def configure(self) -> None:
         if not self._connected or self._sock is None or self._uframe_applied:
@@ -573,6 +633,8 @@ class Fanuc(Robot):
         wanted[2] += self.config.joint_z_offset_mm / 1000.0
         if self.config.joint_z_min_mm is not None:
             wanted[2] = max(wanted[2], self.config.joint_z_min_mm / 1000.0)
+        if gripper is not None and self._gripper_toggles(gripper) and not self._gripper_waiting:
+            self._wait_for_arrival(wanted, lambda: self._send_joint_action({k: v for k, v in action.items() if k not in ("gripper.pos", "gripper", "j7")}))
         position = wanted.copy()
         live = None if self._latest_pose is None else np.array(self._latest_pose[:3], dtype=float) / 1000.0
         # Limit each step against the previous target, not the live pose: the controller then gets one
@@ -621,6 +683,112 @@ class Fanuc(Robot):
         if "sequence_id" in sent:  # a stream send can be skipped while acks are pending
             self._joint_target_m = position
             self._joint_target_deg = np.asarray(joints, dtype=float)
+            self._tcp_target_rot = np.asarray(rotation, dtype=float)
+        return sent
+
+    def _gripper_toggles(self, gripper: float) -> bool:
+        last = self._last_stream_j7  # None: nothing streamed yet this session, so there is no change to hold back
+        return last is not None and (float(gripper) >= 0.5) != (last >= 0.5)
+
+    def _wait_for_arrival(self, wanted_m: np.ndarray, resend: Callable[[], Any]) -> None:
+        """Hold the gripper change until the live TCP reaches this row's target (joint_gripper_wait_mm)."""
+        tol = self.config.joint_gripper_wait_mm
+        if tol is None or self._latest_pose is None:
+            return
+        self._gripper_waiting = True
+        t0 = time.time()
+        err = float(np.linalg.norm(np.array(self._latest_pose[:3], dtype=float) / 1000.0 - wanted_m) * 1000.0)
+        # Time to travel the remaining distance at the speed cap, plus joint_gripper_wait_s: a far target (a policy
+        # that sends one row 250 mm away with the gripper change) is waited for, not closed on in mid-air. Capped,
+        # so a target the arm never reaches (clamped by the floor, blocked) cannot hold the trial for long.
+        limit = min(self.config.joint_gripper_wait_s + err / max(self.config.joint_tcp_speed_mm_s, 1),
+                    self.config.joint_gripper_wait_max_s)
+        try:
+            while True:
+                err = float(np.linalg.norm(np.array(self._latest_pose[:3], dtype=float) / 1000.0 - wanted_m) * 1000.0)
+                if err <= tol or time.time() - t0 > limit:
+                    break
+                if (self._last_ack or {}).get("Communication") == "FRC_SystemFault" or self.reject_streak >= 10:
+                    break
+                resend()
+                time.sleep(0.1)
+        finally:
+            self._gripper_waiting = False
+        logger.info("gripper: waited %.2f s for the arm, %.1f mm from the target", time.time() - t0, err)
+
+    def send_tcp_action(self, xyzwpr_mm_deg, gripper: float | None = None, max_rot_step_deg: float = 5.0) -> RobotAction:
+        """Stream a TCP target (UTOOL in the active UFRAME: x, y, z mm, w, p, r deg) under the joint-mode limits.
+
+        The same path as a joint action after its FK: z offset and floor, at most joint_max_step_mm from the previous
+        target and joint_max_lead_mm ahead of the live pose, joint_tcp_speed_mm_s; the tool orientation turns at most
+        max_rot_step_deg per step. No IK: the controller resolves the arm configuration, as for joint actions.
+        """
+        if self.config.motion != "joint":
+            raise RuntimeError("send_tcp_action needs motion='joint' (the streaming, limited path)")
+        x, y, z, w, p, r = (float(v) for v in xyzwpr_mm_deg[:6])
+        if not np.all(np.isfinite([x, y, z, w, p, r])):
+            raise ValueError("TCP target contains NaN or inf")
+        wanted = np.array([x, y, z]) / 1000.0
+        wanted[2] += self.config.joint_z_offset_mm / 1000.0
+        if self.config.joint_z_min_mm is not None:
+            wanted[2] = max(wanted[2], self.config.joint_z_min_mm / 1000.0)
+        rot = np.array(rotation_matrix_from_wpr(w, p, r), dtype=float)
+        prev = self._tcp_target_rot
+        if prev is None and self._latest_pose is not None:
+            prev = np.array(rotation_matrix_from_wpr(*self._latest_pose[3:6]), dtype=float)
+        if prev is not None:
+            rel = prev.T @ rot
+            angle = float(np.arccos(np.clip((np.trace(rel) - 1) / 2, -1.0, 1.0)))
+            limit = np.radians(max_rot_step_deg)
+            if angle > limit:
+                axis = np.array([rel[2, 1] - rel[1, 2], rel[0, 2] - rel[2, 0], rel[1, 0] - rel[0, 1]])
+                n = float(np.linalg.norm(axis))
+                if n < 1e-9:  # ~180 deg: any axis perpendicular to the rotation's fixed one
+                    vals, vecs = np.linalg.eigh(rel + rel.T)
+                    axis = vecs[:, int(np.argmax(vals))]
+                else:
+                    axis = axis / n
+                k = np.array([[0, -axis[2], axis[1]], [axis[2], 0, -axis[0]], [-axis[1], axis[0], 0]])
+                part = np.eye(3) + np.sin(limit) * k + (1 - np.cos(limit)) * (k @ k)
+                rot = prev @ part
+        if gripper is not None and self._gripper_toggles(gripper) and not self._gripper_waiting:
+            self._wait_for_arrival(wanted, lambda: self.send_tcp_action(xyzwpr_mm_deg, None, max_rot_step_deg))
+        position = wanted.copy()
+        live = None if self._latest_pose is None else np.array(self._latest_pose[:3], dtype=float) / 1000.0
+        anchor = self._joint_target_m if self._joint_target_m is not None else live
+        if anchor is not None:
+            position = _limit_step(anchor, position, self.config.joint_max_step_mm / 1000.0)
+        if live is not None:
+            position = _limit_step(live, position, self.config.joint_max_lead_mm / 1000.0)
+        w, p, r = wpr_from_rotation_matrix(rot.tolist())
+        linear: dict[str, Any] = {
+            "j0": float(position[0] * 1000.0), "j1": float(position[1] * 1000.0), "j2": float(position[2] * 1000.0),
+            "j3": float(w), "j4": float(p), "j5": float(r),
+            "speed": int(self.config.joint_tcp_speed_mm_s), "speed_type": "mmSec",
+            "term_type": "CNT", "term_value": 50, "stream": True,
+        }
+        if gripper is not None:
+            closed = float(gripper) >= 0.5
+            last_closed = None if self._last_stream_j7 is None else self._last_stream_j7 >= 0.5
+            if closed != last_closed:
+                linear["j7"] = 1.0 if closed else 0.0
+        logger.info(
+            "tcp->linear target=(%.1f, %.1f, %.1f, %.1f, %.1f, %.1f) gripper=%s xyz_mm=(%.1f, %.1f, %.1f) "
+            "short_of_policy_mm=%.1f lead_mm=%s",
+            x, y, z, float(xyzwpr_mm_deg[3]), float(xyzwpr_mm_deg[4]), float(xyzwpr_mm_deg[5]), gripper,
+            linear["j0"], linear["j1"], linear["j2"], float(np.linalg.norm(wanted - position) * 1000.0),
+            None if live is None else round(float(np.linalg.norm(position - live) * 1000.0), 1),
+        )
+        saved = self.config.motion
+        self.config.motion = "cartesian"
+        try:
+            sent = self.send_action(linear)
+        finally:
+            self.config.motion = saved
+        if "sequence_id" in sent:
+            self._joint_target_m = position
+            self._tcp_target_rot = rot
+            self._joint_target_deg = None  # the next joint action steps from the live joints
         return sent
 
     def reset_episode(self, timeout_s: float = 20.0) -> dict[str, Any] | None:
@@ -642,6 +810,7 @@ class Fanuc(Robot):
         self._commanded_gripper = 0.0
         self._joint_target_m = None
         self._joint_target_deg = None
+        self._tcp_target_rot = None
         self._command_replies.pop("SIM_Reset", None)
         self._send_json({"Command": "SIM_Reset"})
         deadline = time.time() + timeout_s
@@ -973,7 +1142,10 @@ class Fanuc(Robot):
                 fut.set_result(err_id)
             self._ack_queue.put((seq_id, err_id))
             if err_id not in (0, None):
+                self.reject_streak += 1
                 logger.warning("Fanuc motion rejected ErrorID=%s response=%s", err_id, resp)
+            elif err_id == 0:
+                self.reject_streak = 0
             return
         cmd = resp.get("Command")
         if cmd:
@@ -1009,6 +1181,8 @@ class Fanuc(Robot):
         Sends best-effort Abort/Reset and does not wait, so leftover acks can be
         skipped later by ``_recv_until`` without stealing the Initialize reply.
         """
+        if not self._rmi_session:  # no session of ours to abort: Abort now would poison the next Initialize
+            return
         for cmd in ("FRC_Abort", "FRC_Reset"):
             try:
                 self._send_json({"Command": cmd})
@@ -1035,41 +1209,52 @@ class Fanuc(Robot):
             "Do not Abort/run RMI_MOVE on the pendant; Initialize starts it."
         )
 
-    def _initialize_rmi(self) -> None:
-        # Abort is only valid after a session exists. Sending it first poisons
-        # Initialize (ErrorID 2556955 / GroupMask 16) after a SystemFault.
+    def _try_initialize(self) -> dict[str, Any]:
         self._send_json({"Command": "FRC_Initialize", "GroupMask": self._group})
         resp = self._recv_until(lambda r: r.get("Command") == "FRC_Initialize")
-        err = int(resp.get("ErrorID", -1))
-        if err in (0, _FRC_ALREADY_INITIALIZED):
-            return
-        if err not in (
-            _FRC_INITIALIZE_REJECTED,
-            _FRC_INVALID_CONTROLLER_STATE,
-            _FRC_INVALID_UFRAME_UTOOL,
-        ):
-            raise RuntimeError(self._initialize_error(resp, self._probe_status()))
+        self._rmi_session = int(resp.get("ErrorID", -1)) in (0, _FRC_ALREADY_INITIALIZED)
+        return resp
 
-        logger.warning(
-            "FRC_Initialize ErrorID=%s; aborting leftover RMI session and retrying",
-            err,
+    def _initialize_rmi(self) -> None:
+        # Never send FRC_Abort / FRC_Reset before a session exists: after a SystemFault that poisons every later
+        # Initialize (ErrorID 2556955 / GroupMask 16) until RMI is aborted on the pendant. A session left open by a
+        # process that died (2556937) is retried on fresh connections instead.
+        resp = self._try_initialize()
+        for attempt in range(3):
+            err = int(resp.get("ErrorID", -1))
+            if err in (0, _FRC_ALREADY_INITIALIZED):
+                if attempt:
+                    logger.info("FRC_Initialize succeeded on a fresh session (attempt %d)", attempt + 1)
+                return
+            if err not in (_FRC_INITIALIZE_REJECTED, _FRC_INVALID_CONTROLLER_STATE):
+                break
+            logger.warning("FRC_Initialize ErrorID=%s; reconnecting and retrying in 3 s (%d/3)", err, attempt + 1)
+            self._close_socket()
+            time.sleep(3.0)
+            self._open_tcp_session()
+            resp = self._try_initialize()
+        if int(resp.get("ErrorID", -1)) in (0, _FRC_ALREADY_INITIALIZED):
+            return
+        status = self._probe_status()
+        raise RuntimeError(
+            self._initialize_error(resp, status)
+            + " The controller still holds an RMI session: on the pendant press FCTN > ABORT ALL, SELECT another program"
+              " (not RMI_MOVE), RESET, then start again."
         )
-        self._clear_leftover_rmi()
-        self._send_json({"Command": "FRC_Initialize", "GroupMask": self._group})
-        resp = self._recv_until(lambda r: r.get("Command") == "FRC_Initialize")
-        if int(resp.get("ErrorID", -1)) not in (0, _FRC_ALREADY_INITIALIZED):
-            raise RuntimeError(self._initialize_error(resp, self._probe_status()))
 
     def _close_socket(self) -> None:
         if self._sock is None:
             self._buf = b""
             return
-        try:
-            self._send_json({"Command": "FRC_Abort"})
-        except Exception:
-            pass
+        if self._rmi_session:  # Abort only ends a session we own: sent without one it poisons the next Initialize
+            try:
+                self._send_json({"Command": "FRC_Abort"})
+            except Exception:
+                pass
+        self._rmi_session = False
         try:
             self._send_json({"Communication": "FRC_Disconnect"})
+            time.sleep(0.3)  # let the controller take the disconnect before the socket goes away
         except Exception:
             pass
         try:

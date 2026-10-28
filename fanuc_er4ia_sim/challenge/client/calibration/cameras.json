@@ -1,0 +1,206 @@
+{
+ "model": "pinhole + one radial term: x = Xc/Zc, y = Yc/Zc, d = 1 + k1 (x^2 + y^2), u = fx x d + W/2, v = fx y d + H/2 (camera: +z forward, +x right, +y down)",
+ "table": {
+  "T_base_cam": [
+   [
+    -0.01818048338625146,
+    0.7942711423562825,
+    -0.6072913818290928,
+    0.7758503597891291
+   ],
+   [
+    0.9989498229523242,
+    0.03997863088061857,
+    0.02238214235572794,
+    -0.043399983968107056
+   ],
+   [
+    0.04205616776839105,
+    -0.6062467001913974,
+    -0.7941638478674785,
+    0.8007617581750683
+   ],
+   [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ]
+  ],
+  "fx": 1024.8627910268606,
+  "k1": 0.008859283169230157,
+  "size": [
+   1920,
+   1080
+  ],
+  "solved": "2026-10-07",
+  "rms_px": 0.46505600106875217,
+  "transform": "T_base_cam: camera -> robot base"
+ },
+ "side": {
+  "T_base_cam": [
+   [
+    -0.9985319573825173,
+    -0.029326188299274525,
+    -0.04554014455043047,
+    0.45773801183727186
+   ],
+   [
+    0.045705394425944706,
+    -0.004989088130651437,
+    -0.9989425038109015,
+    0.6287354389216055
+   ],
+   [
+    0.029067972172262563,
+    -0.9995574439117844,
+    0.006322128939881183,
+    0.1377728369831132
+   ],
+   [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ]
+  ],
+  "fx": 1185.870633734718,
+  "k1": 0.0,
+  "size": [
+   1920,
+   1080
+  ],
+  "solved": "2026-10-08",
+  "rms_px": 3.985859335949607,
+  "transform": "T_base_cam: camera -> robot base"
+ },
+ "wrist": {
+  "T_flange_cam": [
+   [
+    0.02815589822486686,
+    -0.019838546616531838,
+    0.9994066627070759,
+    0.16329810793904648
+   ],
+   [
+    -0.9993499576756935,
+    -0.023077751362226312,
+    0.02769619984137578,
+    0.012480163033233196
+   ],
+   [
+    0.02251460612005246,
+    -0.9995368174610715,
+    -0.020475425540191966,
+    0.09711564232151255
+   ],
+   [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ]
+  ],
+  "fx": 619.6399636921526,
+  "k1": -0.019600611286561938,
+  "size": [
+   1280,
+   720
+  ],
+  "solved": "2026-10-07",
+  "rms_px": 0.9037254770073838,
+  "transform": "T_flange_cam: camera -> flange, the twin's J6_link frame (wrist centre, tool along +x); compose with the FK of the joints"
+ },
+ "table_depth": {
+  "model": "pinhole, no distortion (rectified by the camera): u = fx X/Z + cx, v = fy Y/Z + cy",
+  "size": [
+   640,
+   400
+  ],
+  "fx": 305.5168762207031,
+  "fy": 305.5168762207031,
+  "cx": 321.3739318847656,
+  "cy": 200.7133026123047,
+  "units": "mm",
+  "T_base_cam": [
+   [
+    -0.01981,
+    0.826983,
+    -0.561877,
+    0.734599
+   ],
+   [
+    0.999739,
+    0.022801,
+    -0.001689,
+    -0.033502
+   ],
+   [
+    0.011415,
+    -0.561764,
+    -0.827219,
+    0.808303
+   ],
+   [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ]
+  ],
+  "solved": "2026-10-17",
+  "transform": "the depth camera's pose in the base frame (camera: +z forward, +x right, +y down)",
+  "rms_plane_mm": 2.31,
+  "notes": "Factory intrinsics and depth-to-colour extrinsics, on the table colour camera's pose, then tilted and shifted in z onto the work surface. Depth is the distance along the optical axis (Z), in mm; 0 = none."
+ },
+ "wrist_depth": {
+  "model": "pinhole, no distortion (rectified by the camera): u = fx X/Z + cx, v = fy Y/Z + cy",
+  "size": [
+   848,
+   480
+  ],
+  "fx": 416.8527526855469,
+  "fy": 416.8527526855469,
+  "cx": 421.3500061035156,
+  "cy": 239.3375244140625,
+  "units": "mm",
+  "solved": "2026-10-18",
+  "rms_plane_mm": 3.0,
+  "T_flange_cam": [
+   [
+    -0.019032,
+    -0.034867,
+    0.999211,
+    0.175187
+   ],
+   [
+    -0.999719,
+    -0.013478,
+    -0.019512,
+    0.02973
+   ],
+   [
+    0.014148,
+    -0.999301,
+    -0.034601,
+    0.102229
+   ],
+   [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ]
+  ],
+  "transform": "T_flange_cam: depth camera -> flange (the twin's J6_link frame); compose with the FK of the joints the depth came with (camera: +z forward, +x right, +y down)",
+  "solved_at_joints": [
+   -0.007,
+   3.291,
+   -11.897,
+   -0.001,
+   -74.822,
+   -0.029
+  ],
+  "notes": "Factory intrinsics and depth-to-colour extrinsics on the wrist colour camera's flange pose, then tilted and shifted onto the work surface at solved_at_joints. Depth: mm along the optical axis; 0 = none."
+ }
+}

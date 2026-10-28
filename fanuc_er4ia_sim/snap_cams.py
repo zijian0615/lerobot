@@ -28,13 +28,13 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     configs = {
         "table": OpenCVCameraConfig(
-            index_or_path="/dev/v4l/by-path/platform-NVDA8000:00-usb-0:1.1.1:1.4-video-index0",
+            index_or_path="/dev/v4l/by-path/platform-NVDA8000:00-usb-0:1.2.4.2:1.4-video-index0",
             width=1920, height=1080, fps=30, fourcc="MJPG"),
         "side": OpenCVCameraConfig(
             index_or_path="/dev/v4l/by-id/usb-SHENZHEN_AONI_ELECTRONIC_CO.__LTD_Full_HD_webcam_20200729001-video-index0",
             width=1920, height=1080, fps=30, fourcc="MJPG", exposure=args.side_exposure),
         "wrist": OpenCVCameraConfig(
-            index_or_path="/dev/v4l/by-path/platform-NVDA8000:00-usb-0:1.1.3:1.4-video-index0",
+            index_or_path="/dev/v4l/by-path/platform-NVDA8000:00-usb-0:1.2.3:1.4-video-index0",
             width=1280, height=720, fps=30, fourcc="MJPG"),
     }
     for name in args.cams:

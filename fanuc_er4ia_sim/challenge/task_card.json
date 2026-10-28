@@ -1,0 +1,31 @@
+{
+  "task_id": "fanuc_er4ia_screw_to_bin",
+  "track": "Rockwell-NVIDIA Fall 2026 - Dataset 3: Grasping and Sorting",
+  "robot_tag": "fanuc_er4ia",
+  "robot_id": "1",
+  "instruction": "pick one countersunk screw and drop it in the yellow bin",
+  "frames": "Positions are in the robot base frame (x forward, y left, metres). Yaw is the screw axis about +z, degrees.",
+  "bin_xy_m": [0.511, 0.1076],
+  "max_trial_s": 90,
+  "trials_per_layout": 2,
+  "layouts": [
+    {"id": "L1", "screw_xy_m": [0.416, -0.139], "yaw_deg": 37.9, "note": "nominal training layout"},
+    {"id": "L2", "screw_xy_m": [0.350, -0.200], "yaw_deg": 0.0},
+    {"id": "L3", "screw_xy_m": [0.480, -0.060], "yaw_deg": 60.0},
+    {"id": "L4", "screw_xy_m": [0.350, -0.050], "yaw_deg": -30.0},
+    {"id": "L5", "screw_xy_m": [0.500, -0.200], "yaw_deg": 90.0}
+  ],
+  "stages": [
+    {"stage": 0, "name": "none", "rule": "the fingers never reach the screw"},
+    {"stage": 1, "name": "reach", "rule": "a fingertip touches the screw or ends within 10 mm of it"},
+    {"stage": 2, "name": "grasp", "rule": "the screw is lifted at least 10 mm off the surface"},
+    {"stage": 3, "name": "transport", "rule": "the screw is carried over the bin opening"},
+    {"stage": 4, "name": "place", "rule": "the screw rests inside the bin and the gripper has opened"}
+  ],
+  "scoring": {
+    "success": "stage 4 within max_trial_s, with no operator intervention and no controller fault",
+    "progress_score": "stage / 4, averaged over trials (0-100)",
+    "cycle_time_s": "start of the trial to the moment the operator stamps stage 4, successful trials only",
+    "ci": "Wilson 95% interval on the success rate"
+  }
+}

@@ -32,10 +32,10 @@ from lerobot.robots.fanuc import Fanuc, FanucConfig  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 TABLE_CAM = OpenCVCameraConfig(
-    index_or_path="/dev/v4l/by-path/platform-NVDA8000:00-usb-0:1.1.1:1.4-video-index0",
+    index_or_path="/dev/v4l/by-path/platform-NVDA8000:00-usb-0:1.2.4.2:1.4-video-index0",
     width=1920, height=1080, fps=30, fourcc="MJPG")
 WRIST_CAM = OpenCVCameraConfig(
-    index_or_path="/dev/v4l/by-path/platform-NVDA8000:00-usb-0:1.1.3:1.4-video-index0",
+    index_or_path="/dev/v4l/by-path/platform-NVDA8000:00-usb-0:1.2.3:1.4-video-index0",
     width=1280, height=720, fps=30, fourcc="MJPG")
 
 

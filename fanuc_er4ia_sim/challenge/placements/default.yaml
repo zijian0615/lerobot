@@ -1,0 +1,8 @@
+# The cell's default setup, used for every rollout of a run whose objects and layout stay the same (and that sends
+# no placement.yaml of its own): the 8 screws and the yellow bin as in the twin (scene_config SCREWS and BIN_XY).
+# x, y in mm in the robot frame; a screw's position is its head, and yaw points from the head to the tip.
+rollouts:
+  - objects:
+      screw: [[416, -139, 38], [420, -97, 99], [401, -54, 150], [339, -79, 4],
+              [427, -16, -161], [371, 14, 33], [438, 25, -63], [433, 88, -93]]
+      bin: [511, 108]

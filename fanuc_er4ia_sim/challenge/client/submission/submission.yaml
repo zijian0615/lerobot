@@ -1,0 +1,38 @@
+# Your submission. Run: uv run run.py --submit
+
+team: <team name>
+contact: <name, email>
+policy: <policy name>             # Give your policy a name (e.g., GraspV1)
+
+# Choose the closest model type. This does not affect scoring.
+model_type: Hybrid
+# VA          Images -> actions (ACT, Diffusion Policy)
+# VLA         Images + instructions -> actions (NVIDIA GR00T)
+# WAM         Predicts future states to guide robot actions
+# VLM + BM    A VLM decides what to do; a behavior model executes actions
+# TAMP + FMs  Foundation models assist task and motion planning
+# Hybrid      Combines multiple approaches, or choose this if unsure
+
+# --- Task ---
+task_id: pick-cube-C              # Short task name ending with your team letter
+task: Put the cube into the yellow bin.
+                                  # Describe your task in one short sentence
+
+# --- Test Setup ---
+# Tell us how to prepare the workspace for each rollout.
+# Objects and layout can stay the same or change between rollouts.
+
+objects: same
+# same: Use the same set of objects for every rollout.
+# different: May use different objects across rollouts.
+
+layout: same
+# same: Place objects in the same positions for every rollout.
+# different: May change object positions across rollouts.
+
+# --- Evaluation ---
+rollouts: 10                      # Number of attempts in this test
+                                  # Each attempt is scored success or failure
+
+# --- Hardware ---
+custom_hardware: none            # Describe any hardware changes (e.g., 3D-printed fingers)

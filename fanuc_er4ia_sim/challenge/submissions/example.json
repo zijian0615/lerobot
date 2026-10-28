@@ -1,0 +1,17 @@
+{
+  "team": "UWM-CSI",
+  "policy": "ACT (twin v4)",
+  "authors": "UWM-CSI",
+  "model_type": "ACT",
+  "parameters_m": 52,
+  "training_data": "sim",
+  "sim_episodes": 50,
+  "real_episodes": 0,
+  "cameras": ["table", "side", "wrist"],
+  "action_rate_hz": 10,
+  "sim_success_rate": null,
+  "weights_url": "https://huggingface.co/zijian2022/act_fanuc_er4ia_screw_single_v4",
+  "data_url": "https://huggingface.co/datasets/zijian2022/fanuc_er4ia_screw_single_v4",
+  "code_url": "",
+  "date": "2026-10-11"
+}

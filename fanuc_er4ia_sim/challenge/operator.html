@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Physical AI Hackathon for the Factory Floor (2026) Operator</title>
+<link rel="icon" type="image/svg+xml" href='data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"%3E%3Crect width="32" height="32" rx="7" fill="%23141413"/%3E%3Crect x="5.5" y="24" width="13" height="3.6" rx="1.2" fill="%23faf8f3"/%3E%3Cpath d="M12 22.5V12.5L22.5 8.5" fill="none" stroke="%23ffbd00" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"/%3E%3Cpath d="M22.5 8.5V13M19.8 13.2H25.2M19.8 13.2V18M25.2 13.2V18" fill="none" stroke="%23faf8f3" stroke-width="1.9" stroke-linecap="round"/%3E%3Ccircle cx="12" cy="22.5" r="2.7" fill="%23faf8f3"/%3E%3Ccircle cx="12" cy="12.5" r="2.4" fill="%23faf8f3"/%3E%3Ccircle cx="22.5" cy="8.5" r="2.1" fill="%23faf8f3"/%3E%3C/svg%3E'>
+<style>
+:root {
+  --bg: #faf8f3; --bg-2: #ffffff; --surface: #ffffff; --surface2: #f1eee7; --border: #e6e2d8; --border-strong: #cfcabd;
+  --text: #141413; --text-muted: #6b6a63; --ink: #141413; --gold: #ffbd00; --red: #c2412d; --green: #3f7d58; --amber: #b7791f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #141413; --bg-2: #1c1c1a; --surface: #1f1f1d; --surface2: #262623; --border: #2f2f2c; --border-strong: #45453f;
+    --text: #f0eee6; --text-muted: #a3a198; --ink: #f0eee6; --red: #e0614b; --green: #6fb38a; --amber: #e0a33a; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 Inter, system-ui, sans-serif; }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 18px 16px 48px; }
+header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+h1 { font: 600 1.35rem Georgia, serif; margin: 0; } h1 .marks { display: inline-grid; gap: 2px; margin: 0 7px 0 6px; vertical-align: middle; position: relative; top: -0.08em; }  /* one square: Participants; two, stacked: Organizer; three, one over two: Operator */
+h1 .mark { display: block; width: 10px; height: 10px; background: var(--gold); border-radius: 2px; }
+h1 .marks.n2 .mark, h1 .marks.n3 .mark { width: 7px; height: 7px; }
+h1 .marks.n3 { grid-template-columns: 7px 7px; }
+h1 .marks.n3 .mark:first-child { grid-column: 1 / 3; justify-self: center; }
+h1 .role { font-size: 0.75em; }
+h2 { font: 600 1.1rem Georgia, serif; margin: 0 0 10px; }
+.pill { font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border-strong); }
+.pill.idle { color: var(--green); border-color: var(--green); } .pill.running, .pill.homing { color: var(--amber); border-color: var(--amber); }
+.pill.fault, .pill.stopped, .pill.offline { color: var(--red); border-color: var(--red); }
+button { font: 600 0.92rem Inter, system-ui, sans-serif; border-radius: 10px; padding: 10px 16px; cursor: pointer; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); }
+button:hover:not(:disabled) { background: var(--surface2); } button:disabled { opacity: .45; cursor: default; }
+button.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); } button.primary:hover:not(:disabled) { opacity: .88; background: var(--ink); }
+button.stop { background: var(--red); color: #fff; border-color: var(--red); font-size: 1rem; padding: 10px 22px; }
+button.stop:hover:not(:disabled) { background: var(--red); opacity: .9; }
+button.small { padding: 5px 10px; font-size: 0.8rem; border-radius: 8px; }
+.grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 900px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; margin-bottom: 16px; }
+.label { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+.muted { color: var(--text-muted); } .err { color: var(--red); font-size: 0.9rem; min-height: 1.2em; margin: 8px 0 0; }
+.step { font-size: 1.05rem; margin: 0 0 12px; }
+pre.setup { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; white-space: pre-wrap; font: 0.85rem/1.45 ui-monospace, Menlo, monospace; margin: 0 0 12px; }
+input[type=text], input[type=number], select { font: 0.95rem Inter, system-ui, sans-serif; color: var(--text); background: var(--bg-2); border: 1px solid var(--border-strong); border-radius: 8px; padding: 9px 11px; }
+input.wide { width: 100%; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.timer { font: 600 2.6rem/1 ui-monospace, Menlo, monospace; margin: 4px 0 14px; }
+.stages { display: grid; gap: 8px; margin: 8px 0 12px; }
+.stages button { text-align: left; font-weight: 500; padding: 9px 12px; }
+.stages button.on { outline: 3px solid var(--gold); outline-offset: -1px; }
+.stages button.succ { border-color: var(--green); }
+.stages b { margin-right: 8px; }
+img.cam { width: 100%; display: block; border-radius: 10px; background: #000; aspect-ratio: 16/9; object-fit: contain; }
+.camwrap { position: relative; }
+.camwrap svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.camwrap svg .t { fill: none; stroke: #ffbd00; stroke-width: 3; vector-effect: non-scaling-stroke; }
+.camwrap svg text { fill: #ffbd00; font: 600 34px Inter, sans-serif; paint-order: stroke; stroke: #000; stroke-width: 6px; }
+.camwrap .ghost { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; border-radius: 10px; opacity: .5; pointer-events: none; }
+.alignbar { margin-top: 10px; font-size: 0.9rem; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+.alignbar .st { font-weight: 600; } .alignbar .st.ok { color: var(--green); } .alignbar .st.off { color: var(--amber); }
+.alignbar .nums { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+#b-align.on { background: var(--ink); color: var(--bg); border-color: var(--ink); opacity: 1; }
+.tg { display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--text-muted); }
+table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+td, th { padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: left; } th { color: var(--text-muted); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; }
+tr.cur td { background: var(--surface2); }
+.ok { color: var(--green); font-weight: 600; } .bad { color: var(--red); }
+code { font: 0.85em ui-monospace, Menlo, monospace; background: var(--surface2); padding: 1px 5px; border-radius: 4px; }
+.warn { border-left: 4px solid var(--red); }
+ol.pend { margin: 6px 0 12px; padding-left: 20px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Physical AI Hackathon for the Factory Floor (2026) <span class="role"><span class="marks n3"><span class="mark"></span><span class="mark"></span><span class="mark"></span></span>Operator</span></h1>
+    <div class="row">
+      <span class="pill" id="state">…</span>
+      <span class="muted" id="active"></span>
+      <button class="stop" id="b-stop" title="Drop the action queue and halt. The physical E-stop is the safety device.">■ Stop</button>
+    </div>
+  </header>
+
+  <div class="grid">
+    <div>
+      <div class="card">
+        <div class="row" style="justify-content:space-between">
+          <div class="row"><span class="label">Run</span><select id="run" style="min-width:260px"></select></div>
+          <span class="muted" id="run-sum"></span>
+        </div>
+      </div>
+      <div class="card" id="panel"><p class="muted">Choose a run.</p></div>
+      <p class="err" id="err"></p>
+    </div>
+    <div>
+      <div class="card">
+        <div class="row" style="justify-content:space-between;margin-bottom:8px"><span class="label">Live camera</span>
+          <span class="row" style="gap:12px"><label class="tg" title="Where this rollout's objects go (table camera)"><input type="checkbox" id="tg" checked> Targets</label><button class="small" id="b-align" title="Compare the side camera with the view it was calibrated in (the twin's side camera)">Align side</button><select id="cam"></select></span></div>
+        <div class="camwrap"><img class="cam" id="camimg" alt="live camera"><img class="ghost" id="ghost" alt="" hidden><svg id="ov" viewBox="0 0 1600 900" preserveAspectRatio="none"></svg></div>
+        <p class="muted" id="camwarn" hidden style="margin:8px 0 0;font-size:0.85rem"></p>
+        <div class="alignbar" id="alignbar" hidden><span class="st" id="al-st">Checking …</span><span class="nums" id="al-nums"></span>
+          <label class="tg" style="margin-left:auto">Reference <input type="range" id="al-op" min="0" max="100" value="50" style="width:90px"></label></div>
+      </div>
+      <div class="card">
+        <div class="label" style="margin-bottom:6px">Trials</div>
+        <table><thead><tr><th>#</th><th>Layout</th><th>Status</th><th>Score</th><th></th></tr></thead><tbody id="trials"></tbody></table>
+      </div>
+      <div class="card">
+        <div class="label">TCP floor (UF0, mm)</div>
+        <div class="row" style="margin-top:8px"><input type="number" id="floor" step="0.5" style="width:110px"><button class="small" id="b-floor">Set</button><span class="muted" id="floor-now"></span></div>
+        <p class="muted" style="font-size:.82rem;margin:8px 0 0">Between trials only. The work surface is at about −335.1 mm.</p>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const S = { run: null, view: null, state: null, pick: null, skew: 0, busy: false, cams: [] };
+async function api(method, path, body) {
+  const r = await fetch(`/op/${path}`, { method, cache: "no-store", body: body ? JSON.stringify(body) : undefined,
+    headers: method === "POST" ? { "Content-Type": "application/json", "X-Requested-With": "manipbench" } : {} });
+  let d = null; try { d = await r.json(); } catch (e) {}
+  if (!r.ok) throw new Error((d && d.error) || `HTTP ${r.status}`);
+  return d;
+}
+const err = e => { $("err").textContent = e ? String(e.message || e) : ""; };
+async function act(fn) {  // one action at a time; refresh right after
+  if (S.busy) return; S.busy = true; err(null);
+  try { await fn(); } catch (e) { err(e); } finally { S.busy = false; await tick(); }
+}
+const OPEN = ["waiting", "preparing", "ready", "running"];
+
+async function tick() {
+  try {
+    const st = await api("GET", "state");
+    S.state = st; S.skew = st.time - Date.now() / 1000;
+    const pill = $("state"); pill.textContent = st.state; pill.className = "pill " + st.state;
+    $("active").textContent = st.active ? `${st.active.trial_id} · ${st.active.status}` : "";
+    $("floor-now").textContent = st.z_min_mm != null ? `now ${st.z_min_mm}` : "";
+    const recent = (st.camera_reopens || []).filter(e => st.time - e.t < 3600);  // the table camera, reopened when its stream went bad
+    $("camwarn").hidden = !recent.length;
+    if (recent.length) { const e = recent[recent.length - 1];
+      $("camwarn").textContent = `⚠ ${e.camera} camera reopened at ${new Date(e.t * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}: ${e.reason}` + (recent.length > 1 ? ` (${recent.length} times in the last hour)` : ""); }
+    if (!S.cams.length && st.cameras.length) {
+      S.cams = st.cameras; $("cam").innerHTML = st.cameras.map(c => `<option>${esc(c)}</option>`).join("");
+    }
+    const sel = $("run"), cur = sel.value || S.run || (location.hash.slice(1) || "");
+    const opts = st.runs.filter(r => r.open || r.run_id === cur).map(r =>
+      `<option value="${esc(r.run_id)}">${esc(r.team)} / ${esc(r.policy)} · ${esc(r.run_id)} · ${r.scored}/${r.trials}${r.hidden ? " · hidden" : ""}</option>`).join("");
+    if (sel.dataset.opts !== opts) { sel.innerHTML = opts || "<option value=''>No run has trials to run</option>"; sel.dataset.opts = opts; }
+    if (cur && [...sel.options].some(o => o.value === cur)) sel.value = cur;
+    S.run = sel.value || null;
+    if (S.run) location.hash = S.run;
+    S.view = S.run ? await api("GET", `runs/${S.run}`) : null;
+    render();
+  } catch (e) {
+    const pill = $("state"); pill.textContent = "offline"; pill.className = "pill offline";
+    err(e);
+  }
+}
+
+function scoring(t, ended) {
+  const v = S.view, top = v.success_stage;
+  const btns = v.stages.filter(s => s.stage <= top).map(s =>
+    `<button data-stage="${s.stage}" class="${S.pick === s.stage ? "on" : ""} ${s.stage === top ? "succ" : ""}"><b>${s.stage === top ? "✓ " : ""}${s.stage}</b>${esc(s.name)}${s.rule ? ` <span class="muted">· ${esc(s.rule)}</span>` : ""}</button>`).join("");
+  return `<div class="label">Score ${ended ? "this trial" : "when the trial is over"}</div>
+    <div class="stages">${btns}</div>
+    <div class="row" style="margin-bottom:10px"><label><input type="checkbox" id="intv"> I stepped in (never a success)</label></div>
+    <input type="text" class="wide" id="notes" placeholder="notes (optional)" style="margin-bottom:10px">
+    <div class="row"><button class="primary" id="b-score" ${S.pick == null ? "disabled" : ""}>Submit score${S.pick != null ? `: stage ${S.pick}` : ""}</button>
+      <button id="b-void">Void and rerun</button></div>
+    <p class="muted" style="font-size:.82rem;margin:8px 0 0">Void and rerun: the cell's fault, not the policy's (a controller fault, a camera, a setup mistake). The attempt is kept, unscored.</p>`;
+}
+
+function drawTargets() {
+  const show = $("tg").checked && ($("cam").value || "table") === "table" && S.shapes;
+  $("ov").innerHTML = !show ? "" : S.shapes.map(s => {
+    const p = s.pts.map(([u, v]) => [u * 1600, v * 900]);
+    if (s.kind === "screw") return `<circle class="t" cx="${p[0][0]}" cy="${p[0][1]}" r="13"/><line class="t" x1="${p[0][0]}" y1="${p[0][1]}" x2="${p[1][0]}" y2="${p[1][1]}"/>`;
+    const cx = p.reduce((a, q) => a + q[0], 0) / p.length, top = Math.min(...p.map(q => q[1]));
+    return `<polygon class="t" points="${p.map(q => q.join(",")).join(" ")}"/><text x="${cx}" y="${top - 8}" text-anchor="middle">${esc(s.label)}</text>`;
+  }).join("");
+}
+async function targetsFor(t) {  // the overlay follows the rollout being set up or run
+  const id = t && ["preparing", "ready", "running"].includes(t.status) ? t.trial_id : null;
+  if (id === S.ovFor) return;
+  S.ovFor = id; S.shapes = null; drawTargets();
+  if (id) try { const o = await api("GET", `trials/${id}/overlay`); if (S.ovFor === id) { S.shapes = o.shapes; drawTargets(); } } catch (e) {}
+}
+function render() {
+  const v = S.view, st = S.state, panel = $("panel");
+  if (!v) { panel.innerHTML = '<p class="muted">No run has trials left to run. Approve a request in the site\'s Organizer view, or pick a run.</p>'; $("trials").innerHTML = ""; $("run-sum").textContent = ""; return; }
+  const top = v.success_stage, ts = v.trials;
+  $("run-sum").textContent = `${v.task_id} · ${v.action} actions`;
+  const unscored = ts.find(t => !t.outcome && !OPEN.includes(t.status) && t.status !== "cancelled");
+  const cur = ts.find(t => OPEN.includes(t.status) && t.status !== "waiting") || unscored || ts.find(t => t.status === "waiting");
+  targetsFor(cur);
+  $("trials").innerHTML = ts.map(t => {
+    const o = t.outcome, score = o ? (o.success ? '<span class="ok">✓ success</span>' : `stage ${o.stage}${o.intervention ? " · stepped in" : ""}${o.fault ? ' · <span class="bad">fault</span>' : ""}`) : "";
+    return `<tr class="${cur && t.trial_id === cur.trial_id ? "cur" : ""}"><td>${t.index}</td><td>${esc(t.layout)}</td><td>${esc(t.status)}${t.attempts ? ` <span class="muted">(${t.attempts} voided)</span>` : ""}</td><td>${score}</td>
+      <td>${o ? `<button class="small" data-retry="${esc(t.trial_id)}" title="Void this score and run the trial again">Rerun</button>` : ""}</td></tr>`;
+  }).join("");
+  const head = t => `<div class="label">Trial ${t.index} · layout ${esc(t.layout)} · ${esc(t.trial_id)}</div><h2 style="margin-top:4px">${esc(v.team)} / ${esc(v.policy)}</h2>`;
+  if (st.state === "fault" || st.state === "stopped") {
+    panel.className = "card warn";
+    panel.innerHTML = `<h2>Robot ${esc(st.state)}</h2><p class="step">On the teach pendant:</p>
+      <ol class="pend"><li>Check the alarm and clear the cell.</li><li>RESET, STEP off, AUTO, enable switch OFF.</li></ol>
+      <button class="primary" id="b-recover">Recover</button>
+      ${unscored ? `<p class="muted" style="margin-top:12px">Then score trial ${unscored.index}, or void and rerun it.</p>` : ""}`;
+    $("b-recover").onclick = () => act(() => api("POST", "recover"));
+    return;
+  }
+  panel.className = "card";
+  if (!cur) { panel.innerHTML = `<h2>All trials are scored</h2><p class="muted">${ts.filter(t => t.outcome).length} of ${ts.length} scored. Use Rerun in the list to void one and run it again.</p>`; bindRows(); return; }
+  if (cur.status === "waiting") {
+    const busyOther = st.active && st.active.trial_id !== cur.trial_id;
+    panel.innerHTML = head(cur) + `<p class="step">Next: home the arm for this trial.</p>
+      <button class="primary" id="b-prep" ${busyOther ? "disabled" : ""}>Home the arm</button>${busyOther ? `<p class="muted">${esc(st.active.trial_id)} still owns the robot.</p>` : ""}`;
+    $("b-prep").onclick = () => act(() => api("POST", `trials/${cur.trial_id}/prepare`));
+  } else if (cur.status === "preparing" && st.state === "homing") {
+    panel.innerHTML = head(cur) + `<p class="step">Homing the arm …</p>`;
+  } else if (cur.status === "preparing") {
+    const def = cur.prompt || v.task || "";
+    const place = [v.placement === "team" ? "Place (the team's placement.yaml):" : "Place (default setup):", ...cur.place.map(l => "  " + l)];
+    panel.innerHTML = head(cur) + `<p class="step">Reset the cell as below and clear it. On the table camera, the targets show where each object goes.</p><pre class="setup">${esc([v.setup[cur.layout] || "", ...place].filter(Boolean).join("\n"))}</pre>
+      <div class="label">Instruction for this trial</div><input type="text" class="wide" id="instr" value="${esc(S.instr ?? def)}" style="margin:6px 0 12px">
+      <div class="row"><button class="primary" id="b-ready">Ready: let the team start</button><button id="b-abort">Abort trial</button></div>`;
+    $("instr").oninput = e => S.instr = e.target.value;
+    $("b-ready").onclick = () => act(async () => {
+      const ins = $("instr").value.trim() || def;
+      if (!ins) throw new Error("Type the instruction.");
+      await api("POST", `trials/${cur.trial_id}/ready`, { instruction: ins }); S.instr = null;
+    });
+    $("b-abort").onclick = () => confirm("Abort this trial? It ends unscored.") && act(() => api("POST", `trials/${cur.trial_id}/abort`));
+  } else if (cur.status === "ready") {
+    panel.innerHTML = head(cur) + `<p class="step">Waiting for the team's client to start the trial …</p><p class="muted">Instruction: “${esc(cur.instruction)}”</p><button id="b-abort">Abort trial</button>`;
+    $("b-abort").onclick = () => confirm("Abort this trial? It ends unscored.") && act(() => api("POST", `trials/${cur.trial_id}/abort`));
+  } else {
+    const running = cur.status === "running";
+    const el = cur.t_start ? Math.max(0, Date.now() / 1000 + S.skew - cur.t_start) : 0;
+    if (S.pickFor !== cur.trial_id) { S.pick = null; S.intv = false; S.notes = ""; S.pickFor = cur.trial_id; }
+    panel.innerHTML = head(cur) + (running
+      ? `<div class="label">Running</div><div class="timer">${Math.floor(el / 60)}:${String(Math.floor(el % 60)).padStart(2, "0")}</div>`
+      : `<p class="step">Trial ended: <b>${esc(cur.status)}</b>${cur.end_reason ? ` · ${esc(cur.end_reason)}` : ""}${cur.actions != null ? ` · ${cur.actions} actions` : ""}</p>`)
+      + `<p class="muted" style="margin-top:0">Instruction: “${esc(cur.instruction)}”</p>` + scoring(cur, !running);
+    panel.querySelectorAll("[data-stage]").forEach(b => b.onclick = () => { S.pick = +b.dataset.stage; render(); });
+    $("b-score").onclick = () => act(async () => {
+      const intv = $("intv").checked;
+      await api("POST", `trials/${cur.trial_id}/score`, { stage: S.pick, intervention: intv, notes: $("notes").value });
+      S.pick = null; S.intv = false; S.notes = "";
+    });
+    $("b-void").onclick = () => {
+      const reason = prompt("Why void this attempt? (e.g. controller fault, camera, setup mistake)");
+      if (reason === null) return;
+      act(async () => {
+        if (running) { await api("POST", "stop"); await new Promise(r => setTimeout(r, 500)); }
+        await api("POST", `trials/${cur.trial_id}/retry`, { reason });
+      });
+    };
+    $("intv").checked = S.intv; $("notes").value = S.notes;  // kept across the 1 s redraw
+    $("intv").onchange = e => S.intv = e.target.checked; $("notes").oninput = e => S.notes = e.target.value;
+  }
+  bindRows();
+}
+function bindRows() {
+  document.querySelectorAll("[data-retry]").forEach(b => b.onclick = () => {
+    const reason = prompt(`Void the score of ${b.dataset.retry} and run it again? Reason:`);
+    if (reason !== null) act(() => api("POST", `trials/${b.dataset.retry}/retry`, { reason }));
+  });
+}
+
+$("b-stop").onclick = () => act(() => api("POST", "stop"));
+$("run").onchange = () => { S.run = $("run").value; S.pick = null; S.instr = null; tick(); };
+$("tg").onchange = drawTargets; $("cam").addEventListener("change", drawTargets);
+// Align side: the reference frame of the side calibration as a ghost over the live image, and how far off it is
+S.align = false;
+function setAlign(on) {
+  S.align = on; $("b-align").classList.toggle("on", on); $("alignbar").hidden = !on; $("ghost").hidden = !on;
+  if (on) { $("cam").value = "side"; $("ghost").src = "/op/align-ref/side.jpg"; drawTargets(); alignTick(); }
+}
+$("b-align").onclick = () => setAlign(!S.align);
+$("cam").addEventListener("change", () => { if (S.align && $("cam").value !== "side") setAlign(false); });
+$("al-op").oninput = e => $("ghost").style.opacity = e.target.value / 100;
+async function alignTick() {
+  if (!S.align) return;
+  try {
+    const a = await api("GET", "align?cam=side");
+    if (!a.ok) { $("al-st").className = "st off"; $("al-st").textContent = a.reason; $("al-nums").textContent = ""; }
+    else {
+      $("al-st").className = `st ${a.aligned ? "ok" : "off"}`;
+      $("al-st").textContent = a.aligned ? "✓ Matches the calibrated view" : a.hints.join(", ").replace(/^./, c => c.toUpperCase());
+      $("al-nums").textContent = `dx ${a.dx > 0 ? "+" : ""}${a.dx} · dy ${a.dy > 0 ? "+" : ""}${a.dy} px · scale ${a.scale.toFixed(3)} · roll ${a.rot > 0 ? "+" : ""}${a.rot.toFixed(1)}°`;
+    }
+  } catch (e) { $("al-st").className = "st off"; $("al-st").textContent = String(e.message || e); }
+  setTimeout(alignTick, 2000);
+}
+$("b-floor").onclick = () => act(() => api("POST", "config", { z_min_mm: parseFloat($("floor").value) }));
+(function cam() {
+  const c = $("cam").value || "table", img = new Image();
+  img.onload = () => { $("camimg").src = img.src; setTimeout(cam, 400); };
+  img.onerror = () => setTimeout(cam, 1500);
+  img.src = `/op/frame.jpg?cam=${encodeURIComponent(c)}&w=960&t=${Date.now()}`;
+})();
+setInterval(() => { if (!S.busy && document.visibilityState === "visible" && !(document.activeElement && ["instr", "notes", "floor"].includes(document.activeElement.id))) tick(); }, 1000);
+tick();
+</script>
+</body>
+</html>

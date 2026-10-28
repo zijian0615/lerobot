@@ -1,0 +1,6 @@
+# Placement for stack-red-blue-C (team zijian2022): red near (0.40, -0.06) m, blue near (0.40, +0.06) m,
+# each within ±2 cm, rotated within ±20°. The same seed gives the same 10 placements every time.
+seed: 1
+objects:
+  red:  {colour: red,  xy_m: [0.40, -0.06], tol_mm: 20, yaw_deg: [-20, 20], size_mm: 16}
+  blue: {colour: blue, xy_m: [0.40,  0.06], tol_mm: 20, yaw_deg: [-20, 20], size_mm: 16}

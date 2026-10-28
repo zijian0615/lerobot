@@ -50,6 +50,13 @@ class FanucConfig(RobotConfig):
     # No joint target moves more than this from the previous one in one step (the demos peak at 3.45 deg
     # on J6). Chunk-to-chunk jumps are spread over several steps instead of faulting the controller.
     joint_max_step_deg: float = 5.0
+    # Open / close the gripper only once the live TCP is within this many mm of that row's target (None: at
+    # once). The real arm trails its targets by ~0.8 s, so without it a policy closes the jaws in the air.
+    # The row is re-sent (gripper unchanged) until the arm arrives, or for joint_gripper_wait_s plus the time to travel
+    # the remaining distance at joint_tcp_speed_mm_s, at most joint_gripper_wait_max_s.
+    joint_gripper_wait_mm: float | None = None
+    joint_gripper_wait_s: float = 2.0
+    joint_gripper_wait_max_s: float = 15.0
     # Shift every joint-mode TCP target by this much in the user frame's Z (mm), e.g. -7 when the real work
     # surface sits 7 mm below the one the policy was trained on.
     joint_z_offset_mm: float = 0.0

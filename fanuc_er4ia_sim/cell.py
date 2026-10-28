@@ -6,6 +6,7 @@ Assumes SimulationApp has already been started by the caller.
 import os
 import sys
 import math
+import json
 import numpy as np
 from pxr import Usd, UsdGeom, UsdLux, UsdPhysics, UsdShade, Sdf, Gf
 import omni.usd
@@ -13,6 +14,7 @@ from isaacsim.core.utils.stage import add_reference_to_stage
 from isaacsim.storage.native import get_assets_root_path
 
 import scene_config as C
+from gripper_geometry import finger_profile, clip_profile
 
 FLANGE = C.ROBOT_PRIM + "/J6_link"
 WRIST_CAM_PATH = C.WRIST_CAM["parent"] + "/WristCam"
@@ -45,6 +47,11 @@ _TEXTURED = {
 }
 
 _MATERIAL_SPEC = {
+    # CAD gripper (merged from the hackathon starter): blades, air lines, camera cable
+    "uwm_finger": ((1.0, 1.0, 1.0), 0.88, 0.38),
+    "finger_milled": ((1.0, 1.0, 1.0), 0.92, 0.44),
+    "air_line_blue": ((0.025, 0.30, 0.68), 0.00, 0.30),
+    "camera_cable_orange": ((0.85, 0.22, 0.025), 0.00, 0.36),
     #                        diffuse                metallic roughness
     "alu_machined":     ((0.910, 0.915, 0.930), 0.92, 0.26),
     "alu_anodised":     ((0.780, 0.790, 0.800), 0.70, 0.44),
@@ -153,6 +160,7 @@ def init_materials(stage):
 
 PHYS_MAT_PATH = "/World/Physics/ObjectMaterial"
 TAPE_MAT_PATH = "/World/Physics/TapeMaterial"
+SOFT_TIP_MAT_PATH = "/World/Physics/SoftTipMaterial"
 
 
 def enable_ccd(world):
@@ -186,6 +194,14 @@ def init_physics(stage):
     t.CreateStaticFrictionAttr().Set(C.TAPE_STATIC_FRIC)
     t.CreateDynamicFrictionAttr().Set(C.TAPE_DYNAMIC_FRIC)
     t.CreateRestitutionAttr().Set(0.0)
+
+    # the blades' high-friction distal tips (CAD gripper)
+    tip = UsdPhysics.MaterialAPI.Apply(UsdShade.Material.Define(stage, SOFT_TIP_MAT_PATH).GetPrim())
+    tip.CreateStaticFrictionAttr().Set(C.SOFT_TIP_STATIC_FRIC)
+    tip.CreateDynamicFrictionAttr().Set(C.SOFT_TIP_DYNAMIC_FRIC)
+    tip.CreateRestitutionAttr().Set(0.0)
+    from pxr import PhysxSchema
+    PhysxSchema.PhysxMaterialAPI.Apply(tip.GetPrim()).CreateFrictionCombineModeAttr().Set("max")
 
 
 def bind_physics_material(prim, path=PHYS_MAT_PATH):
@@ -716,41 +732,17 @@ def add_screws(stage):
         bind_mat(hexp.GetPrim(), "black_plastic")
 
 
-def finger_profile():
-    """Side silhouette of one blade finger, in (along-tool, across-width).
-
-    v = 0 is the inner face (toward the other finger). The scallop is a
-    semicircular pocket cut into the inner face near the tip; below it the
-    profile returns inward to form the hooked claw seen in the photos.
-    """
-    L, W, R = C.FINGER_LENGTH, C.FINGER_WIDTH, C.SCALLOP_R
-    uc = C.SCALLOP_AT * L
-    pts = [(0.0, 0.0)]
-    pts.append((uc - R, 0.0))
-    for k in range(1, 18):                     # scallop arc, bulging outward
-        a = math.pi * k / 18.0
-        pts.append((uc - R * math.cos(a), R * math.sin(a)))
-    pts.append((uc + R, 0.0))
-    # The flat gripping face must run essentially to the tip. An earlier version
-    # put a 3 mm x 9 mm chamfer here, which meant the face only began ~3 mm above
-    # the tip -- the jaws could then reach only the TOP of a 10 mm screw head and
-    # cammed it out instead of pinching it. Machined blade fingers carry an edge
-    # break, not a chamfer that size.
-    pts.append((L - 0.012 * L, 0.0))           # hooked claw
-    pts.append((L, 0.10 * W))                  # small edge break at the tip
-    pts.append((L, W))
-    pts.append((0.0, W))
-    return pts
-
+# ---- gripper: SMC MHZL2-16D2 CAD body and photo-reconstructed blades, merged from the hackathon
+# starter (2026-10-09); lengths and jaw gap set to the real cell in scene_config.py.
 
 METAL = (0.62, 0.63, 0.66)
-ANODISED = (0.72, 0.73, 0.74)      # light anodised aluminium gripper body
+ANODISED = (0.72, 0.73, 0.74)  # light anodised aluminium gripper body
 DARK_METAL = (0.30, 0.31, 0.34)
 
 
 def gripper_layout():
-    """(carriage_x, finger_x) along TOOL_AXIS from the flange face."""
-    x = (C.ADAPTER_T + C.ZCYL_LEN + C.ZFLANGE_T + C.BODY_LEN + C.PLATE_T)
+    """(carriage_x, finger_x) along TOOL_AXIS from the J6_link origin (the faceplate is FLANGE_OFFSET out)."""
+    x = C.FLANGE_OFFSET + C.ADAPTER_T + C.ZCYL_LEN + C.ZFLANGE_T + C.BODY_LEN + C.PLATE_T
     return x, x + C.CARRIAGE_LEN - C.CARRIAGE_OVERLAP
 
 
@@ -761,8 +753,9 @@ def gripper_transforms(jaw):
     sp = np.array(C.FINGER_SPREAD_AXIS, float)
     out = {}
     for sign, name in ((+1, "L"), (-1, "R")):
-        out[FLANGE + f"/Gripper/Carriage{name}"] = (
-            ax * (cx + C.CARRIAGE_LEN / 2) + sp * sign * (jaw + C.FINGER_WIDTH / 2))
+        out[FLANGE + f"/Gripper/Carriage{name}"] = ax * (
+            cx + C.CARRIAGE_LEN / 2
+        ) + sp * sign * (jaw + C.FINGER_WIDTH / 2)
         out[FLANGE + f"/Gripper/Finger{name}"] = ax * fx + sp * (sign * jaw)
     return out
 
@@ -771,7 +764,7 @@ def grasp_offset():
     """Flange face to the centre of the scallop pocket.
 
     Correct for cradling a cylinder in mid-air, WRONG for picking something off
-    a surface: the pocket sits 20 mm above the fingertips, so commanding it to an
+    a surface: the pocket sits 12 mm above the fingertips, so commanding it to an
     object's centre height drives the tips through the table. Now that the
     fingers carry colliders that is a hard collision, not a cosmetic issue.
     Use tip_offset() for table-top picks.
@@ -790,7 +783,58 @@ JAW_PRIMS = {"L": C.ROBOT_PRIM + "/JawL", "R": C.ROBOT_PRIM + "/JawR"}
 JAW_JOINTS = {"L": "jaw_l", "R": "jaw_r"}
 
 
-def attach_gripper(stage, jaw=None):
+def smc_visual(stage, path, part_name, translation, material):
+    """Load a pre-tessellated supplied STEP part; physics uses explicit proxies."""
+    source = os.path.join(os.path.dirname(os.path.abspath(__file__)), C.GRIPPER_CAD)
+    with open(source) as f:
+        part = next(p for p in json.load(f)["parts"] if p["name"] == part_name)
+    mesh = UsdGeom.Mesh.Define(stage, path)
+    mesh.CreatePointsAttr([Gf.Vec3f(*p) for p in part["points"]])
+    mesh.CreateFaceVertexCountsAttr([3] * (len(part["indices"]) // 3))
+    mesh.CreateFaceVertexIndicesAttr(part["indices"])
+    mesh.CreateSubdivisionSchemeAttr("none")
+    UsdGeom.Xformable(mesh).AddTranslateOp().Set(Gf.Vec3d(*translation))
+    bind_mat(mesh.GetPrim(), material)
+    return mesh.GetPrim()
+
+
+def detailed_finger_visual(stage, jaw_path, sign, offset):
+    """Photo-guided visual machining; collision mesh is deliberately separate."""
+    source = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "assets/gripper/photo_finger_detail.json",
+    )
+    with open(source) as f:
+        parts = json.load(f)["parts"]
+    for part in parts:
+        mesh = UsdGeom.Mesh.Define(stage, jaw_path + "/Detail/" + part["name"])
+        mesh.CreatePointsAttr(
+            [Gf.Vec3f(p[0], sign * p[1], p[2]) for p in part["points"]]
+        )
+        indices = np.array(part["indices"]).reshape(-1, 3)
+        if sign < 0:
+            indices = indices[:, ::-1]
+        mesh.CreateFaceVertexCountsAttr([3] * len(indices))
+        mesh.CreateFaceVertexIndicesAttr(indices.flatten().tolist())
+        mesh.CreateSubdivisionSchemeAttr("none")
+        uv = UsdGeom.PrimvarsAPI(mesh).CreatePrimvar(
+            "st", Sdf.ValueTypeNames.TexCoord2fArray, UsdGeom.Tokens.vertex
+        )
+        uv.Set([Gf.Vec2f(*p) for p in part["uv"]])
+        UsdGeom.Xformable(mesh).AddTranslateOp().Set(
+            Gf.Vec3d(offset, -sign * C.FINGER_WIDTH / 2, 0)
+        )
+        bind_mat(
+            mesh.GetPrim(),
+            {
+                "plain": "finger_milled",
+                "marked": "uwm_finger",
+                "socket": "alu_machined",
+            }[part["name"]],
+        )
+
+
+def attach_gripper(stage, jaw=None, articulated=True):
     """EOAT modelled from the bench photos, with real physics.
 
     Static parts (adapter, cylinder, flange, gripper body, jaw plate, camera and
@@ -806,6 +850,7 @@ def attach_gripper(stage, jaw=None):
 
     Jaw bodies live at /World/ER4iA/Jaw{L,R}, NOT under J6_link -- nesting a
     rigid body inside another rigid body's subtree is invalid.
+    articulated=False builds a static, zero-origin assembly for inspection.
     """
     if jaw is None:
         jaw = C.JAW_OPEN
@@ -817,33 +862,78 @@ def attach_gripper(stage, jaw=None):
 
     def disc(path, radius, length, d, color, mat="alu_machined"):
         c = UsdGeom.Cylinder.Define(stage, path)
-        c.CreateAxisAttr("X"); c.CreateRadiusAttr(radius)
+        c.CreateAxisAttr("X")
+        c.CreateRadiusAttr(radius)
         c.CreateHeightAttr(length)
         c.CreateDisplayColorAttr([Gf.Vec3f(*color)])
         UsdGeom.Xformable(c.GetPrim()).AddTranslateOp().Set(
-            Gf.Vec3d(*at(d + length / 2)))
+            Gf.Vec3d(*at(d + length / 2))
+        )
         bind_mat(c.GetPrim(), mat)
         UsdPhysics.CollisionAPI.Apply(c.GetPrim())
         return c.GetPrim()
 
-    x = 0.0
-    disc(FLANGE + "/Gripper/Adapter", C.ADAPTER_R, C.ADAPTER_T, x, (0.05, 0.05, 0.05),
-         mat="black_anodised")
+    x = C.FLANGE_OFFSET  # COMPAT PATCH: the stack starts at the J6 faceplate
+    disc(
+        FLANGE + "/Gripper/Adapter",
+        C.ADAPTER_R,
+        C.ADAPTER_T,
+        x,
+        (0.05, 0.05, 0.05),
+        mat="black_anodised",
+    )
     x += C.ADAPTER_T
-    disc(FLANGE + "/Gripper/ZCylinder", C.ZCYL_R, C.ZCYL_LEN, x, METAL)
-    disc(FLANGE + "/Gripper/Collar", C.COLLAR_R, C.COLLAR_T, x + C.COLLAR_AT,
-         (0.86, 0.86, 0.85), mat="white_plastic")
+    if C.ZCYL_RECTANGULAR:
+        box(
+            stage,
+            FLANGE + "/Gripper/ZCylinder",
+            (C.ZCYL_LEN, C.ZCYL_BODY_W, C.ZCYL_BODY_D),
+            at(x + C.ZCYL_LEN / 2),
+            ANODISED,
+            mat="alu_machined",
+        )
+        box(
+            stage,
+            FLANGE + "/Gripper/SlideRail",
+            (C.ZCYL_LEN * 0.85, 0.009, 0.003),
+            (x + C.ZCYL_LEN / 2, 0, C.ZCYL_BODY_D / 2 + 0.0015),
+            METAL,
+            mat="alu_machined",
+        )
+    else:
+        disc(FLANGE + "/Gripper/ZCylinder", C.ZCYL_R, C.ZCYL_LEN, x, METAL)
+    disc(
+        FLANGE + "/Gripper/Collar",
+        C.COLLAR_R,
+        C.COLLAR_T,
+        x + C.COLLAR_AT,
+        METAL,
+        mat="alu_machined",
+    )
     x += C.ZCYL_LEN
     disc(FLANGE + "/Gripper/ZFlange", C.ZFLANGE_R, C.ZFLANGE_T, x, METAL)
     x += C.ZFLANGE_T
 
-    box(stage, FLANGE + "/Gripper/Body",
-        (C.BODY_LEN, C.BODY_W, C.BODY_D), at(x + C.BODY_LEN / 2), ANODISED,
-        mat="alu_anodised")
+    body = box(
+        stage,
+        FLANGE + "/Gripper/Body",
+        (C.BODY_LEN, C.BODY_W, C.BODY_D),
+        at(x + C.BODY_LEN / 2),
+        ANODISED,
+        mat="alu_anodised",
+    )
+    UsdGeom.Imageable(body).CreateVisibilityAttr().Set("invisible")
+    smc_visual(stage, FLANGE + "/Gripper/SMCBody", "body", at(x), "alu_anodised")
     x += C.BODY_LEN
-    box(stage, FLANGE + "/Gripper/JawPlate",
-        (C.PLATE_T, C.PLATE_W, C.PLATE_D), at(x + C.PLATE_T / 2), DARK_METAL,
-        mat="steel_dark")
+    if C.PLATE_T > 0:
+        box(
+            stage,
+            FLANGE + "/Gripper/JawPlate",
+            (C.PLATE_T, C.PLATE_W, C.PLATE_D),
+            at(x + C.PLATE_T / 2),
+            DARK_METAL,
+            mat="steel_dark",
+        )
     x += C.PLATE_T
 
     carriage_x, finger_x = gripper_layout()
@@ -852,101 +942,464 @@ def attach_gripper(stage, jaw=None):
         jaw_path = JAW_PRIMS[tag]
         g = UsdGeom.Xform.Define(stage, jaw_path)
         # place the jaw where it sits with the arm at its zero pose
-        home = np.array(at(0.0)) * 0 + np.array([0.29, 0.0, 0.61])
+        home = (
+            np.array([0.29, 0.0, 0.61 + C.TABLE_TOP_Z]) if articulated else np.zeros(3)
+        )
         UsdGeom.Xformable(g.GetPrim()).AddTranslateOp().Set(
-            Gf.Vec3d(*(home + np.array(at(carriage_x, sign * (jaw + C.FINGER_WIDTH / 2)))
-                       + np.array([0.0, 0.0, C.TABLE_TOP_Z]))))
+            Gf.Vec3d(
+                *(home + np.array(at(carriage_x, sign * (jaw + C.FINGER_WIDTH / 2))))
+            )
+        )
 
-        box(stage, jaw_path + "/Carriage",
+        # CAD open jaw centres are +/-13.9 mm. Their inward motion is 6 mm.
+        lateral = sign * (0.0139 - C.JAW_OPEN - C.FINGER_WIDTH / 2)
+        carriage = box(
+            stage,
+            jaw_path + "/Carriage",
             (C.CARRIAGE_LEN, C.CARRIAGE_W, C.CARRIAGE_D),
-            (C.CARRIAGE_LEN / 2, 0.0, 0.0), DARK_METAL, mat="steel_dark")
+            (0.006725, lateral, 0),
+            DARK_METAL,
+            mat="steel_dark",
+        )
+        UsdGeom.Imageable(carriage).CreateVisibilityAttr().Set("invisible")
+        smc_visual(
+            stage,
+            jaw_path + "/SMCJaw",
+            "jaw_l" if sign > 0 else "jaw_r",
+            (0, lateral, 0),
+            "steel_dark",
+        )
 
         prof = [(u, sign * v) for u, v in finger_profile()]
-        fprim = prism(stage, jaw_path + "/Finger", prof, C.FINGER_THICK, METAL,
-                      mat="alu_machined")
-        UsdGeom.Xformable(fprim).AddTranslateOp().Set(
-            Gf.Vec3d(finger_x - carriage_x,
-                     -sign * C.FINGER_WIDTH / 2, 0.0))
-        UsdPhysics.CollisionAPI.Apply(fprim)
-        UsdPhysics.MeshCollisionAPI.Apply(fprim).CreateApproximationAttr().Set(
-            "convexHull")
-        bind_physics_material(fprim)
+        boundary = C.FINGER_LENGTH - C.SOFT_TIP_LENGTH
+        sections = [
+            (
+                clip_profile(prof, boundary, False),
+                "Finger",
+                "uwm_finger",
+                PHYS_MAT_PATH,
+            ),
+            (
+                clip_profile(prof, boundary, True),
+                "SoftTip",
+                "uwm_finger",
+                SOFT_TIP_MAT_PATH,
+            ),
+        ]
+        for section, name, visual_material, physics_material in sections:
+            fprim = prism(
+                stage,
+                jaw_path + "/" + name,
+                section,
+                C.FINGER_THICK,
+                METAL,
+                mat=visual_material,
+            )
+            UsdGeom.Xformable(fprim).AddTranslateOp().Set(
+                Gf.Vec3d(finger_x - carriage_x, -sign * C.FINGER_WIDTH / 2, 0)
+            )
+            uv = UsdGeom.PrimvarsAPI(fprim).CreatePrimvar(
+                "st", Sdf.ValueTypeNames.TexCoord2fArray, UsdGeom.Tokens.vertex
+            )
+            uv.Set(
+                [
+                    Gf.Vec2f(
+                        float(p[0] / C.FINGER_LENGTH),
+                        float(sign * p[1] / C.FINGER_WIDTH),
+                    )
+                    for p in UsdGeom.Mesh(fprim).GetPointsAttr().Get()
+                ]
+            )
+            UsdGeom.Imageable(fprim).CreateVisibilityAttr().Set("invisible")
+        detailed_finger_visual(stage, jaw_path, sign, finger_x - carriage_x)
+        # COLLISION: straight blades -- the grasping validated in this cell (every recorded episode). The CAD
+        # / photo profile above is visual only: its hooked AA socket stalled the jaws on a lying screw. The
+        # inner face sits at the real fingertip gap, FINGER_INNER_TIP outside the jaw's straight face, along
+        # the whole blade (4 mm closed / 16 mm open); the distal SOFT_TIP_LENGTH carries the high friction.
+        from pxr import PhysxSchema
 
-        # duct tape wrapped round the working end: slightly proud of the blade
-        # so it is the surface that actually touches the part, and bound to a
-        # high-friction material. It covers the scallop, which is what the real
-        # wrap does too.
-        pad, u0 = C.TAPE_PAD, C.FINGER_LENGTH - C.TAPE_LEN
-        tape_prof = [(u0, sign * -pad), (C.FINGER_LENGTH, sign * -pad),
-                     (C.FINGER_LENGTH, sign * (C.FINGER_WIDTH + pad)),
-                     (u0, sign * (C.FINGER_WIDTH + pad))]
-        tprim = prism(stage, jaw_path + "/Tape", tape_prof,
-                      C.FINGER_THICK + 2 * pad, (0.38, 0.39, 0.40),
-                      mat="duct_tape")
-        UsdGeom.Xformable(tprim).AddTranslateOp().Set(
-            Gf.Vec3d(finger_x - carriage_x, -sign * C.FINGER_WIDTH / 2, 0.0))
-        UsdPhysics.CollisionAPI.Apply(tprim)
-        UsdPhysics.MeshCollisionAPI.Apply(tprim).CreateApproximationAttr().Set(
-            "convexHull")
-        bind_physics_material(tprim, TAPE_MAT_PATH)
+        lateral = -sign * C.FINGER_WIDTH / 2 + sign * (C.FINGER_INNER_TIP + C.FINGER_COLLIDER_T / 2)
+        for name, u0, u1, material in (
+            ("Blade", 0.0, boundary, PHYS_MAT_PATH),
+            ("BladeTip", boundary, C.FINGER_LENGTH, SOFT_TIP_MAT_PATH),
+        ):
+            collider = box(
+                stage,
+                jaw_path + f"/Collision/{name}",
+                (u1 - u0, C.FINGER_COLLIDER_T, C.FINGER_THICK),
+                (finger_x - carriage_x + (u0 + u1) / 2, lateral, 0.0),
+                METAL,
+            )
+            UsdGeom.Imageable(collider).CreateVisibilityAttr().Set("invisible")
+            contact = PhysxSchema.PhysxCollisionAPI.Apply(collider)
+            contact.CreateContactOffsetAttr().Set(0.0002)
+            contact.CreateRestOffsetAttr().Set(0.0)
+            bind_physics_material(collider, material)
+        for number, u in enumerate(C.FINGER_MOUNT_HOLES):
+            for face in (-1, 1):
+                cyl(
+                    stage,
+                    jaw_path + f"/MountScrew{number}_{'front' if face>0 else 'back'}",
+                    0.0022,
+                    0.0008,
+                    (
+                        finger_x - carriage_x + u,
+                        0,
+                        face * (C.FINGER_THICK / 2 - 0.0007),
+                    ),
+                    DARK_METAL,
+                    mat="steel_dark",
+                )
+                # Hex drive inset within the recessed cap screw.
+                h = [
+                    (
+                        finger_x - carriage_x + u + 0.0012 * math.cos(k * math.pi / 3),
+                        0.0012 * math.sin(k * math.pi / 3),
+                    )
+                    for k in range(6)
+                ]
+                inset = prism(
+                    stage,
+                    jaw_path + f"/ScrewSocket{number}_{'front' if face>0 else 'back'}",
+                    h,
+                    0.00004,
+                    (0.035, 0.035, 0.04),
+                    mat="black_oxide",
+                )
+                UsdGeom.Xformable(inset).AddTranslateOp().Set(
+                    Gf.Vec3d(0, 0, face * (C.FINGER_THICK / 2 - 0.00028))
+                )
+        outer_bolt = cyl(
+            stage,
+            jaw_path + "/OuterCrossBolt",
+            0.0022,
+            0.0018,
+            (finger_x - carriage_x + 0.012, sign * (C.FINGER_WIDTH / 2 + 0.0009), 0),
+            DARK_METAL,
+            mat="black_oxide",
+        )
+        UsdGeom.Xformable(outer_bolt).AddRotateXOp().Set(90.0)
+        if tag == "R" and C.SHOW_TOOL_DETAIL:
+            carrier = prism(
+                stage,
+                jaw_path + "/SensorCarrier",
+                [
+                    (0.024, 0),
+                    (0.054, 0),
+                    (0.056, 0.0015),
+                    (0.053, 0.0028),
+                    (0.027, 0.0028),
+                ],
+                0.0036,
+                METAL,
+                mat="alu_machined",
+            )
+            UsdGeom.Xformable(carrier).AddTranslateOp().Set(
+                Gf.Vec3d(finger_x - carriage_x, C.FINGER_WIDTH / 2, 0)
+            )
+            box(
+                stage,
+                jaw_path + "/SensorRedNose",
+                (0.006, 0.0025, 0.003),
+                (finger_x - carriage_x + 0.054, C.FINGER_WIDTH / 2 + 0.0008, 0),
+                (0.7, 0.035, 0.025),
+                collision=False,
+                mat="plastic_red",
+            )
 
-        rb = UsdPhysics.RigidBodyAPI.Apply(g.GetPrim())
-        rb.CreateRigidBodyEnabledAttr().Set(True)
-        UsdPhysics.MassAPI.Apply(g.GetPrim()).CreateMassAttr(C.JAW_MASS)
+        if C.FINGER_TAPE:
+            # duct tape wrapped round the working end: slightly proud of the blade
+            # so it is the surface that actually touches the part, and bound to a
+            # high-friction material. It covers the scallop, which is what the real
+            # wrap does too.
+            pad, u0 = C.TAPE_PAD, C.FINGER_LENGTH - C.TAPE_LEN
+            tape_prof = [
+                (u0, sign * -pad),
+                (C.FINGER_LENGTH, sign * -pad),
+                (C.FINGER_LENGTH, sign * (C.FINGER_WIDTH + pad)),
+                (u0, sign * (C.FINGER_WIDTH + pad)),
+            ]
+            tprim = prism(
+                stage,
+                jaw_path + "/Tape",
+                tape_prof,
+                C.FINGER_THICK + 2 * pad,
+                (0.38, 0.39, 0.40),
+                mat="duct_tape",
+            )
+            UsdGeom.Xformable(tprim).AddTranslateOp().Set(
+                Gf.Vec3d(finger_x - carriage_x, -sign * C.FINGER_WIDTH / 2, 0.0)
+            )
+            UsdPhysics.CollisionAPI.Apply(tprim)
+            UsdPhysics.MeshCollisionAPI.Apply(tprim).CreateApproximationAttr().Set(
+                "convexHull"
+            )
+            bind_physics_material(tprim, TAPE_MAT_PATH)
 
-        j = UsdPhysics.PrismaticJoint.Define(
-            stage, FLANGE + f"/Gripper/{JAW_JOINTS[tag]}")
-        j.CreateBody0Rel().SetTargets([FLANGE])
-        j.CreateBody1Rel().SetTargets([jaw_path])
-        j.CreateAxisAttr().Set("Y")
-        j.CreateLocalPos0Attr().Set(Gf.Vec3f(
-            *at(carriage_x, sign * (jaw + C.FINGER_WIDTH / 2))))
-        j.CreateLocalPos1Attr().Set(Gf.Vec3f(0.0, 0.0, 0.0))
-        travel = C.JAW_OPEN - C.JAW_CLOSED
-        # q = 0 is fully open; closing moves each jaw toward the tool axis
-        if sign > 0:
-            j.CreateLowerLimitAttr().Set(-travel); j.CreateUpperLimitAttr().Set(0.0)
-        else:
-            j.CreateLowerLimitAttr().Set(0.0); j.CreateUpperLimitAttr().Set(travel)
-        drive = UsdPhysics.DriveAPI.Apply(j.GetPrim(), "linear")
-        drive.CreateTypeAttr().Set("force")
-        drive.CreateStiffnessAttr().Set(C.JAW_DRIVE_STIFF)
-        drive.CreateDampingAttr().Set(C.JAW_DRIVE_DAMP)
-        drive.CreateMaxForceAttr().Set(C.JAW_MAX_FORCE)
-        drive.CreateTargetPositionAttr().Set(0.0)
+        if articulated:
+            rb = UsdPhysics.RigidBodyAPI.Apply(g.GetPrim())
+            rb.CreateRigidBodyEnabledAttr().Set(True)
+            UsdPhysics.MassAPI.Apply(g.GetPrim()).CreateMassAttr(C.JAW_MASS)
 
-    # Wrist vision: FANUC SC130EF2 camera sitting on a Banner LEDRR70X70 ring
-    # light, both hanging off a bracket to one side of the tool and looking
-    # straight down it. Dimensions from the Banner datasheet; placement VIDEO.
+            j = UsdPhysics.PrismaticJoint.Define(
+                stage, FLANGE + f"/Gripper/{JAW_JOINTS[tag]}"
+            )
+            j.CreateBody0Rel().SetTargets([FLANGE])
+            j.CreateBody1Rel().SetTargets([jaw_path])
+            j.CreateAxisAttr().Set("Y")
+            j.CreateLocalPos0Attr().Set(
+                Gf.Vec3f(*at(carriage_x, sign * (jaw + C.FINGER_WIDTH / 2)))
+            )
+            j.CreateLocalPos1Attr().Set(Gf.Vec3f(0.0, 0.0, 0.0))
+            travel = C.JAW_OPEN - C.JAW_CLOSED
+            # q = 0 is fully open; closing moves each jaw toward the tool axis
+            if sign > 0:
+                j.CreateLowerLimitAttr().Set(-travel)
+                j.CreateUpperLimitAttr().Set(0.0)
+            else:
+                j.CreateLowerLimitAttr().Set(0.0)
+                j.CreateUpperLimitAttr().Set(travel)
+            drive = UsdPhysics.DriveAPI.Apply(j.GetPrim(), "linear")
+            drive.CreateTypeAttr().Set("force")
+            drive.CreateStiffnessAttr().Set(C.JAW_DRIVE_STIFF)
+            drive.CreateDampingAttr().Set(C.JAW_DRIVE_DAMP)
+            drive.CreateMaxForceAttr().Set(C.JAW_MAX_FORCE)
+            drive.CreateTargetPositionAttr().Set(0.0)
+
+    # Wrist vision: compact grey camera body on a bracket to one side of the
+    # tool. PHOTO 2026-10-08: no ring light — earlier model was wrong.
     side = np.array(C.WRISTCAM_DIR, float)
 
     def at_side(d, lateral):
         return tuple(ax * d + side * lateral)
 
-    rl = C.RINGLIGHT
-    ring_bot = C.TOOL_LENGTH - C.RINGLIGHT_ABOVE_TIP
     lat = C.WRISTCAM_LATERAL
-    # sizes are (along tool, spread axis, side axis) given TOOL_AXIS = +X
-    box(stage, FLANGE + "/Gripper/RingLight", (rl[2], rl[0], rl[1]),
-        at_side(ring_bot - rl[2] / 2, lat), (0.03, 0.03, 0.03), mat="black_anodised")
-    cam_top = ring_bot - rl[2] - C.CAMBODY[2]
     cb = C.CAMBODY
-    box(stage, FLANGE + "/Gripper/WristCamBody", (cb[2], cb[0], cb[1]),
-        at_side(cam_top + cb[2] / 2, lat), (0.07, 0.07, 0.08), mat="black_plastic")
-    c = UsdGeom.Cylinder.Define(stage, FLANGE + "/Gripper/WristCamBNC")
-    c.CreateAxisAttr("X"); c.CreateRadiusAttr(0.0055); c.CreateHeightAttr(0.016)
-    UsdGeom.Xformable(c.GetPrim()).AddTranslateOp().Set(Gf.Vec3d(*at_side(cam_top - 0.008, lat)))
-    bind_mat(c.GetPrim(), "alu_machined")
+    cam_bot = C.TOOL_LENGTH - C.CAM_ABOVE_TIP  # distance from flange to camera bottom
+    cam_ctr = cam_bot - cb[2] / 2
+    # Camera bracket orientation follows the fitted mount direction in Y/Z.
+    bracket_roll = math.degrees(math.atan2(-side[1], side[2]))
+    # Housing and sensor roll together around the tool axis. The bracket
+    # follows the rotated mount offset; finger orientation stays on local Y.
+    for name, depth, axial, material in (
+        ("WristCamBody", cb[2], cam_ctr, "alu_anodised"),
+        ("WristCamSeam", 0.0005, cam_bot - cb[2] - 0.00025, "black_plastic"),
+        (
+            "WristCamLid",
+            C.CAM_LID_T,
+            cam_bot - cb[2] - 0.0005 - C.CAM_LID_T / 2,
+            "alu_machined",
+        ),
+    ):
+        housing = prism(
+            stage,
+            FLANGE + "/Gripper/" + name,
+            _rounded_square(cb[0] / 2, C.CAM_CORNER_R),
+            depth,
+            C.CAMBODY_GREY,
+        )
+        bind_mat(housing, material)
+        xf = UsdGeom.Xformable(housing)
+        xf.AddTranslateOp().Set(Gf.Vec3d(*at_side(axial, lat)))
+        xf.AddRotateXOp().Set(C.WRISTCAM_ROLL_DEG)
+        xf.AddRotateYOp().Set(90.0)
+        UsdPhysics.CollisionAPI.Apply(housing)
+        UsdPhysics.MeshCollisionAPI.Apply(housing).CreateApproximationAttr().Set(
+            "convexHull"
+        )
+    for y in (-0.018, 0.018):
+        for z in (-0.018, 0.018):
+            screw = disc(
+                FLANGE
+                + f"/Gripper/CamScrew_{y}_{z}".replace("-", "m").replace(".", "p"),
+                0.0018,
+                0.001,
+                cam_bot - cb[2] - 0.003,
+                DARK_METAL,
+                "steel_dark",
+            )
+            UsdGeom.Xformable(screw).GetOrderedXformOps()[0].Set(
+                Gf.Vec3d(cam_bot - cb[2] - 0.0025, side[1] * lat + y, side[2] * lat + z)
+            )
+    # small lens cylinder on the bottom face of the camera body, pointing down
+    lens = UsdGeom.Cylinder.Define(stage, FLANGE + "/Gripper/WristCamLens")
+    lens.CreateAxisAttr("X")
+    lens.CreateRadiusAttr(0.008)
+    lens.CreateHeightAttr(0.006)
+    UsdGeom.Xformable(lens.GetPrim()).AddTranslateOp().Set(
+        Gf.Vec3d(*at_side(cam_bot + 0.003, lat))
+    )
+    bind_mat(lens.GetPrim(), "black_plastic")
     # bracket: an arm out from the rod guide, then a plate down beside the camera
-    arm_x = C.ADAPTER_T + C.ZCYL_LEN + C.ZFLANGE_T / 2
-    box(stage, FLANGE + "/Gripper/CamBracketArm",
+    arm_x = C.FLANGE_OFFSET + C.ADAPTER_T + C.ZCYL_LEN + C.ZFLANGE_T / 2
+    box(
+        stage,
+        FLANGE + "/Gripper/CamBracketArm",
         (C.BRACKET_T, 0.018, lat - cb[1] / 2),
-        at_side(arm_x, (lat - cb[1] / 2) / 2 + C.ZFLANGE_R / 2), DARK_METAL, mat="steel_dark")
-    drop = cam_top + cb[2] - arm_x
-    box(stage, FLANGE + "/Gripper/CamBracketPlate",
+        at_side(arm_x, (lat - cb[1] / 2) / 2 + C.ZFLANGE_R / 2),
+        DARK_METAL,
+        rot=(bracket_roll, 0.0, 0.0),
+        mat="steel_dark",
+    )
+    drop = cam_bot - arm_x
+    box(
+        stage,
+        FLANGE + "/Gripper/CamBracketPlate",
         (drop, 0.018, C.BRACKET_T),
-        at_side(arm_x + drop / 2, lat - cb[1] / 2 - C.BRACKET_T / 2), DARK_METAL,
-        mat="steel_dark")
+        at_side(arm_x + drop / 2, lat - cb[1] / 2 - C.BRACKET_T / 2),
+        DARK_METAL,
+        rot=(bracket_roll, 0.0, 0.0),
+        mat="steel_dark",
+    )
+
+    if C.SHOW_TOOL_DETAIL:
+        for n, color in enumerate(((0.95, 0.32, 0.04), (0.08, 0.35, 0.8))):
+            # Two stacked pneumatic sensor/valve units visible above the jaws.
+            box(
+                stage,
+                FLANGE + f"/Gripper/PneumaticBlock{n}",
+                (0.012, 0.022, 0.014),
+                (finger_x - 0.027 + n * 0.014, -0.004, 0.022),
+                ANODISED,
+                mat="alu_anodised",
+            )
+            box(
+                stage,
+                FLANGE + f"/Gripper/PneumaticInsert{n}",
+                (0.006, 0.019, 0.002),
+                (finger_x - 0.027 + n * 0.014, -0.004, 0.030),
+                color,
+                collision=False,
+            )
+        for n, (along, color) in enumerate(
+            ((0.036, (0.08, 0.35, 0.8)), (0.065, (0.95, 0.32, 0.04)))
+        ):
+            cyl(
+                stage,
+                FLANGE + f"/Gripper/AirFitting{n}",
+                0.0034,
+                0.010,
+                (along, C.ZCYL_BODY_W / 2, 0),
+                DARK_METAL,
+                mat="steel_dark",
+            )
+            hose = UsdGeom.BasisCurves.Define(stage, FLANGE + f"/Gripper/AirTube{n}")
+            hose.CreateTypeAttr("linear")
+            hose.CreateWrapAttr("nonperiodic")
+            hose.CreateCurveVertexCountsAttr([5])
+            hose.CreatePointsAttr(
+                [
+                    Gf.Vec3f(along, 0.019, 0.006),
+                    Gf.Vec3f(along - 0.005, 0.027, 0.015),
+                    Gf.Vec3f(0.022, 0.029 + n * 0.005, 0.022),
+                    Gf.Vec3f(-0.012, 0.031 + n * 0.005, 0.021),
+                    Gf.Vec3f(-0.035, 0.026, 0.016),
+                ]
+            )
+            hose.CreateWidthsAttr([0.003])
+            hose.SetWidthsInterpolation("constant")
+            hose.CreateDisplayColorAttr([Gf.Vec3f(*color)])
+            bind_mat(hose.GetPrim(), "air_line_blue")
+        laser = disc(
+            FLANGE + "/Gripper/LaserBody",
+            C.LASER_RADIUS,
+            C.LASER_LENGTH,
+            finger_x - 0.010,
+            (0.65, 0.035, 0.025),
+            None,
+        )
+        UsdGeom.Xformable(laser).GetOrderedXformOps()[0].Set(
+            Gf.Vec3d(finger_x - 0.010 + C.LASER_LENGTH / 2, -0.016, 0.011)
+        )
+        # Keep the existing collider; reproduce the visible slim metal carrier
+        # and red nose from the JPG independently of collision geometry.
+        UsdGeom.Imageable(laser).CreateVisibilityAttr().Set("invisible")
+        box(
+            stage,
+            FLANGE + "/Gripper/CameraConnector",
+            (0.012, 0.010, 0.009),
+            at_side(cam_ctr - 0.005, lat + cb[0] / 2 + 0.004),
+            (0.95, 0.32, 0.04),
+            collision=False,
+            mat="camera_cable_orange",
+        )
+        across = np.cross(ax, side)
+
+        def photo_line(name, points, width, material):
+            line = UsdGeom.BasisCurves.Define(stage, FLANGE + "/Gripper/" + name)
+            line.CreateTypeAttr("cubic")
+            line.CreateBasisAttr("bspline")
+            line.CreateWrapAttr("nonperiodic")
+            line.CreateCurveVertexCountsAttr([len(points)])
+            line.CreatePointsAttr(
+                [Gf.Vec3f(*(ax * d + side * l + across * t)) for d, l, t in points]
+            )
+            line.CreateWidthsAttr([width])
+            line.SetWidthsInterpolation("constant")
+            bind_mat(line.GetPrim(), material)
+
+        # Broad blue loops and orange camera cable visible in both close-up JPGs.
+        # These details have no colliders and do not alter the grasp envelope.
+        for n in range(2):
+            t = 0.012 + n * 0.010
+            photo_line(
+                f"PhotoBlueAirLoop{n}",
+                [
+                    (-0.040, 0.045, t),
+                    (-0.020, 0.055, t),
+                    (0.025, 0.105, t),
+                    (0.080, 0.122, t),
+                    (0.133, 0.105, t),
+                    (0.152, 0.070, t),
+                    (0.127, 0.049, t),
+                    (0.080, 0.032, t),
+                    (0.036, 0.023, t),
+                    (0.036, 0.023, t),
+                ],
+                0.0055,
+                "air_line_blue",
+            )
+        photo_line(
+            "PhotoOrangeCameraCable",
+            [
+                (cam_ctr - 0.005, lat + 0.031, 0),
+                (cam_ctr - 0.005, lat + 0.031, 0),
+                (0.065, 0.095, 0.024),
+                (0.015, 0.100, 0.040),
+                (-0.025, 0.065, 0.035),
+                (-0.040, 0.055, 0.028),
+            ],
+            0.004,
+            "camera_cable_orange",
+        )
+        photo_line(
+            "PhotoBlackSensorLead",
+            [
+                (0.095, 0.002, 0.017),
+                (0.095, 0.002, 0.017),
+                (0.084, -0.025, 0.025),
+                (0.035, -0.043, 0.035),
+                (0.010, -0.029, 0.030),
+                (-0.025, -0.015, 0.020),
+                (-0.030, -0.015, 0.020),
+            ],
+            0.003,
+            "black_plastic",
+        )
+
+    # Default centimetre-scale contact offsets are too large for this small
+    # actuator: the carriage proxies can repel each other before closing.
+    from pxr import PhysxSchema
+
+    for prim in stage.Traverse():
+        path = str(prim.GetPath())
+        if prim.HasAPI(UsdPhysics.CollisionAPI) and (
+            path.startswith(FLANGE + "/Gripper/")
+            or any(path.startswith(root + "/") for root in JAW_PRIMS.values())
+        ):
+            contact = PhysxSchema.PhysxCollisionAPI.Apply(prim)
+            contact.CreateContactOffsetAttr().Set(0.0002)
+            contact.CreateRestOffsetAttr().Set(0.0)
 
 
 def jaw_targets(jaw):
