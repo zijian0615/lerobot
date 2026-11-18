@@ -62,6 +62,7 @@ from tabletop_perception.geometry import (
 from tabletop_perception.run_xarm_live import (
     DEFAULT_CALIB,
     _capture_from_camera,
+    undistort_with_calib,
     _connect_xarm,
     _execution_cfg_for_arm,
     _load_calib,
@@ -427,12 +428,15 @@ def main() -> int:
                 input(">>> 按 Enter 拍照：")
                 print("拍照中…")
                 sys.stdout.flush()
-                image = _capture_from_camera(
-                    camera_path,
-                    width=int(cam_cfg["width"]),
-                    height=int(cam_cfg["height"]),
-                    fps=int(cam_cfg["fps"]),
-                    fourcc=cam_cfg.get("fourcc") or "MJPG",
+                image = undistort_with_calib(
+                    _capture_from_camera(
+                        camera_path,
+                        width=int(cam_cfg["width"]),
+                        height=int(cam_cfg["height"]),
+                        fps=int(cam_cfg["fps"]),
+                        fourcc=cam_cfg.get("fourcc") or "MJPG",
+                    ),
+                    calib,
                 )
                 print(f"图像 {image.shape[1]}x{image.shape[0]}，正在调用 VLM（SSH 下可能要等几秒）…")
                 sys.stdout.flush()
@@ -448,9 +452,25 @@ def main() -> int:
                 pred_t = apply_table_xy_affine(raw_t, a_g, b_g)
             else:
                 pred_t = raw_t
+            # Running correction from the samples confirmed so far, so later hovers land close:
+            # 1-3 samples -> mean translation; >=4 -> full affine. Stored samples keep the
+            # uncorrected prediction, so the final fit is still raw -> true.
+            hover_t = pred_t
+            if samples:
+                p_s = [tuple(s["pred_table_xy"]) for s in samples]
+                t_s = [tuple(s["true_table_xy"]) for s in samples]
+                if len(samples) >= 4:
+                    a_r, b_r, _ = fit_table_xy_affine(p_s, t_s)
+                    hover_t = apply_table_xy_affine(pred_t, a_r, b_r)
+                    corr = f"affine from {len(samples)} samples"
+                else:
+                    off = np.mean(np.asarray(t_s) - np.asarray(p_s), axis=0)
+                    hover_t = (pred_t[0] + float(off[0]), pred_t[1] + float(off[1]))
+                    corr = f"translation {off[0] * 1000:+.0f},{off[1] * 1000:+.0f} mm from {len(samples)} sample(s)"
+                print(f"  running correction: {corr}")
             cmd_x, cmd_y = _table_to_base_xy(
-                pred_t[0],
-                pred_t[1],
+                hover_t[0],
+                hover_t[1],
                 base_xy=base_xy,
                 flip_x=flip_x,
                 flip_y=flip_y,

@@ -57,6 +57,22 @@ Live UI (top + xarm1 wrist + timer) opens at http://127.0.0.1:8765/ ::
     # default on; disable with --no-ui
     # wrist camera defaults to /dev/video2 (Innomaker)
 
+Serve mode: connect once, then type instructions into the live UI page (no restart)::
+
+    python -m manipulation.run_xarm_live --serve --execute --skip-place-verify
+    # open http://127.0.0.1:8765/ → type an instruction → RUN; repeat as often as needed.
+    # --instruction is optional here: if given, it runs immediately.
+
+Voice (Boson Higgs Realtime) on top of serve mode — talk while the arm works::
+
+    export BOSON_API_KEY=...
+    python -m manipulation.run_xarm_live --serve --voice --execute --skip-place-verify
+    # Mic/speaker device (e.g. a laptop, via ssh -L 8765:localhost:8765): open
+    #   http://localhost:8765/voice   (audio only, no video) → START VOICE.
+    # Robot machine: open http://127.0.0.1:8765/  (camera + task state + mirrored voice log).
+    # The model can ask for a task / status / go-home; any motion needs Enter (or the CONFIRM
+    # button) on either page, Esc cancels. Use headphones; the mic needs localhost/127.0.0.1.
+
 Fixed plan (no planner Gemini; all steps on xarm / arm1)::
 
     python -m manipulation.run_xarm_live --execute --skip-place-verify --fixed-plan \\
@@ -71,8 +87,10 @@ import argparse
 import json
 import logging
 import math
+import os
 import sys
 import time
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -103,6 +121,7 @@ from tabletop_perception.perception import Perception, object_top_z_from_calib  
 from tabletop_perception.run_xarm_live import (  # noqa: E402
     DEFAULT_CALIB,
     _capture_from_camera,
+    undistort_with_calib,
     _connect_xarm,
     _draw_image_overlay,
     _execution_cfg_for_arm,
@@ -147,6 +166,39 @@ def _resolve_arm_names(args: argparse.Namespace, calib: dict[str, Any]) -> list[
         return names
     legacy = dict(calib.get("execution") or {})
     return [str(args.arm or legacy.get("arm_name", "xarm"))]
+
+
+def _check_leap_ready(calib: dict[str, Any], arm_names: list[str]) -> None:
+    """Fail before any arm moves if a LEAP-hand arm cannot possibly connect its hand."""
+    problems = []
+    for name in arm_names:
+        ee = _ee_name_for_arm(calib, name, _execution_cfg_for_arm(calib, name)).lower()
+        if ee not in {"leaphand", "leap_hand", "leap"}:
+            continue
+        leap = LeapHandEE.from_calib(calib, name)
+        if not (Path(leap.api_dir) / "leap_hand_utils").is_dir():
+            problems.append(
+                f"{name}: LEAP Hand API (leap_hand_utils) not found under {leap.api_dir}; "
+                "clone LEAP_Hand_API and set leaphand.api_dir in the calib"
+            )
+        import importlib.util
+
+        if importlib.util.find_spec("dynamixel_sdk") is None:
+            problems.append(f"{name}: Python package dynamixel_sdk missing (uv pip install dynamixel_sdk)")
+        ports = [str(leap.port), "/dev/ttyUSB0", "/dev/ttyUSB1"]
+        found = [p for p in ports if os.path.exists(p)]
+        if found and not any(os.access(p, os.R_OK | os.W_OK) for p in found):
+            problems.append(
+                f"{name}: no permission on {found[0]}; you are in group dialout only after a new "
+                'login, or start with: sg dialout -c "uv run python -m manipulation.run_xarm_live ..."'
+            )
+        if not found:
+            problems.append(
+                f"{name}: LEAP Hand USB serial port not found ({leap.port}); plug the hand's "
+                "USB (FTDI) cable into this computer"
+            )
+    if problems:
+        raise RuntimeError("LEAP Hand not ready:\n  " + "\n  ".join(problems))
 
 
 def _ee_name_for_arm(calib: dict[str, Any], arm_name: str, exe_cfg: dict[str, Any]) -> str:
@@ -195,6 +247,7 @@ def _build_backend(
         table_xy_affine=arm_affine,
         use_object_yaw=bool(exe_cfg.get("use_object_yaw", True)),
         grasp_yaw_offset_rad=float(exe_cfg.get("grasp_yaw_offset_rad", math.pi / 2.0)),
+        ee_center_offset_base_mm=tuple(float(v) for v in exe_cfg.get("ee_center_offset_base_mm", [0.0, 0.0])),  # type: ignore[arg-type]
     )
 
 
@@ -282,8 +335,14 @@ class XArmMotionBackend:
         table_xy_affine: tuple[np.ndarray, np.ndarray] | None = None,
         use_object_yaw: bool = True,
         grasp_yaw_offset_rad: float = math.pi / 2.0,
+        ee_center_offset_base_mm: tuple[float, float] = (0.0, 0.0),
     ) -> None:
         self.robot = robot
+        # Grasp centre vs flange axis, base mm as seen at yaw 0 (measure_hand_center.py).
+        self.ee_center_offset_base_mm = (
+            float(ee_center_offset_base_mm[0]),
+            float(ee_center_offset_base_mm[1]),
+        )
         self.arm = robot.real_arm
         self.base_xy_table = base_xy_table
         self.table_z_base_m = table_z_base_m
@@ -325,6 +384,14 @@ class XArmMotionBackend:
         )
         xyzrpy[0] += self.xy_offset_base_mm[0]
         xyzrpy[1] += self.xy_offset_base_mm[1]
+        vx, vy = self.ee_center_offset_base_mm
+        if vx or vy:
+            # The XY calibration was taken at wrist yaw 0, so it already contains v once.
+            # At yaw psi the grasp centre sits at P + R(psi) v: move the flange by
+            # -(R(psi) - I) v to keep it where the yaw-0 calibration put it.
+            c, s = math.cos(xyzrpy[5]), math.sin(xyzrpy[5])
+            xyzrpy[0] -= (c * vx - s * vy) - vx
+            xyzrpy[1] -= (s * vx + c * vy) - vy
         logger.info(
             "move_to_pose table=%s → base_mm=%s (xy_offset=%s flip_x=%s flip_y=%s)",
             [round(v, 3) for v in pose_table],
@@ -387,6 +454,30 @@ def build_argparser() -> argparse.ArgumentParser:
         help="Open the live dashboard (top + wrist + timer). --no-ui to disable.",
     )
     p.add_argument("--ui-port", type=int, default=8765)
+    p.add_argument(
+        "--voice",
+        action="store_true",
+        help="With --serve: voice control via Boson Higgs Realtime (needs BOSON_API_KEY). Open "
+        "/voice on the device with the mic (audio only); the main page mirrors it. Motion still "
+        "needs Enter/CONFIRM.",
+    )
+    p.add_argument("--voice-name", type=str, default="default", help="Higgs Realtime voice preset.")
+    p.add_argument(
+        "--post-check",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="With --serve --execute: after each task (arm homed) photograph the table and ask "
+        "the VLM whether the instruction is really done; the page/voice report that verdict, "
+        "not just 'moves finished'.",
+    )
+    p.add_argument("--voice-model", type=str, default="higgs-realtime")
+    p.add_argument(
+        "--ui-host",
+        type=str,
+        default=None,
+        help="Bind address of the live UI (default 0.0.0.0, or 127.0.0.1 with --serve because "
+        "the page can then start robot motion; use ssh -L to reach it remotely).",
+    )
     p.add_argument("--image", type=Path, default=None, help="Still image instead of live camera")
     p.add_argument("--robot-ip", type=str, default=None)
     p.add_argument(
@@ -406,7 +497,19 @@ def build_argparser() -> argparse.ArgumentParser:
         action="store_true",
         help="Shortcut: plan/execute with both xarm and xarm2",
     )
-    p.add_argument("--instruction", type=str, required=True)
+    p.add_argument(
+        "--instruction",
+        type=str,
+        default=None,
+        help="Task instruction (required unless --serve).",
+    )
+    p.add_argument(
+        "--serve",
+        action="store_true",
+        help="Stay running after a task: the live UI gets an instruction box, and every "
+        "instruction submitted there runs on the already-connected robot/cameras. "
+        "Ctrl-C to quit.",
+    )
     p.add_argument("--execute", action="store_true", help="Actually move the arm (default: dry-run)")
     p.add_argument("--no-robot", action="store_true", help="Skip robot connect (plan/solve only)")
     p.add_argument("--lookahead", action=argparse.BooleanOptionalAction, default=True)
@@ -472,9 +575,19 @@ def build_argparser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-    args = build_argparser().parse_args(argv)
+    parser = build_argparser()
+    args = parser.parse_args(argv)
     if args.turn_loop:
         args.interactive = True
+    if args.serve:
+        if not args.ui:
+            parser.error("--serve needs the live UI (drop --no-ui).")
+        if args.interactive or args.loop_minutes > 0:
+            parser.error("--serve cannot be combined with --interactive/--turn-loop/--loop-minutes.")
+    if args.voice and not args.serve:
+        parser.error("--voice requires --serve.")
+    if not args.serve and not args.instruction:
+        parser.error("--instruction is required unless --serve is given.")
     calib = _load_calib(args.calib)
     if args.fixed_plan:
         # Arm1-only fixed planner: ignore --collab / multi-arm selection.
@@ -532,22 +645,56 @@ def main(argv: list[str] | None = None) -> int:
     camera_path = args.camera or cam_cfg["index_or_path"]
     wrist_cfg = dict(calib.get("wrist_camera") or {})
     wrist_path = args.wrist_camera or wrist_cfg.get("index_or_path") or "/dev/video2"
-    if str(wrist_path) == str(camera_path):
+    # Two threads cannot stream the same V4L2 node: it makes both stall ("select() timeout").
+    # Compare the resolved devices (by-path/by-id symlinks and /dev/videoN can alias).
+    if wrist_path and os.path.realpath(str(wrist_path)) == os.path.realpath(str(camera_path)):
+        logger.warning(
+            "wrist camera %s is the same device as the top camera %s → wrist disabled",
+            wrist_path,
+            camera_path,
+        )
+        wrist_path = None
+    elif wrist_path and str(wrist_path).startswith("/") and not os.path.exists(str(wrist_path)):
+        logger.warning("wrist camera %s not found → wrist disabled", wrist_path)
         wrist_path = None
 
     ui: LiveUI | None = None
     if args.ui:
         ui = LiveUI(
-            instruction=args.instruction,
+            instruction=args.instruction or "",
             top_path=str(camera_path),
             wrist_path=str(wrist_path) if wrist_path else None,
             width=int(cam_cfg.get("width", 640)),
             height=int(cam_cfg.get("height", 480)),
             fps=int(cam_cfg.get("fps", 30)),
+            host=args.ui_host or ("127.0.0.1" if args.serve else "0.0.0.0"),
             port=int(args.ui_port),
         )
+        if args.serve:
+            ui.enable_serve()
+        if args.voice:
+            from manipulation.voice_ui import build_session
+
+            ui.enable_voice(
+                build_session(
+                    model=args.voice_model,
+                    voice=args.voice_name,
+                    arms=[
+                        (n, _ee_name_for_arm(calib, n, _execution_cfg_for_arm(calib, n)))
+                        for n in arm_names
+                    ],
+                )
+            )
+            if not os.environ.get("BOSON_API_KEY"):
+                logger.warning("--voice: BOSON_API_KEY is not set; START VOICE will fail until it is.")
+            if args.ui_host and args.ui_host not in ("127.0.0.1", "localhost", "::1"):
+                logger.warning(
+                    "--voice on a non-loopback --ui-host: anyone who can reach the page can spend "
+                    "your Boson credit and start robot tasks (browsers also block the mic off localhost)."
+                )
         ui.start()
-        ui.start_task(args.instruction)
+        if not args.serve:
+            ui.start_task(args.instruction)
 
     def _on_phase(phase: str, detail: str = "") -> None:
         if ui is not None:
@@ -561,7 +708,32 @@ def main(argv: list[str] | None = None) -> int:
 
     robots: dict[str, Any] = {}
     leaps: dict[str, LeapHandEE] = {}
+    guard_ref: dict[str, Any] = {"g": None}  # overlap mutex, once built (execute mode)
+    task_arms: dict[str, list[str] | None] = {"v": None}  # serve: arms allowed for this task
+    task_rules: dict[str, list[dict[str, Any]]] = {"v": []}  # serve: per-object arm rules
+
+    def _arms_not_home(tol_rad: float = 0.05) -> list[str]:
+        """Arms that are in an error state or not at start_joints (e.g. after an e-stop the
+        SDK refuses the home move with code 9 and the arm stays where it was)."""
+        out = []
+        for name, robot in robots.items():
+            api = getattr(robot, "real_arm", None)
+            if api is None:
+                continue
+            err = int(getattr(api, "error_code", 0) or 0)
+            if err:
+                out.append(f"{name} has controller error {err} (1 = emergency stop pressed)")
+                continue
+            code, ang = api.get_servo_angle(is_radian=True)
+            home = list(getattr(getattr(robot, "config", None), "start_joints", []) or [])
+            if code == 0 and ang and home:
+                dev = max(abs(float(a) - float(b)) for a, b in zip(list(ang)[: len(home)], home, strict=False))
+                if dev > tol_rad:
+                    out.append(f"{name} is not at home (off by {dev:.2f} rad)")
+        return out
+
     if not args.no_robot:
+        _check_leap_ready(calib, arm_names)
         for i, name in enumerate(arm_names):
             # --robot-ip only overrides the first arm (legacy single-arm CLI).
             ip = args.robot_ip if (args.robot_ip and i == 0 and len(arm_names) == 1) else None
@@ -588,8 +760,20 @@ def main(argv: list[str] | None = None) -> int:
     if ui is not None and robots:
         def _ui_go_home() -> None:
             for name, robot in robots.items():
+                api = getattr(robot, "real_arm", None)
+                if api is not None and int(getattr(api, "error_code", 0) or 0) != 0:
+                    # e.g. after an emergency stop (released): GO HOME is an explicit operator action.
+                    logger.info("UI go home: clearing error %s on arm=%s", api.error_code, name)
+                    robot._clear_and_enable()
                 logger.info("UI go home arm=%s", name)
                 robot.move_to_home(speed_deg_s=20.0)
+            _wait_arms_still()
+            problems = _arms_not_home()
+            if problems:
+                raise RuntimeError("; ".join(problems))
+            if guard_ref["g"] is not None:
+                for name in robots:
+                    guard_ref["g"].release_after(name)
 
         ui.set_go_home(_ui_go_home)
 
@@ -636,7 +820,32 @@ def main(argv: list[str] | None = None) -> int:
         thinking_budget=int(args.thinking_budget),
     )
 
+    def _apply_arm_rules(plan: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Force the arm on every step whose object matches an operator rule (per task)."""
+        from tabletop_perception.perception import matches_height_key
+
+        rules = task_rules["v"] or []
+        for step in plan:
+            obj = str((step.get("args") or {}).get("object") or "")
+            for r in rules:
+                if obj and matches_height_key(obj, r["object"]):
+                    if step.get("arm") not in r["arms"]:
+                        logger.info(
+                            "arm rule %s → %s: step %s %s %s (was %s)",
+                            r["object"], r["arms"][0], step.get("step"), step.get("primitive"),
+                            obj, step.get("arm"),
+                        )
+                        step["arm"] = r["arms"][0]
+                    break
+        return plan
+
     def plan_fn(symbolic_view, instruction, arms):
+        rules = task_rules["v"] or []
+        if rules and not args.fixed_plan:
+            # Tell the planner too, so ordering/handovers fit; enforcement is _apply_arm_rules.
+            instruction = instruction + " Arm rules (must follow): " + "; ".join(
+                f"anything that is a {r['object']} is handled only by {r['arms'][0]}" for r in rules
+            ) + "."
         if args.fixed_plan:
             plan = plan_screws_to_container_xarm(
                 symbolic_view,
@@ -648,6 +857,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             logger.info("Planning for arms=%s instruction=%r", list(arms), instruction)
             plan = planner(symbolic_view, instruction, arms)
+            plan = _apply_arm_rules(plan)
             logger.info("plan=%s", json.dumps(plan, indent=2))
         (out_dir / "plan.json").write_text(json.dumps(plan, indent=2))
         return plan
@@ -661,19 +871,107 @@ def main(argv: list[str] | None = None) -> int:
     perception_dir.mkdir(parents=True, exist_ok=True)
     perceive_count = {"n": 0}
 
-    def capture_image() -> np.ndarray:
+    def capture_image(newer_than: float | None = None) -> np.ndarray:
         if args.image is not None:
             return _load_image(args.image)
         if ui is not None:
-            frame = ui.snapshot("top")
+            frame = ui.snapshot("top", newer_than=newer_than)
+            # Right after the camera opens it can emit dark warm-up frames; wait briefly.
+            for _ in range(20):
+                if frame is None or float(frame.mean()) >= 30.0:
+                    break
+                time.sleep(0.15)
+                frame = ui.snapshot("top")
             if frame is not None:
-                return frame
-        return _capture_from_camera(
-            camera_path,
-            width=int(cam_cfg["width"]),
-            height=int(cam_cfg["height"]),
-            fps=int(cam_cfg["fps"]),
+                return undistort_with_calib(frame, calib)
+        return undistort_with_calib(
+            _capture_from_camera(
+                camera_path,
+                width=int(cam_cfg["width"]),
+                height=int(cam_cfg["height"]),
+                fps=int(cam_cfg["fps"]),
+            ),
+            calib,
         )
+
+    check_count = {"n": 0}
+
+    def _wait_arms_still(timeout_s: float = 20.0, settle_s: float = 0.5) -> bool:
+        """Block until every connected arm reports no motion and its joints have not changed
+        for ``settle_s``. ``move_to_home(wait=True)`` can return before the arm has settled."""
+        deadline = time.monotonic() + timeout_s
+        for name, robot in robots.items():
+            api = getattr(robot, "real_arm", None)
+            if api is None:
+                continue
+            last: list[float] | None = None
+            still_since: float | None = None
+            while True:
+                if time.monotonic() > deadline:
+                    logger.warning("arm %s did not settle within %.0f s", name, timeout_s)
+                    return False
+                moving = getattr(api, "state", None) == 1  # xArm state 1 = in motion
+                code, ang = api.get_servo_angle(is_radian=True)
+                if code == 0 and ang:
+                    cur = [float(a) for a in list(ang)[:6]]
+                    if last is not None and not moving and max(abs(a - b) for a, b in zip(cur, last, strict=False)) < 0.002:
+                        still_since = still_since or time.monotonic()
+                        if time.monotonic() - still_since >= settle_s:
+                            break
+                    else:
+                        still_since = None
+                    last = cur
+                time.sleep(0.05)
+        return True
+
+    def _scene_check(question: str | None = None, *, wait_still: bool = False) -> dict[str, Any]:
+        """Top-camera photo → VLM verdict on the current instruction (saved in out_dir).
+        With ``wait_still`` the photo is taken only after the arm(s) stopped moving."""
+        from manipulation.scene_check import check_scene
+
+        arm_still = None
+        newer_than = None
+        if wait_still and robots:
+            arm_still = _wait_arms_still()
+            newer_than = time.monotonic() + 0.15  # skip frames already in flight
+        image = capture_image(newer_than=newer_than)
+        result = check_scene(image, instruction=args.instruction or "", question=question)
+        if arm_still is False:
+            result["answer"] = "(arm had not fully stopped) " + str(result.get("answer") or "")
+        result["arm_still"] = arm_still
+        check_count["n"] += 1
+        tag = f"check_{check_count['n']:02d}"
+        cv2.imwrite(str(out_dir / f"{tag}.jpg"), cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+        (out_dir / f"{tag}.json").write_text(
+            json.dumps({"instruction": args.instruction, "question": question, **result}, indent=2)
+        )
+        logger.info("Camera check (%s): %s", question or "task done?", result)
+        return result
+
+    def _preflight(instruction: str) -> dict[str, Any]:
+        """Before a spoken task: do the objects it names exist on the table? (saved in out_dir)"""
+        from manipulation.scene_check import preflight_objects
+
+        image = capture_image()
+        result = preflight_objects(image, instruction=instruction)
+        check_count["n"] += 1
+        tag = f"precheck_{check_count['n']:02d}"
+        cv2.imwrite(str(out_dir / f"{tag}.jpg"), cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+        (out_dir / f"{tag}.json").write_text(json.dumps({"said": instruction, **result}, indent=2))
+        logger.info("Object pre-check %r → %s", instruction, result)
+        return result
+
+    if ui is not None:
+        ui.set_scene_check(_scene_check)
+        ui.arms = list(arm_names)
+        roles: dict[str, list[str]] = {}
+        for n in arm_names:
+            ee = _ee_name_for_arm(calib, n, _execution_cfg_for_arm(calib, n)).lower()
+            role = "hand" if ee in {"leaphand", "leap_hand", "leap"} else "gripper"
+            roles.setdefault(role, []).append(n)
+        ui.arm_roles = roles
+        ui.post_check = bool(args.serve and args.execute and args.post_check)
+        ui.set_preflight(_preflight)
 
     def _dump_perception_logs(
         image: np.ndarray,
@@ -717,7 +1015,14 @@ def main(argv: list[str] | None = None) -> int:
 
     def perceive_pair():
         image = capture_image()
-        logger.info("Perceiving image shape=%s", image.shape)
+        logger.info(
+            "Perceiving image shape=%s mean=%.1f instruction=%r",
+            image.shape,
+            float(image.mean()),
+            args.instruction,
+        )
+        # Save the exact frame sent to the VLM first, so a failed perception can be inspected.
+        cv2.imwrite(str(out_dir / "capture_rgb.png"), cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
         # One VLM call, reuse for Perception + overlay boxes.
         raw = perception.vlm_caller(image, args.instruction, perception.prompt or "")
         detections = parse_vlm_detections(raw, image_hw=(image.shape[0], image.shape[1]))
@@ -760,23 +1065,82 @@ def main(argv: list[str] | None = None) -> int:
         primary_exe = _execution_cfg_for_arm(calib, arm_names[0])
         solver_margin = float(primary_exe.get("solver_margin_m", 0.03))
 
-        if not args.execute:
-            if args.interactive:
-                _on_phase("perceiving", "vision VLM")
-                symbolic, geometric = perceive_pair()
-                _on_phase("planning", args.instruction)
-                decision = planner.decide(symbolic, args.instruction, arm_names)
-                _on_phase("done", str(decision.get("status") or ""))
-                print(json.dumps(decision, indent=2, default=str))
-                print(f"\nInteractive dry-run. Outputs → {out_dir}")
-                print("Re-run with --execute --interactive to play turns.")
-                return 0
-            # Dry-run: perceive → plan → solve only.
+        def _serve_forever(
+            run_one: Callable[[], str],
+            *,
+            reset: Callable[[], None] | None = None,
+        ) -> int:
+            """Keep the process (robot, cameras, VLM clients) alive and run each
+            instruction submitted through the live UI."""
+            nonlocal out_dir, perception_dir
+            assert ui is not None
+            pending = (args.instruction or "").strip() or None
+            if pending is None:
+                ui.phase("idle", "waiting for an instruction")
+                print("\nServe mode: waiting for an instruction at the live UI.\n")
+            else:
+                ui.set_task_busy(True)
+            first = True
+            while True:
+                while pending is None:
+                    pending = ui.wait_task(timeout=0.5)
+                args.instruction = pending
+                pending = None
+                task_arms["v"] = [a for a in (ui.last_task_arms or []) if a in arm_names] or None
+                task_rules["v"] = [
+                    r for r in (ui.last_task_rules or []) if all(a in arm_names for a in r["arms"])
+                ]
+                if task_rules["v"]:
+                    logger.info("Serve: per-object arm rules=%s", task_rules["v"])
+                if task_arms["v"]:
+                    logger.info("Serve: task restricted to arms=%s", task_arms["v"])
+                if not first:
+                    # Fresh run dir per task so earlier logs are not overwritten.
+                    stamp_i = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    out_dir = args.out_dir / stamp_i
+                    perception_dir = PERCEPTION_RUNS / stamp_i
+                    out_dir.mkdir(parents=True, exist_ok=True)
+                    perception_dir.mkdir(parents=True, exist_ok=True)
+                    perceive_count["n"] = 0
+                    last_views["symbolic"] = None
+                    last_views["geometric"] = None
+                    if reset is not None:
+                        reset()
+                first = False
+                logger.info("Serve: task %r", args.instruction)
+                ui.start_task(args.instruction)
+                try:
+                    status = run_one()
+                except Exception as exc:  # noqa: BLE001
+                    # Keep serving; the arm is NOT auto-homed here (state unknown) — use
+                    # GO HOME on the page once the workspace is clear.
+                    logger.exception("Serve: task failed")
+                    ui.phase("failed", f"{type(exc).__name__}: {exc}")
+                else:
+                    if args.execute and args.post_check:
+                        # "success" from the executor = every move ran, NOT that the object is
+                        # where it should be. Report what the camera sees instead.
+                        from manipulation.scene_check import verdict_text
+
+                        ui.phase("verifying", "waiting for the arm to stop, then camera check")
+                        try:
+                            verdict = verdict_text(_scene_check(None, wait_still=True))
+                        except Exception as exc:  # noqa: BLE001
+                            logger.warning("Serve: camera check failed: %s", exc)
+                            verdict = f"camera check failed: {exc}"
+                        ui.phase("result", f"{verdict} (arm moves: {status})")
+                    else:
+                        ui.stop_task(status)
+                finally:
+                    ui.set_task_busy(False)
+
+        def _dry_run_once() -> str:
+            from manipulation.solver import solve
+
             _on_phase("perceiving", "vision VLM")
             symbolic, geometric = perceive_pair()
             _on_phase("planning", args.instruction)
-            plan = plan_fn(symbolic, args.instruction, arm_names)
-            from manipulation.solver import solve
+            plan = plan_fn(symbolic, args.instruction, task_arms["v"] or arm_names)
 
             _on_phase("solving", f"{len(plan)} step(s)")
             bound = solve(
@@ -797,6 +1161,23 @@ def main(argv: list[str] | None = None) -> int:
             (out_dir / "bound.json").write_text(json.dumps(bound, indent=2))
             print(json.dumps({"plan": plan, "bound": bound}, indent=2))
             print(f"\nDry-run only. Outputs → {out_dir}")
+            return "dry-run"
+
+        if not args.execute:
+            if args.interactive:
+                _on_phase("perceiving", "vision VLM")
+                symbolic, geometric = perceive_pair()
+                _on_phase("planning", args.instruction)
+                decision = planner.decide(symbolic, args.instruction, arm_names)
+                _on_phase("done", str(decision.get("status") or ""))
+                print(json.dumps(decision, indent=2, default=str))
+                print(f"\nInteractive dry-run. Outputs → {out_dir}")
+                print("Re-run with --execute --interactive to play turns.")
+                return 0
+            # Dry-run: perceive → plan → solve only.
+            if args.serve:
+                return _serve_forever(_dry_run_once)
+            _dry_run_once()
             print("Re-run with --execute to move the arm(s).")
             _on_phase("done", "dry-run")
             return 0
@@ -887,7 +1268,7 @@ def main(argv: list[str] | None = None) -> int:
             arms=ov_cfg.get("arms"),
             table_polygon=table_polygon if ov_cfg.get("clip_to_table", True) else None,
         )
-        overlap_guard = OverlapGuard(
+        overlap_guard = guard_ref["g"] = OverlapGuard(
             ov_poly,
             retract={},
             enabled=bool(ov_cfg) and not ov_poly.is_empty,
@@ -991,6 +1372,63 @@ def main(argv: list[str] | None = None) -> int:
                 on_phase=_on_phase,
             )
 
+        def _run_one_execute(cycle: int = 1) -> str:
+            result = run_manipulation(
+                args.instruction,
+                perceive=perceive_pair,
+                plan_fn=plan_fn,
+                executors=executors,
+                solver_config=SolverConfig(
+                    grasp_height=grasp_height,
+                    margin=solver_margin,
+                    place_height_offsets_m=place_height_offsets,
+                    place_height_offsets_by_arm=place_height_offsets_by_arm,
+                    grasp_height_offsets_by_arm=grasp_height_offsets_by_arm,
+                    place_clearance_m=place_clearance,
+                ),
+                arms=task_arms["v"] or arm_names,
+                lookahead=args.lookahead,
+                overlap_guard=overlap_guard,
+                on_phase=_on_phase,
+            )
+
+            payload = {
+                "status": result.status,
+                "reason": result.reason,
+                "plan": result.plan,
+                "bound": result.bound,
+                "results": result.results,
+                "symbolic_view": result.symbolic_view,
+                "arms": task_arms["v"] or arm_names,
+                "cycle": cycle,
+            }
+            (out_dir / "result.json").write_text(json.dumps(payload, indent=2, default=str))
+            print(json.dumps(payload, indent=2, default=str))
+            print(f"\nOutputs → {out_dir}")
+
+            for name, robot in robots.items():
+                try:
+                    logger.info("Query finished → go home arm=%s", name)
+                    robot.move_to_home(speed_deg_s=20.0)
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("go home %s failed: %s", name, exc)
+            _wait_arms_still()  # move_to_home(wait=True) can return before the arm settles
+            problems = _arms_not_home()
+            if problems:
+                # Keep the overlap lock as is (an arm may still be in the zone) and say so.
+                raise RuntimeError(
+                    "moves finished but " + "; ".join(problems)
+                    + ". Release the e-stop if pressed, then press GO HOME."
+                )
+            # Home is outside the shared zone: without this the next task would "retract" an
+            # arm that already sits at home, because the lock still names it as the holder.
+            for name in robots:
+                overlap_guard.release_after(name)
+            return result.status
+
+        if args.serve:
+            return _serve_forever(_run_one_execute, reset=last_place_cmd.clear)
+
         loop_minutes = float(args.loop_minutes or 0.0)
         deadline = time.perf_counter() + loop_minutes * 60.0 if loop_minutes > 0 else None
         cycle = 0
@@ -1023,46 +1461,7 @@ def main(argv: list[str] | None = None) -> int:
                 last_views["geometric"] = None
                 last_place_cmd.clear()
 
-            result = run_manipulation(
-                args.instruction,
-                perceive=perceive_pair,
-                plan_fn=plan_fn,
-                executors=executors,
-                solver_config=SolverConfig(
-                    grasp_height=grasp_height,
-                    margin=solver_margin,
-                    place_height_offsets_m=place_height_offsets,
-                    place_height_offsets_by_arm=place_height_offsets_by_arm,
-                    grasp_height_offsets_by_arm=grasp_height_offsets_by_arm,
-                    place_clearance_m=place_clearance,
-                ),
-                arms=arm_names,
-                lookahead=args.lookahead,
-                overlap_guard=overlap_guard,
-                on_phase=_on_phase,
-            )
-
-            payload = {
-                "status": result.status,
-                "reason": result.reason,
-                "plan": result.plan,
-                "bound": result.bound,
-                "results": result.results,
-                "symbolic_view": result.symbolic_view,
-                "arms": arm_names,
-                "cycle": cycle,
-            }
-            (out_dir / "result.json").write_text(json.dumps(payload, indent=2, default=str))
-            print(json.dumps(payload, indent=2, default=str))
-            print(f"\nOutputs → {out_dir}")
-            last_status = result.status
-
-            for name, robot in robots.items():
-                try:
-                    logger.info("Query finished → go home arm=%s", name)
-                    robot.move_to_home(speed_deg_s=20.0)
-                except Exception as exc:  # noqa: BLE001
-                    logger.warning("go home %s failed: %s", name, exc)
+            last_status = _run_one_execute(cycle)
 
             if deadline is None:
                 break

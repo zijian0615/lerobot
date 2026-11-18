@@ -104,6 +104,9 @@ class ManipulationLoop:
         obj = params.get("object") or ""
         dest = params.get("destination") or ""
         detail = prim
+        arm = str(step.get("arm") or "")
+        if arm and len(self.arms) > 1:  # dual-arm: say which arm moves
+            detail = f"{arm}: {prim}"
         if obj:
             detail += f"  {obj}"
         if dest:

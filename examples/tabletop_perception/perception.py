@@ -16,6 +16,8 @@
 
 from __future__ import annotations
 
+import logging
+import re
 from typing import TypedDict
 
 import numpy as np
@@ -33,8 +35,11 @@ from .geometry import (
 
 
 # Calib keys that also apply to other name substrings (one offset for both).
+logger = logging.getLogger(__name__)
+
 _GRASP_OFFSET_ALIASES = {
     "stand": ("ring",),
+    "screw": ("bolt",),  # the VLM calls the same parts screws or bolts
 }
 
 
@@ -48,7 +53,12 @@ def matches_height_key(object_name: str, key: str) -> bool:
         return False
     if needle in hay:
         return True
-    return any(alias in hay for alias in _GRASP_OFFSET_ALIASES.get(needle, ()))
+    # Aliases match whole snake_case words only ("ring", "o_ring", "rings"), not inside
+    # other words: "wearing" must not pick up the stand/ring height offset.
+    return any(
+        re.search(rf"(^|_){re.escape(alias)}s?(_|$)", hay)
+        for alias in _GRASP_OFFSET_ALIASES.get(needle, ())
+    )
 
 
 def resolve_grasp_height_m(
@@ -356,6 +366,29 @@ class Perception:
                     "grasp_pose": (grasp_xy[0], grasp_xy[1], z, yaw),
                 }
             )
+
+        # STEP 2b — stacked objects. The VLM reports ``support.blocked_by = top`` when ``top``
+        # lies on ``support`` (e.g. a plush bear on the container). If the top object's grasp
+        # point is over the support, it rests on it: grasp that much higher (support top height).
+        by_name = {g["name"]: g for g in geometric_objects}
+        for det in detections:
+            top = det.get("blocked_by")
+            support = by_name.get(det["name"])
+            if not top or top == det["name"] or top not in by_name or support is None:
+                continue
+            g = by_name[top]
+            if not Point(g["xy"]).within(support["footprint"].buffer(0.01)):
+                continue
+            lift = resolve_object_top_z_m(
+                det["name"], self.object_top_z_m, self.object_top_z_m_default
+            )
+            if lift > 0:
+                x, y, z, yaw = g["grasp_pose"]
+                g["grasp_pose"] = (x, y, z + lift, yaw)
+                g["resting_on"] = det["name"]
+                logger.info(
+                    "%s rests on %s → grasp z %.3f → %.3f m", top, det["name"], z, z + lift
+                )
 
         # STEP 3 — predicates.
         name_to_blocked = {det["name"]: det["blocked_by"] for det in detections}

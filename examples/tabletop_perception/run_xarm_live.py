@@ -187,6 +187,19 @@ def _capture_from_camera(
         cam.disconnect()
 
 
+def undistort_with_calib(image: np.ndarray, calib: dict[str, Any]) -> np.ndarray:
+    """Remove lens distortion so the pinhole ``K`` / ``to_table`` projection is valid.
+
+    No-op when ``dist_coeffs`` is absent or all zero. ``K`` is kept as the new camera matrix, so
+    the calib ``K`` stays correct for the returned image.
+    """
+    dist = np.asarray(calib.get("dist_coeffs") or [], dtype=float)
+    if dist.size == 0 or not np.any(dist):
+        return image
+    k = np.asarray(calib["K"], dtype=float)
+    return cv2.undistort(image, k, dist, None, k)
+
+
 def _load_image(path: Path) -> np.ndarray:
     bgr = cv2.imread(str(path))
     if bgr is None:
@@ -440,12 +453,15 @@ def main(argv: list[str] | None = None) -> int:
             image = _load_image(args.image)
         else:
             print(f"Capturing from camera: {camera_path}")
-            image = _capture_from_camera(
-                camera_path,
-                width=int(cam_cfg["width"]),
-                height=int(cam_cfg["height"]),
-                fps=int(cam_cfg["fps"]),
-                fourcc=cam_cfg.get("fourcc") or "MJPG",
+            image = undistort_with_calib(
+                _capture_from_camera(
+                    camera_path,
+                    width=int(cam_cfg["width"]),
+                    height=int(cam_cfg["height"]),
+                    fps=int(cam_cfg["fps"]),
+                    fourcc=cam_cfg.get("fourcc") or "MJPG",
+                ),
+                calib,
             )
         print(f"Image shape: {image.shape}")
 

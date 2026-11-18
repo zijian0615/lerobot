@@ -109,12 +109,14 @@ def jog_xy_wasd(
         dx, dy = x - x0, y - y0
         print(f"  pose=({x:.1f}, {y:.1f})  Δ=({dx:+.1f}, {dy:+.1f}) mm  step={step:.1f}")
 
-    def _apply_key(ch: str) -> None:
+    def _apply_key(ch: str, *, move: bool = True) -> None:
+        """Update the target; with ``move=False`` the caller sends one combined move afterwards."""
         nonlocal x, y
         sx, sy = _KEY_DELTA_BASE_MM[ch]
         x += sx * step
         y += sy * step
-        _goto(x, y)
+        if move:
+            _goto(x, y)
 
     _status()
 
@@ -154,16 +156,19 @@ def jog_xy_wasd(
             continue
         tokens = line.replace(",", " ").split()
         i = 0
+        # Accumulate the whole line into ONE move: "w 20" used to be 20 stop-and-go 5 mm moves.
+        pending = False
+        done = False
         while i < len(tokens):
             tok = tokens[i]
             if tok in ("ok", "done", "enter", "yes", "y"):
-                return x - x0, y - y0
+                done = True
+                break
             if tok in ("q", "quit", "abort"):
                 raise KeyboardInterrupt("jog aborted")
             if tok == "r":
                 x, y = x0, y0
-                _goto(x, y)
-                _status()
+                pending = True
                 i += 1
                 continue
             if tok == "step" and i + 1 < len(tokens):
@@ -177,16 +182,21 @@ def jog_xy_wasd(
                     n = max(1, int(tokens[i + 1]))
                     i += 1
                 for _ in range(n):
-                    _apply_key(tok)
-                _status()
+                    _apply_key(tok, move=False)
+                pending = True
                 i += 1
                 continue
             # Allow glued keys: "ddaw"
             if all(c in _KEY_DELTA_BASE_MM for c in tok):
                 for c in tok:
-                    _apply_key(c)
-                _status()
+                    _apply_key(c, move=False)
+                pending = True
                 i += 1
                 continue
             print(f"  unknown token {tok!r}; try: d / w 3 / step 10 / r / ok / q")
             i += 1
+        if pending:
+            _goto(x, y)
+            _status()
+        if done:
+            return x - x0, y - y0

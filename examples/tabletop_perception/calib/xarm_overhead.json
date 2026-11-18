@@ -1,10 +1,10 @@
 {
   "_comment": "Top: Orbbec Gemini AY6V16300WC color. Dual xArm: Robot1 image bottom-LEFT true\u2248(-0.45,-0.35); Robot2 image bottom-RIGHT mirrored about image vertical through table_xy_affine \u2192 true\u2248(-0.55,+0.51). Do NOT use naive (+0.45,-0.35) \u2014 affine rotates axes ~90\u00b0. K and affine are still from the previous camera.",
   "camera": {
-    "_comment": "Orbbec Gemini color, top. Depth is a separate node (Y16 1280x800), not this color path.",
-    "index_or_path": "/dev/v4l/by-id/usb-Orbbec_R__Orbbec_R__Gemini_TM__AY6V16300WC-video-index0",
-    "width": 640,
-    "height": 480,
+    "_comment": "Orbbec Gemini colour node (the by-id symlink is the IR node: do not use). Checkerboard-calibrated 2026-11-16.",
+    "index_or_path": "/dev/v4l/by-path/platform-NVDA8000:01-usb-0:1.2:1.4-video-index0",
+    "width": 1280,
+    "height": 720,
     "fps": 30,
     "fourcc": "MJPG"
   },
@@ -18,14 +18,14 @@
   },
   "K": [
     [
-      700.0,
+      768.7687666664557,
       0.0,
-      320.0
+      629.0777249153531
     ],
     [
       0.0,
-      700.0,
-      240.0
+      764.6765083299003,
+      358.44086881302854
     ],
     [
       0.0,
@@ -35,22 +35,22 @@
   ],
   "T_cam_table": [
     [
-      1.0,
-      0.0,
-      0.0,
-      0.0
+      0.166987227964556,
+      -0.883474535317501,
+      0.43770767772822894,
+      -0.5037669283271328
     ],
     [
-      0.0,
-      -1.0,
-      0.0,
-      0.0
+      0.9850360187107998,
+      0.1302845993709154,
+      -0.11282714659662842,
+      -0.03139394960620642
     ],
     [
-      0.0,
-      0.0,
-      -1.0,
-      1.0
+      -0.04265334147625978,
+      -0.4499985206778859,
+      -0.8920101029969468,
+      0.8776228838999017
     ],
     [
       0.0,
@@ -131,8 +131,8 @@
       "_role": "Robot2 LeapHand @ 192.168.2.199. Image bottom-RIGHT = mirror of Robot1 about image vertical; after table_xy_affine (~90\u00b0), true-table base \u2248 (-0.55,+0.51) NOT (+0.45,-0.35).",
       "type": "semicircle",
       "center": [
-        -0.55,
-        0.51
+        -0.439,
+        0.243
       ],
       "radius": 0.75,
       "opening": "+x-y",
@@ -223,11 +223,11 @@
       }
     },
     "xarm2": {
-      "_uncalibrated": true,
-      "_note": "Base\u2248(-0.548,+0.505) image BR. Same axis convention as xarm: +X\u2248image-up into table, +Y\u2248image-left (flip_y=true). flip_y=false made bear hover go image-right/out of FOV.",
+      "_uncalibrated": false,
+      "_note": "xarm2 residual refit 2026-11-17 from 11 samples (translation only, RMSE ~21 mm, LOO ~23 mm). Noise is dominated by alignment (high hover, oblique view, mixed targets); redo with low hover + one rigid box to tighten.",
       "table_base_xy_m": [
-        -0.548,
-        0.505
+        -0.439,
+        0.243
       ],
       "table_z_base_m": 0.0,
       "flip_x": false,
@@ -251,25 +251,73 @@
       "lift_offset_m": 0.08,
       "ee": "leaphand",
       "grasp_height_offset_m": {
-        "_comment": "arm2 LeapHand extras on top of perception z. stand/ring 0.18-0.02=0.16; box 0.20-0.04=0.16. stand also matches ring.",
+        "_comment": "arm2 LeapHand extras on top of perception z. stand/ring 0.18-0.02=0.16; box 0.20-0.04=0.16. stand also matches ring. plush/bear 0.20-0.04=0.16 (worked 2026-11-17 11:35; 0.21 was too high).",
+        "plush": -0.04,
+        "bear": -0.04,
         "stand": -0.02,
         "box": -0.04
       },
+      "_note_base_2026_11_16": "Re-expressed through the new xarm1 global affine (true frame). Still an estimate (+-3 cm); the xarm2 residual fit corrects it.",
       "table_xy_affine": {
-        "_comment": "true_table = A @ pred_table + b (metres). pred = global table_xy_affine(raw); per-arm residual.",
+        "_comment": "true_table = A @ pred_table + b (metres). pred = global table_xy_affine(raw). Translation-only residual: with 11 noisy samples a full affine had the same leave-one-out error (23.3 mm) and extrapolates worse.",
         "A": [
           [
-            1.006192,
-            0.097761
+            1.0,
+            0.0
           ],
           [
-            0.112789,
-            0.9526
+            0.0,
+            1.0
           ]
         ],
         "b": [
-          -0.110192,
-          0.170909
+          0.01945,
+          -0.05133
+        ],
+        "fit": {
+          "model": "translation",
+          "n": 11,
+          "rmse_m": 0.0212,
+          "loo_rmse_m": 0.0233
+        }
+      },
+      "_full_affine_fit_6pt": {
+        "_comment": "true_table = A @ pred_table + b (metres). pred = global table_xy_affine(raw); per-arm residual.",
+        "A": [
+          [
+            1.035303,
+            -0.014949
+          ],
+          [
+            -0.006779,
+            0.982741
+          ]
+        ],
+        "b": [
+          0.015364,
+          -0.042444
+        ]
+      },
+      "ee_center_offset_base_mm": [
+        -0.0,
+        0.0
+      ],
+      "_ee_center_note": "measured by measure_hand_center (yaws 0,90,-90 deg, residual [0.0, 0.0, 0.0] mm). Flange is moved by -(R(yaw)-I)v.",
+      "_full_affine_fit_11pt": {
+        "_comment": "true_table = A @ pred_table + b (metres). pred = global table_xy_affine(raw); per-arm residual.",
+        "A": [
+          [
+            1.016597,
+            0.034679
+          ],
+          [
+            -0.000382,
+            0.92087
+          ]
+        ],
+        "b": [
+          0.020062,
+          -0.048261
         ]
       }
     }
@@ -288,7 +336,7 @@
     "open_duration_s": 2.5,
     "ramp_hz": 30,
     "settle_s": 0.5,
-    "api_dir": "/home/sidcjetsonj1/LEAP_Hand_API/python",
+    "api_dir": "/home/gb1_6d6a/LEAP_Hand_API/python",
     "measured_open_raw": {
       "_comment": "Do NOT set 1/5 here (code strips them \u2192 \u03c0). Joint 6 measured open only.",
       "6": 3772
@@ -331,21 +379,134 @@
     ],
     "_comment_manual_poses": "open_leap/close_leap: taught 16-DOF LEAP poses. When both set, open()/close() use them directly (skip formula thumb scales)."
   },
+  "dist_coeffs": [
+    0.1020161680789022,
+    -0.09767611989986344,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "_stale_before_camera_swap": {
+    "K": [
+      [
+        700.0,
+        0.0,
+        320.0
+      ],
+      [
+        0.0,
+        700.0,
+        240.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "T_cam_table": [
+      [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        -1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        -1.0,
+        1.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "table_xy_affine": {
+      "_comment": "true_table = A @ pred_table + b (metres). pred = to_table(uv, z=object_top).",
+      "A": [
+        [
+          -0.087362,
+          1.44789
+        ],
+        [
+          1.353882,
+          0.13476
+        ]
+      ],
+      "b": [
+        -0.13037,
+        0.094876
+      ]
+    },
+    "T_cam_board_frame_x_right_y_up": [
+      [
+        0.9977805152126887,
+        -0.06488186039402248,
+        -0.014979574550437273,
+        0.02463137383921132
+      ],
+      [
+        -0.05113448858462464,
+        -0.890669229051686,
+        0.45176718395393006,
+        -0.43840681259081543
+      ],
+      [
+        -0.04265334147625978,
+        -0.4499985206778859,
+        -0.8920101029969468,
+        0.8776228838999017
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "xarm2_table_base_xy_m": [
+      -0.548,
+      0.505
+    ],
+    "xarm2_workspace_center": [
+      -0.55,
+      0.51
+    ],
+    "xarm2_table_xy_affine": "removed (old-camera residual); see git history"
+  },
+  "_calibration": {
+    "date": "2026-11-16",
+    "board": "checkerboard 10x7 squares, 25.0 mm",
+    "rms_px": 0.520972823799891,
+    "views": 33,
+    "table_pose_rms_px": 0.3909797668457031,
+    "note": "global table_xy_affine removed; per-arm residuals in execution_by_arm are stale until re-fit with calibrate_table_xy.py",
+    "table_frame": "x = xArm1 base X, y = -xArm1 base Y (matches flip_y=true), z up (left-handed); origin set so the xArm1 base plate is at (-0.45,-0.35). Axes/origin come from ONE eyeballed tip observation (xarm1 at base (286.3,-436.5,280)) + plate pixel -> expect a few cm / degrees; the arm affine refit corrects it."
+  },
   "table_xy_affine": {
     "_comment": "true_table = A @ pred_table + b (metres). pred = to_table(uv, z=object_top).",
     "A": [
       [
-        -0.087362,
-        1.44789
+        0.94249,
+        -0.147672
       ],
       [
-        1.353882,
-        0.13476
+        0.208157,
+        0.968947
       ]
     ],
     "b": [
-      -0.13037,
-      0.094876
+      -0.046189,
+      0.091405
     ]
   }
 }

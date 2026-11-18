@@ -797,12 +797,19 @@ def solve(
             # Update simulated layout after Place.
             old = state[obj]
             new_fp = translate_footprint(old.footprint, old.xy, (x, y))
+            place_offs = dict(config.place_height_offsets_m)
+            place_offs.update(config.place_height_offsets_by_arm.get(arm) or {})
+            on_support = dest in state and _match_name_offset_m(dest, place_offs) is not None
+            # Not stacked on a support: the object rests at its own height again, so a later
+            # Grasp (e.g. the other arm after a handover) must not inherit this arm's release
+            # height (+clearance, + this arm's EE offsets).
+            rest_z = z if on_support else float(old.grasp_pose[2])
             state[obj] = ObjectState(
                 name=obj,
                 xy=(x, y),
                 yaw=yaw,
                 footprint=new_fp,
-                grasp_pose=(x, y, z, yaw),
+                grasp_pose=(x, y, rest_z, yaw),
             )
 
         elif prim == "LiftUp":

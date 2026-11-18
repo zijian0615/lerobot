@@ -1,0 +1,1141 @@
+<title>八臂循环产线</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Noto+Sans+SC:wght@400;500&family=Noto+Serif+SC:wght@500&family=Space+Mono:wght@400;700&display=swap">
+<style>
+/* Layout: one wide stage (the cell, live), then a two-column status board; paper-and-ink, like a lab notebook. */
+:root {
+  --paper: #fafafa;
+  --surface: #f1f0ec;
+  --ink: #2c2c2c;
+  --muted: #6b6a64;
+  --line: #dddcd5;
+  --unit: #24493f;
+  --unit-ink: #e7efe9;
+  --accent: #e87420;
+  --red: #d6483b;
+  --green: #4f9a45;
+  --blue: #3b72c8;
+  --cap: #7963bc;
+  --mix: #df922f;
+  --chute: #9a9893;
+  --display: "Instrument Serif", "Noto Serif SC", Georgia, serif;
+  --display-cjk: "Noto Serif SC", "Songti SC", serif;
+  --body: "Noto Sans SC", "PingFang SC", system-ui, sans-serif;
+  --mono: "Space Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: light;
+}
+html, body { background: var(--paper); color: var(--ink); }
+body { font-family: var(--body); font-size: 15px; line-height: 1.7; -webkit-font-smoothing: antialiased; }
+.page {
+  max-width: 1180px; margin: 0 auto;
+  padding-block: 36px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 28px;
+}
+header { display: flex; flex-direction: column; gap: 10px; max-width: 760px; }
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { margin: 0; font-family: var(--display-cjk); font-weight: 500; font-size: clamp(32px, 4.6vw, 48px); line-height: 1.15; letter-spacing: .01em; text-wrap: balance; }
+h1 .lat { font-family: var(--display); font-weight: 400; font-style: italic; letter-spacing: -.01em; }
+.lede { margin: 0; color: var(--ink); max-width: 64ch; }
+h2 { margin: 0 0 12px; font-family: var(--display-cjk); font-weight: 500; font-size: 20px; line-height: 1.3; }
+.mono { font-family: var(--mono); }
+
+figure { margin: 0; display: flex; flex-direction: column; gap: 10px; }
+.stage {
+  position: relative; width: 100%; max-width: 100%; aspect-ratio: 16 / 10;
+  background: var(--paper); border: 1px solid var(--line); border-radius: 4px; overflow: hidden;
+}
+.stage canvas { display: block; width: 100%; height: 100%; touch-action: pan-y; cursor: grab; }
+.stage canvas:active { cursor: grabbing; }
+.labels { position: absolute; inset: 0; pointer-events: none; }
+.lbl { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); white-space: nowrap; will-change: transform; }
+.lbl.unit {
+  pointer-events: auto; cursor: pointer; display: inline-flex; align-items: baseline; gap: 6px;
+  background: var(--unit); color: var(--unit-ink); border-radius: 3px; padding: 2px 8px; font-size: 12px; line-height: 1.5;
+}
+.lbl.unit b { font-family: var(--mono); font-weight: 700; font-size: 11px; color: #9fd0b6; }
+.lbl.arm {
+  pointer-events: auto; cursor: pointer; width: 26px; height: 26px; border-radius: 50%; padding: 0;
+  display: grid; place-items: center; font-family: var(--mono); font-size: 11px; color: #f3f3f1;
+  background: #4a4a47; border: 1.5px solid #8b8a85; transition: background .14s, border-color .14s;
+}
+.lbl.arm:hover { border-color: var(--accent); }
+.lbl.arm.sel { background: var(--accent); border-color: #fff; }
+.labels.off .lbl { display: none; }
+
+.controls {
+  position: absolute; left: max(10px, env(safe-area-inset-left, 0px)); bottom: 10px; right: 10px;
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center; pointer-events: none;
+}
+.group { display: inline-flex; background: rgba(250,250,250,.92); border: 1px solid var(--line); border-radius: 4px; pointer-events: auto; }
+.group button {
+  font: inherit; font-family: var(--mono); font-size: 12px; color: var(--ink); background: transparent; border: 0;
+  padding: 6px 10px; min-height: 32px; cursor: pointer; border-right: 1px solid var(--line);
+}
+.group button:last-child { border-right: 0; }
+.group button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.group button:hover:not([aria-pressed="true"]) { background: #ececE8; }
+.group button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.clock { pointer-events: none; margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--muted); background: rgba(250,250,250,.92); padding: 4px 8px; border-radius: 4px; border: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+figcaption { color: var(--muted); font-size: 13px; }
+
+.board { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 32px; align-items: start; }
+@media (max-width: 860px) { .board { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 640px) { .stage { aspect-ratio: 4 / 5; } .clock { display: none; } }
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+th { text-align: left; font-weight: 500; color: var(--muted); font-size: 12px; padding: 0 8px 8px 0; border-bottom: 1px solid var(--line); }
+td { padding: 9px 8px 9px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+td.num { text-align: right; font-family: var(--mono); white-space: nowrap; }
+tr.unitrow { cursor: pointer; }
+tr.unitrow:hover td { background: #f3f2ee; }
+.chip { display: inline-flex; align-items: baseline; gap: 6px; background: var(--unit); color: var(--unit-ink); border-radius: 3px; padding: 0 7px; font-size: 12px; white-space: nowrap; }
+.chip b { font-family: var(--mono); font-size: 11px; color: #9fd0b6; }
+.armlist { display: inline-flex; gap: 4px; }
+.armbtn {
+  font-family: var(--mono); font-size: 11px; width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid #8b8a85;
+  background: #4a4a47; color: #f3f3f1; cursor: pointer; padding: 0;
+}
+.armbtn.sel { background: var(--accent); border-color: var(--accent); }
+.armbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.state { color: var(--ink); }
+.state.wait { color: var(--muted); }
+
+.side { display: flex; flex-direction: column; gap: 28px; min-width: 0; }
+.card { border: 1px solid var(--line); border-radius: 4px; padding: 14px 16px; background: #fff; }
+.card .who { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.card .who .armbtn { cursor: default; }
+.card p { margin: 0 0 6px; }
+.card .meta { color: var(--muted); font-size: 13px; }
+.kv { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 14px; font-size: 13px; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; font-variant-numeric: tabular-nums; }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; vertical-align: 0; }
+
+.legend { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; font-size: 13px; }
+.legend li { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.legend svg { flex: 0 0 34px; }
+.notes { margin: 0; padding-left: 18px; color: var(--ink); font-size: 14px; max-width: 78ch; }
+.notes li { margin-bottom: 6px; }
+.notes .mono { font-size: 12.5px; }
+@media (prefers-reduced-motion: reduce) { .lbl.arm { transition: none; } }
+</style>
+
+<div class="page">
+  <header>
+    <div class="eyebrow">SO-101 × 8 · 6 个单元 · 1 条闭环</div>
+    <h1>八臂循环产线 <span class="lat">almost a line</span></h1>
+    <p class="lede">按你的示意图搭的 3D 布局,物料一直在循环。瓶子顺时针走外圈,瓶盖从 U4 斜穿圈内回到 U2,小球在左侧倒出、分色后回到灌装,不需要人补料。</p>
+  </header>
+
+  <figure>
+    <div class="stage" id="stage">
+      <canvas id="view" tabindex="0" aria-label="产线三维视图。拖动旋转,滚轮或双指缩放。"></canvas>
+      <div class="labels" id="labels"></div>
+      <div class="controls">
+        <div class="group" role="group" aria-label="播放">
+          <button id="btnPlay" type="button" aria-pressed="false">暂停</button>
+        </div>
+        <div class="group" role="group" aria-label="速度">
+          <button type="button" data-speed="1" aria-pressed="true">1×</button>
+          <button type="button" data-speed="2" aria-pressed="false">2×</button>
+          <button type="button" data-speed="4" aria-pressed="false">4×</button>
+        </div>
+        <div class="group" role="group" aria-label="视角">
+          <button type="button" data-view="oblique" aria-pressed="true">斜视</button>
+          <button type="button" data-view="top" aria-pressed="false">俯视</button>
+          <button type="button" data-view="low" aria-pressed="false">低视</button>
+        </div>
+        <div class="group" role="group" aria-label="缩放和标签">
+          <button type="button" id="zoomIn" aria-label="放大">+</button>
+          <button type="button" id="zoomOut" aria-label="缩小">−</button>
+          <button type="button" id="btnLabels" aria-pressed="true">标签</button>
+        </div>
+        <div class="clock" id="clock">00:00</div>
+      </div>
+    </div>
+    <figcaption>拖动旋转,滚轮或双指缩放。点机械臂或它的编号,看它正在做什么。俯视和你的示意图方向一致。</figcaption>
+  </figure>
+
+  <section class="board">
+    <div>
+      <h2>单元状态</h2>
+      <table>
+        <thead><tr><th>单元</th><th>机械臂</th><th>正在做</th><th style="text-align:right">完成</th></tr></thead>
+        <tbody id="unitRows"></tbody>
+      </table>
+    </div>
+    <div class="side">
+      <div>
+        <h2>选中的机械臂</h2>
+        <div class="card" id="armCard"><p class="meta">点场景里的机械臂,或上表里的编号。</p></div>
+      </div>
+      <div>
+        <h2>物料</h2>
+        <dl class="kv" id="stock"></dl>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>图例</h2>
+    <ul class="legend">
+      <li><svg width="34" height="10" aria-hidden="true"><line x1="1" y1="5" x2="33" y2="5" stroke="#9a9893" stroke-width="4"/></svg>瓶滑道(外圈,顺时针)</li>
+      <li><svg width="34" height="10" aria-hidden="true"><line x1="1" y1="5" x2="33" y2="5" stroke="#7963bc" stroke-width="4"/></svg>盖滑道(U4 → U2)</li>
+      <li><svg width="34" height="10" aria-hidden="true"><line x1="1" y1="5" x2="33" y2="5" stroke="#df922f" stroke-width="4"/></svg>混色球:漏斗 → 暂存杯 → U6</li>
+      <li><svg width="34" height="14" aria-hidden="true"><line x1="1" y1="2" x2="33" y2="2" stroke="#d6483b" stroke-width="3"/><line x1="1" y1="7" x2="33" y2="7" stroke="#4f9a45" stroke-width="3"/><line x1="1" y1="12" x2="33" y2="12" stroke="#3b72c8" stroke-width="3"/></svg>分色球滑道(U6 → U1)</li>
+      <li><svg width="34" height="14" aria-hidden="true"><rect x="1" y="2" width="32" height="10" rx="2" fill="#d3dfd5" stroke="#8fae98"/></svg>操作单元底板</li>
+      <li><svg width="34" height="14" aria-hidden="true"><rect x="12" y="2" width="10" height="10" fill="#2b2d31"/></svg>入口擒纵闸门(舵机)</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>布局里的几个取舍</h2>
+    <ul class="notes">
+      <li>尺寸按示意图换算,<span class="mono">1 px ≈ 1.5 mm</span>:台面 1.85 × 1.6 m,单元底板 38 × 23 cm,桌面印了 10 cm 网格。</li>
+      <li>SO-101 末端朝下时,有效半径大约 22–24 cm。每台臂的位置按「同时够到入口、工位、出口」来摆,所以和示意图里圆点的位置不完全一样;选中一台臂,可以看到它最远的作业点有多远。</li>
+      <li>出口滑道起点高 11 cm,入口闸门高 5 cm。每段滑道降 6 cm,这个高度靠臂把瓶子放进出口时补回来。外圈回程约 1.7 m,坡度只有 2° 左右,实物里空瓶最好躺着滚;图里为了好看,统一画成立着走。</li>
+      <li>环里一共 9 只瓶、6 个盖、33 个球。灌装配方暂时随机,按各色滑道的余量加权,避免某种颜色被用光。</li>
+      <li>没有做碰撞检测,也没有模拟真实的滑动摩擦。动作时长是估计值,用来看节拍和单元之间的等待关系。</li>
+    </ul>
+  </section>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+
+const V3 = THREE.Vector3;
+const HEADLESS = !!globalThis.__LOOP_HEADLESS__;
+
+// ---------- dimensions (metres, z up) ----------
+const PT = 0.018;                 // unit plate top
+const NEST_Z = PT + 0.008;        // bottle base when standing in a nest
+const BOT_H = 0.10, BOT_R = 0.0135;
+const R_BALL = 0.0085;
+const CAP_R = 0.0155, CAP_H = 0.016;
+const GRIP_Z = 0.075;             // grasp point above bottle base
+const L1 = 0.116, L2 = 0.135, LW = 0.03, LG = 0.075, LT = LW + LG, SH = 0.10;
+const REACH_NOTE = 0.24;
+
+const COL = {
+  table: '#dddcd3', plate: '#d3dfd5', plateEdge: '#8fae98', clay: '#efebe3', claySel: '#f4c79c', servo: '#2b2d31',
+  post: '#bdbab0', chute: '#9a9893', cap: '#7963bc', mix: '#df922f', nest: '#5d6166',
+  red: '#d6483b', green: '#4f9a45', blue: '#3b72c8', glass: '#bcd8e2',
+};
+const BALL_COLORS = ['red', 'green', 'blue'];
+const COLOR_NAME = { red: '红', green: '绿', blue: '蓝' };
+
+const UNITS = [
+  { id: 'U1', name: '灌装', sub: '取球放入瓶口', c: [0.036, 0.5505], nest: [0.07, 0.60], arms: ['A1'], inP: 'P51', outP: 'P12' },
+  { id: 'U2', name: '封盖拧紧', sub: '扶瓶 + 放盖拧紧', c: [0.597, 0.2325], nest: [0.597, 0.2325], arms: ['A2', 'A3'], inP: 'P12', outP: 'P23' },
+  { id: 'U3', name: '质检追溯', sub: '相机读序列和码', c: [0.597, -0.288], nest: [0.597, -0.288], arms: ['A4'], inP: 'P23', outP: 'P34' },
+  { id: 'U4', name: '拆盖', sub: '扶瓶 + 拧开', c: [0.036, -0.6045], nest: [0.036, -0.6045], arms: ['A5', 'A6'], inP: 'P34', outP: 'P45' },
+  { id: 'U5', name: '倒球', sub: '倾倒 + 查空', c: [-0.525, -0.288], nest: [-0.62, -0.215], arms: ['A7'], inP: 'P45', outP: 'P51' },
+  { id: 'U6', name: '分拣', sub: '相机按色分球', c: [-0.525, 0.2325], nest: null, arms: ['A8'] },
+];
+const ARMS = [
+  { id: 'A1', unit: 'U1', xy: [0.03, 0.49], role: '取球放入瓶口;也负责把瓶子从入口搬进工位、再送到出口。' },
+  { id: 'A2', unit: 'U2', xy: [0.72, 0.2325], role: '扶瓶;负责瓶子进出工位。' },
+  { id: 'A3', unit: 'U2', xy: [0.47, 0.30], role: '从盖滑道取盖,放到瓶口并拧紧。' },
+  { id: 'A4', unit: 'U3', xy: [0.72, -0.288], role: '把瓶子举到相机前转一圈,读出球的颜色序列和瓶码。' },
+  { id: 'A5', unit: 'U4', xy: [0.036, -0.685], role: '扶瓶;负责瓶子进出工位。' },
+  { id: 'A6', unit: 'U4', xy: [-0.05, -0.53], role: '拧开瓶盖,放进盖滑道送回 U2。' },
+  { id: 'A7', unit: 'U5', xy: [-0.50, -0.30], role: '把瓶子倒扣在漏斗上倒出小球,确认倒空后放回。' },
+  { id: 'A8', unit: 'U6', xy: [-0.53, 0.27], role: '从暂存杯出口取球,相机认颜色,放进红、绿、蓝滑道。' },
+];
+const PATHS = {
+  P12: { pts: [[0.17, 0.552], [0.5955, 0.552], [0.5955, 0.325]], z: [0.11, 0.05], w: 0.042, h: 0.026, color: COL.chute, kind: 'bottle' },
+  P23: { pts: [[0.5955, 0.14], [0.5955, -0.2]], z: [0.11, 0.05], w: 0.042, h: 0.026, color: COL.chute, kind: 'bottle' },
+  P34: { pts: [[0.5955, -0.38], [0.5955, -0.603], [0.2, -0.603]], z: [0.11, 0.05], w: 0.042, h: 0.026, color: COL.chute, kind: 'bottle' },
+  P45: { pts: [[-0.13, -0.603], [-0.525, -0.603], [-0.525, -0.385]], z: [0.11, 0.05], w: 0.042, h: 0.026, color: COL.chute, kind: 'bottle' },
+  P51: { pts: [[-0.665, -0.30], [-0.7875, -0.30], [-0.7875, 0.6225], [-0.12, 0.6225]], z: [0.11, 0.05], w: 0.042, h: 0.026, color: COL.chute, kind: 'bottle' },
+  CAP: { pts: [[0.09, -0.505], [0.45, 0.19]], z: [0.12, 0.045], w: 0.036, h: 0.02, color: COL.cap, kind: 'cap' },
+  red: { pts: [[-0.355, 0.30], [-0.12, 0.535]], z: [0.095, 0.04], w: 0.019, h: 0.013, color: COL.red, kind: 'ball' },
+  green: { pts: [[-0.355, 0.258], [-0.12, 0.497]], z: [0.095, 0.04], w: 0.019, h: 0.013, color: COL.green, kind: 'ball' },
+  blue: { pts: [[-0.355, 0.216], [-0.12, 0.459]], z: [0.095, 0.04], w: 0.019, h: 0.013, color: COL.blue, kind: 'ball' },
+  M1: { pts: [[-0.525, -0.20], [-0.525, -0.072]], z: [0.10, 0.084], w: 0.02, h: 0.012, color: COL.mix, kind: 'ball', transit: true },
+  M2: { pts: [[-0.525, 0.012], [-0.525, 0.15]], z: [0.04, 0.028], w: 0.02, h: 0.012, color: COL.mix, kind: 'ball' },
+};
+const SPACING = { bottle: 0.034, ball: 0.0178, cap: 0.034 };
+const END_PAD = { bottle: 0.022, ball: 0.011, cap: 0.02 };
+const SPEED = { bottle: 0.22, ball: 0.34, cap: 0.2 };
+const FUNNEL = new V3(-0.525, -0.215, 0.11);
+const CUP = new V3(-0.525, -0.03, 0.035);
+const INSPECT_P = new V3(0.555, -0.288, 0.215);
+const CAM3 = new V3(0.455, -0.288, 0.19);
+
+// ---------- sim clock + tiny scheduler ----------
+let simTime = 0;
+const timers = [];
+const sleep = (s) => new Promise((res) => timers.push({ t: simTime + s, res }));
+function runTimers() {
+  for (let i = timers.length - 1; i >= 0; i--) if (timers[i].t <= simTime) { const t = timers.splice(i, 1)[0]; t.res(); }
+}
+const ease = (u) => (u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+// ---------- scene ----------
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#fafafa');
+const mat = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.82, metalness: 0, ...o });
+const M = {
+  clay: mat(COL.clay), servo: mat(COL.servo, { roughness: 0.55 }), post: mat(COL.post), nest: mat(COL.nest, { roughness: 0.6 }),
+  plate: mat(COL.plate), plateEdge: mat(COL.plateEdge), cap: mat(COL.cap, { roughness: 0.6 }),
+  glass: new THREE.MeshStandardMaterial({ color: COL.glass, roughness: 0.15, metalness: 0, transparent: true, opacity: 0.32, depthWrite: false, side: THREE.DoubleSide }),
+  rim: mat('#97b6c1', { roughness: 0.4 }),
+  ball: { red: mat(COL.red, { roughness: 0.45 }), green: mat(COL.green, { roughness: 0.45 }), blue: mat(COL.blue, { roughness: 0.45 }) },
+  funnel: mat('#cfc9bb', { side: THREE.DoubleSide }), cup: mat('#e9e3d4', { side: THREE.DoubleSide }),
+};
+const shadowy = (m, cast = true, recv = true) => { m.castShadow = cast; m.receiveShadow = recv; return m; };
+const zcyl = (r1, r2, h, seg = 24, open = false) => { const g = new THREE.CylinderGeometry(r1, r2, h, seg, 1, open); g.rotateX(Math.PI / 2); return g; };
+
+// table with a printed 10 cm grid
+const TABLE = { w: 1.85, d: 1.6, cx: 0, cy: -0.02 };
+{
+  const tex = HEADLESS ? null : (() => {
+    const W = 2048, H = Math.round(2048 * TABLE.d / TABLE.w);
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const g = cv.getContext('2d');
+    g.fillStyle = COL.table; g.fillRect(0, 0, W, H);
+    const px = W / TABLE.w;
+    for (let i = 0; i * 0.05 <= TABLE.w + 1e-6; i++) {
+      g.strokeStyle = i % 2 === 0 ? 'rgba(120,116,100,.28)' : 'rgba(120,116,100,.12)'; g.lineWidth = i % 2 === 0 ? 2 : 1;
+      g.beginPath(); g.moveTo(i * 0.05 * px, 0); g.lineTo(i * 0.05 * px, H); g.stroke();
+    }
+    for (let j = 0; j * 0.05 <= TABLE.d + 1e-6; j++) {
+      g.strokeStyle = j % 2 === 0 ? 'rgba(120,116,100,.28)' : 'rgba(120,116,100,.12)'; g.lineWidth = j % 2 === 0 ? 2 : 1;
+      g.beginPath(); g.moveTo(0, j * 0.05 * px); g.lineTo(W, j * 0.05 * px); g.stroke();
+    }
+    g.fillStyle = 'rgba(44,44,44,.55)'; g.font = '28px "Space Mono", monospace';
+    g.fillText('10 cm', 0.06 * px, H - 0.075 * px);
+    g.fillRect(0.06 * px, H - 0.06 * px, 0.1 * px, 6);
+    g.fillText('1.85 × 1.60 m · SO-101 × 8', W - 0.62 * px, H - 0.05 * px);
+    const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
+  })();
+  const top = shadowy(new THREE.Mesh(new THREE.BoxGeometry(TABLE.w, TABLE.d, 0.035),
+    [mat('#cfcdc3'), mat('#cfcdc3'), mat('#cfcdc3'), mat('#cfcdc3'), tex ? mat('#ffffff', { map: tex }) : mat(COL.table), mat('#cfcdc3')]), false, true);
+  top.position.set(TABLE.cx, TABLE.cy, -0.0175);
+  scene.add(top);
+}
+
+// unit plates + nests
+const unitById = {};
+for (const u of UNITS) {
+  unitById[u.id] = u;
+  const plate = shadowy(new THREE.Mesh(new RoundedBoxGeometry(0.38, 0.23, PT, 2, 0.006), M.plate));
+  plate.position.set(u.c[0], u.c[1], PT / 2);
+  plate.userData.unit = u.id;
+  scene.add(plate);
+  const edge = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(0.38, 0.23, PT)), new THREE.LineDashedMaterial({ color: COL.plateEdge, dashSize: 0.012, gapSize: 0.008 }));
+  edge.position.copy(plate.position); edge.computeLineDistances(); scene.add(edge);
+  if (u.nest) {
+    const n = shadowy(new THREE.Mesh(zcyl(0.022, 0.022, 0.008, 28), M.nest));
+    n.position.set(u.nest[0], u.nest[1], PT + 0.004); scene.add(n);
+  }
+  u.state = '启动中'; u.count = 0; u.busy = false;
+}
+
+// ---------- paths (chutes) ----------
+class Path {
+  constructor(key, def) {
+    Object.assign(this, def); this.key = key;
+    const P = def.pts.map(([x, y]) => new THREE.Vector2(x, y));
+    const D = [P[0].clone()];
+    for (let i = 1; i < P.length - 1; i++) {
+      const A = P[i - 1], C = P[i], B = P[i + 1];
+      const d1 = A.clone().sub(C), d2 = B.clone().sub(C);
+      const r = Math.min(0.06, d1.length() * 0.45, d2.length() * 0.45);
+      d1.normalize(); d2.normalize();
+      const s1 = C.clone().addScaledVector(d1, r), s2 = C.clone().addScaledVector(d2, r);
+      for (let k = 0; k <= 10; k++) {
+        const u = k / 10, a = (1 - u) * (1 - u), b = 2 * u * (1 - u), c = u * u;
+        D.push(new THREE.Vector2(a * s1.x + b * C.x + c * s2.x, a * s1.y + b * C.y + c * s2.y));
+      }
+    }
+    D.push(P[P.length - 1].clone());
+    this.d = D; this.cum = [0];
+    for (let i = 1; i < D.length; i++) this.cum.push(this.cum[i - 1] + D[i].distanceTo(D[i - 1]));
+    this.len = this.cum[this.cum.length - 1];
+    this.sp = SPACING[def.kind]; this.pad = END_PAD[def.kind];
+    this.cap = Math.floor((this.len - this.pad) / this.sp) + 1;
+    this.q = [];
+  }
+  at(s, out = new V3()) {
+    s = clamp(s, 0, this.len);
+    let i = 1; while (i < this.cum.length - 1 && this.cum[i] < s) i++;
+    const s0 = this.cum[i - 1], s1 = this.cum[i], u = s1 > s0 ? (s - s0) / (s1 - s0) : 0;
+    const a = this.d[i - 1], b = this.d[i];
+    return out.set(a.x + (b.x - a.x) * u, a.y + (b.y - a.y) * u, this.z[0] + (this.z[1] - this.z[0]) * (s / this.len));
+  }
+  dir(s) {
+    const a = this.at(Math.max(0, s - 0.004)), b = this.at(Math.min(this.len, s + 0.004));
+    return new THREE.Vector2(b.x - a.x, b.y - a.y).normalize();
+  }
+}
+const paths = {};
+for (const [k, def] of Object.entries(PATHS)) paths[k] = new Path(k, def);
+const LANES = { red: paths.red, green: paths.green, blue: paths.blue };
+
+function chuteMesh(p) {
+  const n = Math.max(2, Math.ceil(p.len / 0.008));
+  const pos = [], idx = [];
+  const T = 0.004;
+  for (let i = 0; i <= n; i++) {
+    const s = (i / n) * p.len, c = p.at(s), d = p.dir(s), nx = -d.y, ny = d.x, hw = p.w / 2;
+    const L = [c.x + nx * hw, c.y + ny * hw], R = [c.x - nx * hw, c.y - ny * hw];
+    pos.push(L[0], L[1], c.z, R[0], R[1], c.z, L[0], L[1], c.z - T, R[0], R[1], c.z - T, L[0], L[1], c.z + p.h, R[0], R[1], c.z + p.h);
+  }
+  for (let i = 0; i < n; i++) {
+    const a = i * 6, b = (i + 1) * 6;
+    const quad = (p0, p1) => { idx.push(a + p0, a + p1, b + p1, a + p0, b + p1, b + p0); };
+    quad(0, 1); quad(3, 2); quad(2, 4); quad(5, 3);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+  const m = shadowy(new THREE.Mesh(g, mat(p.color, { side: THREE.DoubleSide, roughness: 0.7 })));
+  scene.add(m);
+  // posts
+  const nPosts = Math.max(2, Math.round(p.len / 0.2) + 1);
+  for (let i = 0; i < nPosts; i++) {
+    const s = (i / (nPosts - 1)) * p.len * 0.94 + p.len * 0.03, c = p.at(s);
+    const h = c.z - 0.004;
+    const post = shadowy(new THREE.Mesh(zcyl(0.0032, 0.0032, h, 10), M.post));
+    post.position.set(c.x, c.y, h / 2); scene.add(post);
+  }
+  // escapement gate at the end (not on transit chutes)
+  if (!p.transit) {
+    const e = p.at(p.len), d = p.dir(p.len);
+    const gate = shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.004, p.w + 0.006, p.h + 0.012), M.clay));
+    gate.position.set(e.x, e.y, e.z + (p.h + 0.012) / 2); gate.rotation.z = Math.atan2(d.y, d.x);
+    scene.add(gate);
+    const sv = shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.012, 0.016), M.servo));
+    const nx = -d.y, ny = d.x, off = p.w / 2 + 0.012;
+    sv.position.set(e.x + nx * off - d.x * 0.008, e.y + ny * off - d.y * 0.008, e.z + 0.01); sv.rotation.z = Math.atan2(d.y, d.x);
+    scene.add(sv);
+  }
+}
+for (const p of Object.values(paths)) chuteMesh(p);
+
+// funnel, cup, cameras
+{
+  const fg = new THREE.LatheGeometry([new THREE.Vector2(0.009, 0), new THREE.Vector2(0.011, 0.006), new THREE.Vector2(0.042, 0.05)], 32);
+  fg.rotateX(Math.PI / 2);
+  const f = shadowy(new THREE.Mesh(fg, M.funnel)); f.position.copy(FUNNEL); scene.add(f);
+  const fp = shadowy(new THREE.Mesh(zcyl(0.004, 0.004, FUNNEL.z - PT, 10), M.post)); fp.position.set(FUNNEL.x + 0.03, FUNNEL.y, PT + (FUNNEL.z - PT) / 2); scene.add(fp);
+  const cg = new THREE.LatheGeometry([new THREE.Vector2(0, 0), new THREE.Vector2(0.034, 0), new THREE.Vector2(0.036, 0.045)], 32);
+  cg.rotateX(Math.PI / 2);
+  const c = shadowy(new THREE.Mesh(cg, M.cup)); c.position.copy(CUP); scene.add(c);
+  const cs = shadowy(new THREE.Mesh(zcyl(0.012, 0.016, CUP.z, 16), M.post)); cs.position.set(CUP.x, CUP.y, CUP.z / 2); scene.add(cs);
+}
+const flashers = {};
+function cameraRig(id, at, look) {
+  const outer = new THREE.Group(); outer.position.copy(at);
+  const post = shadowy(new THREE.Mesh(zcyl(0.005, 0.005, at.z, 10), M.post)); post.position.set(0, 0, -at.z / 2); outer.add(post);
+  const g = new THREE.Group(); g.rotation.order = 'ZYX'; outer.add(g);
+  const body = shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.038, 0.03), M.servo)); g.add(body);
+  const lens = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.014, 18).rotateZ(-Math.PI / 2), M.servo)); lens.position.x = 0.021; g.add(lens);
+  const ringMat = new THREE.MeshStandardMaterial({ color: '#f2efe6', emissive: '#ffffff', emissiveIntensity: 0, roughness: 0.4 });
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.016, 0.003, 10, 28).rotateY(Math.PI / 2), ringMat); ring.position.x = 0.028; g.add(ring);
+  const d = look.clone().sub(at);
+  g.rotation.z = Math.atan2(d.y, d.x);
+  g.rotation.y = -Math.atan2(d.z, Math.hypot(d.x, d.y));
+  scene.add(outer);
+  flashers[id] = { m: ringMat, t: -9 };
+}
+cameraRig('U3', CAM3, INSPECT_P.clone().add(new V3(0, 0, -0.03)));
+cameraRig('U6', new V3(-0.44, 0.15, 0.2), paths.M2.at(paths.M2.len - 0.011));
+const flash = (id) => { if (flashers[id]) flashers[id].t = simTime; };
+
+// ---------- tokens ----------
+const tokens = [];
+const G = {
+  ball: new THREE.SphereGeometry(R_BALL, 20, 14),
+  bottleBody: (() => { const g = new THREE.CylinderGeometry(BOT_R, BOT_R, BOT_H, 28, 1, true); g.rotateX(Math.PI / 2); g.translate(0, 0, BOT_H / 2); return g; })(),
+  bottleFloor: (() => { const g = zcyl(BOT_R, BOT_R, 0.004, 28); g.translate(0, 0, 0.002); return g; })(),
+  rim: (() => { const g = new THREE.TorusGeometry(BOT_R, 0.0018, 8, 28); g.translate(0, 0, BOT_H); return g; })(),
+  band: (() => { const g = new THREE.CylinderGeometry(BOT_R + 0.0004, BOT_R + 0.0004, 0.022, 28, 1, true); g.rotateX(Math.PI / 2); g.translate(0, 0, 0.04); return g; })(),
+  cap: (() => { const g = zcyl(CAP_R, CAP_R, CAP_H, 24); g.translate(0, 0, CAP_H / 2); return g; })(),
+  capRib: new THREE.BoxGeometry(0.004, CAP_R * 2 + 0.002, 0.006),
+};
+class Tok {
+  constructor(kind, mesh) { this.kind = kind; this.mesh = mesh; this.mode = 'static'; this.path = null; this.s = 0; this.sT = 0; this.target = new V3(); this.fly = null; tokens.push(this); scene.add(mesh); }
+}
+const ANCHOR = { bottle: new V3(0, 0, GRIP_Z), ball: new V3(0, 0, 0), cap: new V3(0, 0, 0.008) };
+
+function makeBall(color) {
+  const m = shadowy(new THREE.Mesh(G.ball, M.ball[color]), true, false);
+  const t = new Tok('ball', m); t.color = color; return t;
+}
+function makeCap() {
+  const g = new THREE.Group();
+  g.add(shadowy(new THREE.Mesh(G.cap, M.cap)));
+  const rib = shadowy(new THREE.Mesh(G.capRib, mat('#5d4a96'))); rib.position.z = CAP_H + 0.002; g.add(rib);
+  return new Tok('cap', g);
+}
+let bottleSeq = 0;
+function makeBottle() {
+  const id = 'B' + String(++bottleSeq).padStart(2, '0');
+  const g = new THREE.Group();
+  g.add(new THREE.Mesh(G.bottleBody, M.glass));
+  g.add(shadowy(new THREE.Mesh(G.bottleFloor, M.rim), false, true));
+  g.add(new THREE.Mesh(G.rim, M.rim));
+  if (!HEADLESS) {
+    const cv = document.createElement('canvas'); cv.width = 256; cv.height = 64;
+    const c = cv.getContext('2d');
+    c.fillStyle = '#ffffff'; c.fillRect(0, 0, 256, 64);
+    c.fillStyle = '#2c2c2c'; c.font = 'bold 30px "Space Mono", monospace'; c.fillText(id, 14, 42);
+    for (let i = 0; i < 6; i++) for (let j = 0; j < 6; j++) if ((i * 7 + j * 13 + bottleSeq * 5) % 3 === 0) c.fillRect(150 + i * 8, 8 + j * 8, 7, 7);
+    c.fillRect(204, 8, 40, 4); c.fillRect(204, 52, 40, 4);
+    const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;
+    g.add(new THREE.Mesh(G.band, new THREE.MeshStandardMaterial({ map: t, roughness: 0.7, side: THREE.DoubleSide })));
+  }
+  const tok = new Tok('bottle', g); tok.id = id; tok.balls = []; tok.pending = 0; tok.capTok = null; tok.loops = 0; tok.lastRead = '';
+  return tok;
+}
+function addBallToBottle(ball, bottle) {
+  bottle.mesh.add(ball.mesh);
+  ball.mode = 'child';
+  ball.mesh.position.set(0, 0, 0.0045 + R_BALL + bottle.balls.length * 2 * R_BALL);
+  ball.mesh.quaternion.identity();
+  bottle.balls.push(ball);
+}
+function capOnBottle(cap, bottle) {
+  bottle.mesh.attach(cap.mesh);
+  cap.mode = 'child';
+  const e = new THREE.Euler().setFromQuaternion(cap.mesh.quaternion, 'ZYX');
+  cap.mesh.quaternion.setFromAxisAngle(new V3(0, 0, 1), e.z);
+  cap.mesh.position.set(0, 0, BOT_H - 0.006);
+  bottle.capTok = cap;
+}
+function retarget(p) { p.q.forEach((t, i) => { t.sT = Math.max(0, p.len - p.pad - i * p.sp); }); }
+function enqueue(p, tok, s = 0, snap = false) {
+  if (tok.mesh.parent !== scene) scene.attach(tok.mesh);
+  tok.mode = 'path'; tok.path = p; tok.s = s; tok.transit = null; p.q.push(tok); retarget(p);
+  if (snap) { tok.s = tok.sT; placeOnPath(tok); }
+}
+function takeHead(p) { const t = p.q.shift(); retarget(p); t.mode = 'static'; t.path = null; return t; }
+function arrived(p) { const t = p.q[0]; return !!t && Math.abs(t.s - t.sT) < 0.002; }
+function outletFree(p) { const q = p.q; if (q.length >= p.cap) return false; if (!q.length) return true; return q[q.length - 1].s > p.sp + 0.004; }
+const _v = new V3();
+function placeOnPath(t) {
+  t.path.at(t.s, _v); if (t.kind === 'ball') _v.z += R_BALL;
+  t.mesh.position.copy(_v);
+}
+// mixed balls: head of queue on chute M2, the rest piled in the cup
+const mixQ = [];
+function mixTarget(i, out) {
+  if (i < 4) { paths.M2.at(paths.M2.len - paths.M2.pad - i * paths.M2.sp, out); out.z += R_BALL; return out; }
+  const j = i - 4, layer = Math.floor(j / 7), k = j % 7;
+  const a = (k - 1) * Math.PI / 3 + layer * 0.5, r = k === 0 ? 0 : 0.0185;
+  return out.set(CUP.x + Math.cos(a) * r, CUP.y + Math.sin(a) * r, CUP.z + 0.003 + R_BALL + layer * 0.015);
+}
+function toMix(ball) { if (ball.mesh.parent !== scene) scene.attach(ball.mesh); ball.mode = 'free'; mixQ.push(ball); }
+function mixReady() { const b = mixQ[0]; if (!b) return false; mixTarget(0, _v); return b.mesh.position.distanceTo(_v) < 0.003; }
+
+function flyTo(tok, p1, dur, arc, done) {
+  if (tok.mesh.parent !== scene) scene.attach(tok.mesh);
+  tok.mode = 'fly'; tok.fly = { p0: tok.mesh.position.clone(), p1: p1.clone(), t0: simTime, dur, arc, done };
+}
+const IDQ = new THREE.Quaternion();
+function updateTokens(dt) {
+  for (const t of tokens) {
+    if (t.mode === 'path') {
+      const v = SPEED[t.kind];
+      if (t.s < t.sT) t.s = Math.min(t.sT, t.s + v * dt);
+      placeOnPath(t);
+      if (t.kind !== 'bottle') t.mesh.quaternion.slerp(IDQ, 1 - Math.exp(-dt * 8));
+      if (t.transit && t.s >= t.path.len - 1e-4) { const cb = t.transit; t.transit = null; cb(); }
+    } else if (t.mode === 'free') {
+      const i = mixQ.indexOf(t);
+      if (i >= 0) mixTarget(i, t.target);
+      t.mesh.position.lerp(t.target, 1 - Math.exp(-dt * 7));
+    } else if (t.mode === 'fly') {
+      const f = t.fly, u = clamp((simTime - f.t0) / f.dur, 0, 1), e = u * u;
+      t.mesh.position.lerpVectors(f.p0, f.p1, e);
+      t.mesh.position.z += f.arc * Math.sin(Math.PI * u);
+      if (u >= 1) { t.mode = 'static'; f.done && f.done(); }
+    }
+  }
+}
+
+// ---------- arms ----------
+const arms = {};
+const armPickables = [];
+class Arm {
+  constructor(def) {
+    Object.assign(this, def);
+    this.base = new V3(def.xy[0], def.xy[1], PT);
+    this.shoulder = new V3(def.xy[0], def.xy[1], PT + SH);
+    const u = unitById[def.unit];
+    const work = u.nest ? new V3(u.nest[0], u.nest[1], 0) : paths.M2.at(paths.M2.len);
+    const dir = new V3(work.x - this.base.x, work.y - this.base.y, 0).normalize();
+    this.homeP = this.base.clone().addScaledVector(dir, 0.1); this.homeP.z = PT + 0.2;
+    this.cur = { p: this.homeP.clone(), pitch: null, roll: 0, grip: 0.75 };
+    this.tw = null; this.held = null; this.holdMode = 'upright'; this.action = '待命'; this.idle = true;
+    this.lastPan = Math.atan2(dir.y, dir.x); this.phase = Math.random() * 6.28; this.breath = 1;
+    this.mClay = M.clay.clone();
+    this.build(dir);
+  }
+  build(dir) {
+    const root = new THREE.Group(); root.position.copy(this.base); this.root = root;
+    const add = (parent, geo, m, x = 0, y = 0, z = 0) => { const o = shadowy(new THREE.Mesh(geo, m)); o.position.set(x, y, z); o.userData.arm = this.id; parent.add(o); armPickables.push(o); return o; };
+    const baseG = new THREE.Group(); baseG.rotation.z = Math.atan2(dir.y, dir.x) + Math.PI / 2; root.add(baseG);
+    add(baseG, new RoundedBoxGeometry(0.1, 0.082, 0.03, 2, 0.006), this.mClay, 0, 0, 0.015);
+    add(baseG, new THREE.BoxGeometry(0.045, 0.034, 0.04), M.servo, 0, 0, 0.05);
+    const pan = new THREE.Group(); pan.position.z = 0.07; root.add(pan); this.pan = pan;
+    add(pan, zcyl(0.026, 0.026, 0.01, 24), this.mClay, 0, 0, 0.004);
+    add(pan, new RoundedBoxGeometry(0.03, 0.056, 0.028, 2, 0.005), this.mClay, 0, 0, 0.018);
+    const sh = new THREE.Group(); sh.position.z = SH - 0.07; pan.add(sh); this.sh = sh;
+    add(sh, new THREE.BoxGeometry(0.034, 0.046, 0.03), M.servo);
+    add(sh, new RoundedBoxGeometry(L1, 0.026, 0.034, 2, 0.006), this.mClay, L1 / 2, 0, 0);
+    const el = new THREE.Group(); el.position.x = L1; sh.add(el); this.el = el;
+    add(el, new THREE.BoxGeometry(0.032, 0.044, 0.028), M.servo);
+    add(el, new RoundedBoxGeometry(L2, 0.024, 0.03, 2, 0.006), this.mClay, L2 / 2, 0, 0);
+    const wr = new THREE.Group(); wr.position.x = L2; el.add(wr); this.wr = wr;
+    add(wr, new THREE.BoxGeometry(0.028, 0.04, 0.026), M.servo);
+    add(wr, new THREE.BoxGeometry(LW, 0.022, 0.022), this.mClay, LW / 2, 0, 0);
+    const roll = new THREE.Group(); roll.position.x = LW; wr.add(roll); this.rollG = roll;
+    add(roll, new RoundedBoxGeometry(0.03, 0.05, 0.03, 2, 0.005), this.mClay, 0.015, 0, 0);
+    add(roll, new THREE.BoxGeometry(0.02, 0.026, 0.02), M.servo, 0.012, 0, 0.022);
+    this.f1 = add(roll, new RoundedBoxGeometry(0.053, 0.006, 0.014, 1, 0.002), this.mClay, 0.0565, 0, 0);
+    this.f2 = add(roll, new RoundedBoxGeometry(0.053, 0.006, 0.014, 1, 0.002), this.mClay, 0.0565, 0, 0);
+    const tip = new THREE.Object3D(); tip.position.x = LG; roll.add(tip); this.tip = tip;
+    scene.add(root);
+  }
+  feasible(p, psi) {
+    const h = Math.hypot(p.x - this.base.x, p.y - this.base.y);
+    const wr = h - LT * Math.cos(psi), wz = p.z - LT * Math.sin(psi) - this.shoulder.z;
+    const d = Math.hypot(wr, wz);
+    return d <= L1 + L2 - 0.003 && d >= Math.abs(L1 - L2) + 0.006;
+  }
+  autoPitch(p) {
+    const lo = -Math.PI / 2, step = Math.PI / 36;
+    if (this.feasible(p, lo)) return lo;
+    let a = lo, b = null;
+    for (let k = 1; k <= 16; k++) { const psi = lo + k * step; if (this.feasible(p, psi)) { b = psi; break; } a = psi; }
+    if (b === null) return lo + 16 * step;
+    for (let i = 0; i < 8; i++) { const m = (a + b) / 2; if (this.feasible(p, m)) b = m; else a = m; }
+    return b;
+  }
+  solve(p, psi) {
+    const dx = p.x - this.base.x, dy = p.y - this.base.y, h = Math.hypot(dx, dy);
+    const pan = h > 0.02 ? Math.atan2(dy, dx) : this.lastPan; this.lastPan = pan;
+    const wr = h - LT * Math.cos(psi), wz = p.z - LT * Math.sin(psi) - this.shoulder.z;
+    let d = Math.hypot(wr, wz); const a0 = Math.atan2(wz, wr);
+    d = clamp(d, Math.abs(L1 - L2) + 0.006, L1 + L2 - 0.003);
+    const th1 = a0 + Math.acos(clamp((L1 * L1 + d * d - L2 * L2) / (2 * L1 * d), -1, 1));
+    const ex = L1 * Math.cos(th1), ez = L1 * Math.sin(th1);
+    const th2 = Math.atan2(d * Math.sin(a0) - ez, d * Math.cos(a0) - ex);
+    return { pan, th1, th2 };
+  }
+  go(pose, dur) {
+    return new Promise((res) => {
+      const from = { p: this.cur.p.clone(), pitch: this.cur.pitch, roll: this.cur.roll, grip: this.cur.grip };
+      const to = { p: pose.p ? pose.p.clone() : from.p.clone(), pitch: 'pitch' in pose ? pose.pitch : from.pitch, roll: 'roll' in pose ? pose.roll : from.roll, grip: 'grip' in pose ? pose.grip : from.grip };
+      const pa = from.pitch ?? this.autoPitch(from.p), pb = to.pitch ?? this.autoPitch(to.p);
+      this.tw = { from, to, pa, pb, t: 0, dur: Math.max(0.05, dur), res };
+    });
+  }
+  hold(tok, mode = 'upright') { this.held = tok; this.holdMode = mode; if (tok.mesh.parent !== scene) scene.attach(tok.mesh); tok.mode = 'held'; }
+  release() { const t = this.held; this.held = null; if (t) t.mode = 'static'; return t; }
+  update(dt) {
+    let p = this.cur.p, pitch = this.cur.pitch, roll = this.cur.roll, grip = this.cur.grip;
+    if (this.tw) {
+      const w = this.tw; w.t += dt; const u = ease(clamp(w.t / w.dur, 0, 1));
+      p = w.from.p.clone().lerp(w.to.p, u);
+      pitch = w.pa + (w.pb - w.pa) * u; roll = w.from.roll + (w.to.roll - w.from.roll) * u; grip = w.from.grip + (w.to.grip - w.from.grip) * u;
+      if (w.t >= w.dur) { this.cur = { p: w.to.p.clone(), pitch: w.to.pitch, roll: w.to.roll, grip: w.to.grip }; this.tw = null; w.res(); }
+      else this.cur = { p, pitch: this.cur.pitch, roll, grip, live: true };
+    }
+    const pp = p.clone();
+    this.breath += ((this.idle && !this.tw ? 1 : 0) - this.breath) * Math.min(1, dt * 2.5);
+    pp.z += this.breath * 0.006 * Math.sin(simTime * 1.1 + this.phase);
+    pp.x += this.breath * 0.004 * Math.sin(simTime * 0.7 + this.phase * 2);
+    const psi = pitch ?? this.autoPitch(pp);
+    this.liveRoll = roll;
+    const s = this.solve(pp, psi);
+    this.pan.rotation.z = s.pan;
+    this.sh.rotation.y = -s.th1;
+    this.el.rotation.y = -(s.th2 - s.th1);
+    this.wr.rotation.y = -(psi - s.th2);
+    this.rollG.rotation.x = roll;
+    const gap = 0.008 + 0.038 * clamp(grip, 0, 1);
+    this.f1.position.y = gap / 2 + 0.003; this.f2.position.y = -gap / 2 - 0.003;
+    this.root.updateMatrixWorld(true);
+  }
+  placeHeld() {
+    const t = this.held; if (!t) return;
+    const tp = this.tip.getWorldPosition(new V3());
+    let q;
+    if (this.holdMode === 'rigid') {
+      q = this.tip.getWorldQuaternion(new THREE.Quaternion()).multiply(new THREE.Quaternion().setFromAxisAngle(new V3(0, 1, 0), -Math.PI / 2));
+    } else {
+      q = new THREE.Quaternion().setFromAxisAngle(new V3(0, 0, 1), this.pan.rotation.z - this.liveRoll);
+    }
+    t.mesh.quaternion.copy(q);
+    t.mesh.position.copy(tp).sub(ANCHOR[t.kind].clone().applyQuaternion(q));
+  }
+  setSelected(on) { this.mClay.color.set(on ? COL.claySel : COL.clay); }
+}
+for (const d of ARMS) arms[d.id] = new Arm(d);
+for (const u of UNITS) { u.holder = arms[u.arms[0]]; u.worker = arms[u.arms[u.arms.length - 1]]; if (u.inP) { u.in = paths[u.inP]; u.out = paths[u.outP]; } }
+
+// how far each arm reaches for its work (horizontal, from the base)
+const nestV = (u) => new V3(u.nest[0], u.nest[1], NEST_Z);
+const reachPts = {
+  A1: [paths.P51.at(paths.P51.len), nestV(unitById.U1), paths.P12.at(0), paths.red.at(paths.red.len), paths.blue.at(paths.blue.len)],
+  A2: [paths.P12.at(paths.P12.len), nestV(unitById.U2), paths.P23.at(0)],
+  A3: [nestV(unitById.U2), paths.CAP.at(paths.CAP.len)],
+  A4: [paths.P23.at(paths.P23.len), nestV(unitById.U3), paths.P34.at(0), INSPECT_P],
+  A5: [paths.P34.at(paths.P34.len), nestV(unitById.U4), paths.P45.at(0)],
+  A6: [nestV(unitById.U4), paths.CAP.at(0)],
+  A7: [paths.P45.at(paths.P45.len), nestV(unitById.U5), paths.P51.at(0), FUNNEL],
+  A8: [paths.M2.at(paths.M2.len), paths.red.at(0), paths.blue.at(0)],
+};
+for (const [id, pts] of Object.entries(reachPts)) {
+  const a = arms[id]; a.reach = Math.max(...pts.map((p) => Math.hypot(p.x - a.base.x, p.y - a.base.y)));
+}
+
+// ---------- choreography ----------
+const up = (p, dz) => p.clone().add(new V3(0, 0, dz));
+const toward = (arm, p, d) => { const v = new V3(arm.base.x - p.x, arm.base.y - p.y, 0).normalize(); return p.clone().addScaledVector(v, d); };
+async function home(arm) { arm.action = '待命'; await arm.go({ p: arm.homeP, pitch: null, roll: 0, grip: 0.75 }, 0.7); }
+async function pickBottle(arm, base) {
+  await arm.go({ p: up(base, GRIP_Z + 0.06), grip: 1, pitch: null }, 0.75);
+  await arm.go({ p: up(base, GRIP_Z) }, 0.4);
+  await arm.go({ grip: 0.32 }, 0.22);
+}
+async function carry(arm, tok, from, to, onPlaced) {
+  await pickBottle(arm, from);
+  arm.hold(tok);
+  await arm.go({ p: up(from, GRIP_Z + 0.07) }, 0.4);
+  await arm.go({ p: up(to, GRIP_Z + 0.07) }, 0.9);
+  await arm.go({ p: up(to, GRIP_Z) }, 0.42);
+  const t = arm.release(); t.mesh.position.copy(to); onPlaced && onPlaced(t);
+  await arm.go({ grip: 1 }, 0.2);
+  await arm.go({ p: up(to, GRIP_Z + 0.06) }, 0.32);
+}
+async function sideHold(arm, nb) {
+  const hp = up(nb, 0.05);
+  await arm.go({ p: toward(arm, hp, 0.05), pitch: -0.9, grip: 1 }, 0.7);
+  await arm.go({ p: hp }, 0.35);
+  await arm.go({ grip: 0.38 }, 0.22);
+}
+async function sideRelease(arm, nb) { await arm.go({ grip: 1 }, 0.2); await arm.go({ p: toward(arm, up(nb, 0.05), 0.06) }, 0.35); }
+
+function pickLane() {
+  const ready = BALL_COLORS.filter((c) => arrived(LANES[c]));
+  if (!ready.length) return null;
+  const total = ready.reduce((s, c) => s + LANES[c].q.length, 0);
+  let r = Math.random() * total;
+  for (const c of ready) { r -= LANES[c].q.length; if (r <= 0) return c; }
+  return ready[ready.length - 1];
+}
+const PROCESS = {
+  async U1(u, bottle) {
+    const A = u.worker, nb = nestV(u), recipe = [];
+    for (let k = 0; k < 3; k++) {
+      let c; while (!(c = pickLane())) { u.state = '等待来球'; await sleep(0.3); }
+      u.state = `灌装 ${k + 1}/3 · 取${COLOR_NAME[c]}球`; A.action = `从${COLOR_NAME[c]}球滑道取球`;
+      const lane = LANES[c], ball = lane.q[0], bp = ball.mesh.position.clone();
+      await A.go({ p: up(bp, 0.05), grip: 1, pitch: null }, 0.6);
+      await A.go({ p: bp }, 0.3);
+      takeHead(lane); await A.go({ grip: 0.08 }, 0.16); A.hold(ball);
+      await A.go({ p: up(bp, 0.06) }, 0.3);
+      A.action = '把球放进瓶口';
+      await A.go({ p: up(nb, BOT_H + 0.035) }, 0.75);
+      const b = A.release(); await A.go({ grip: 1 }, 0.12);
+      bottle.mesh.updateMatrixWorld(true);
+      const slot = bottle.mesh.localToWorld(new V3(0, 0, 0.0045 + R_BALL + (bottle.balls.length + bottle.pending) * 2 * R_BALL));
+      bottle.pending++;
+      flyTo(b, slot, 0.26, 0, () => { bottle.pending--; addBallToBottle(b, bottle); });
+      recipe.push(COLOR_NAME[c]);
+    }
+    bottle.recipe = recipe.join('');
+    await sleep(0.3);
+  },
+  async U2(u, bottle) {
+    const A = u.holder, W = u.worker, nb = nestV(u), capP = paths.CAP;
+    while (!arrived(capP)) { u.state = '等待瓶盖'; await sleep(0.3); }
+    u.state = '扶瓶 · 取盖';
+    const capTok = capP.q[0], cp = up(capTok.mesh.position, 0.008);
+    A.action = '扶住瓶身'; W.action = '从盖滑道取盖';
+    await Promise.all([
+      sideHold(A, nb),
+      (async () => {
+        await W.go({ p: up(cp, 0.05), grip: 1, pitch: null }, 0.7);
+        await W.go({ p: cp }, 0.3);
+        takeHead(capP); await W.go({ grip: 0.42 }, 0.2); W.hold(capTok, 'rigid');
+        await W.go({ p: up(cp, 0.06) }, 0.3);
+      })(),
+    ]);
+    u.state = '放盖 · 拧紧'; W.action = '放盖并拧紧';
+    const top = up(nb, BOT_H + 0.002);
+    await W.go({ p: up(top, 0.04), pitch: -Math.PI / 2 }, 0.75);
+    await W.go({ p: top }, 0.32);
+    await W.go({ roll: Math.PI / 2 }, 0.6);
+    const c = W.release(); capOnBottle(c, bottle);
+    await W.go({ grip: 1 }, 0.18);
+    await W.go({ p: up(top, 0.05), roll: 0, pitch: null }, 0.4);
+    A.action = '松开瓶身';
+    await Promise.all([sideRelease(A, nb), home(W)]);
+  },
+  async U3(u, bottle) {
+    const A = u.holder, nb = nestV(u);
+    u.state = '举到相机前'; A.action = '把瓶子举到相机前';
+    await pickBottle(A, nb); A.hold(bottle);
+    await A.go({ p: up(nb, GRIP_Z + 0.06) }, 0.35);
+    await A.go({ p: INSPECT_P }, 0.8);
+    u.state = '读球序列和瓶码'; A.action = '转一圈读码';
+    flash('U3'); await A.go({ roll: Math.PI }, 0.8); flash('U3'); await A.go({ roll: 2 * Math.PI }, 0.8);
+    A.cur.roll = 0;
+    bottle.lastRead = bottle.balls.map((b) => COLOR_NAME[b.color]).join('');
+    u.lastRead = `${bottle.id} · ${bottle.lastRead || '空'} · 合格`;
+    u.state = '放回工位'; A.action = '放回工位';
+    await A.go({ p: up(nb, GRIP_Z + 0.06) }, 0.8);
+    await A.go({ p: up(nb, GRIP_Z) }, 0.38);
+    const t = A.release(); t.mesh.position.copy(nb);
+    await A.go({ grip: 1 }, 0.2);
+  },
+  async U4(u, bottle) {
+    const A = u.holder, W = u.worker, nb = nestV(u), capP = paths.CAP;
+    u.state = '扶瓶 · 拧开'; A.action = '扶住瓶身'; W.action = '拧开瓶盖';
+    const top = up(nb, BOT_H + 0.002);
+    await Promise.all([
+      sideHold(A, nb),
+      (async () => { await W.go({ p: up(top, 0.05), grip: 1, pitch: -Math.PI / 2 }, 0.75); await W.go({ p: top }, 0.32); await W.go({ grip: 0.42 }, 0.2); })(),
+    ]);
+    const cap = bottle.capTok; bottle.capTok = null;
+    if (cap) { W.hold(cap, 'rigid'); }
+    await W.go({ roll: -Math.PI / 2 }, 0.6);
+    await W.go({ p: up(top, 0.06) }, 0.35);
+    u.state = '瓶盖送回 U2'; W.action = '把盖放进盖滑道';
+    const start = capP.at(0);
+    await Promise.all([
+      sideRelease(A, nb),
+      (async () => {
+        await W.go({ p: up(start, 0.05), pitch: null, roll: 0 }, 0.75);
+        while (!outletFree(capP)) await sleep(0.3);
+        await W.go({ p: up(start, 0.012) }, 0.3);
+        const c = W.release(); if (c) enqueue(capP, c, 0);
+        await W.go({ grip: 1 }, 0.18);
+        await home(W);
+      })(),
+    ]);
+  },
+  async U5(u, bottle) {
+    const A = u.holder, nb = nestV(u);
+    u.state = '取瓶'; A.action = '拿起瓶子';
+    await pickBottle(A, nb); A.hold(bottle);
+    await A.go({ p: up(nb, GRIP_Z + 0.07) }, 0.35);
+    const pre = new V3(FUNNEL.x - 0.004, FUNNEL.y + 0.03, 0.235);
+    await A.go({ p: pre }, 0.75);
+    u.state = '倾倒'; A.action = '倒扣在漏斗上';
+    A.holdMode = 'rigid';
+    await A.go({ p: new V3(FUNNEL.x - 0.004, FUNNEL.y + 0.035, 0.215), pitch: 0.55 }, 1.0);
+    const throat = new V3(FUNNEL.x, FUNNEL.y, FUNNEL.z + 0.012);
+    const balls = bottle.balls.splice(0).reverse();
+    for (const b of balls) {
+      bottle.mesh.updateMatrixWorld(true);
+      const mouth = bottle.mesh.localToWorld(new V3(0, 0, BOT_H));
+      scene.attach(b.mesh); b.mesh.position.copy(mouth);
+      flyTo(b, throat, 0.32, 0.01, () => { b.mode = 'path'; b.path = paths.M1; b.s = 0; b.sT = paths.M1.len; b.transit = () => toMix(b); });
+      await sleep(0.14);
+    }
+    await sleep(0.5);
+    u.state = '查空'; A.action = '确认倒空';
+    await A.go({ p: pre, pitch: -Math.PI / 2 }, 0.9);
+    A.holdMode = 'upright';
+    await A.go({ p: up(nb, GRIP_Z + 0.07), pitch: null }, 0.7);
+    await A.go({ p: up(nb, GRIP_Z) }, 0.38);
+    const t = A.release(); t.mesh.position.copy(nb);
+    await A.go({ grip: 1 }, 0.2);
+  },
+};
+const busy = (u) => u.arms.forEach((id) => { arms[id].idle = false; });
+async function bottleUnitTick(u) {
+  const A = u.holder;
+  if (u.nestTok && u.nestDone) {
+    if (!outletFree(u.out)) { u.state = '等出口空位'; return false; }
+    u.state = '送往下一单元'; A.action = '把瓶子放进出口滑道';
+    const tok = u.nestTok; busy(u);
+    await carry(A, tok, nestV(u), u.out.at(0), (t) => enqueue(u.out, t, 0));
+    u.nestTok = null; u.nestDone = false;
+    return true;
+  }
+  if (!u.nestTok) {
+    if (!arrived(u.in)) { u.state = '等待来瓶'; return false; }
+    const tok = takeHead(u.in); busy(u);
+    u.state = '取瓶进工位'; A.action = '从入口取瓶';
+    const from = tok.mesh.position.clone();
+    await carry(A, tok, from, nestV(u), (t) => { t.mode = 'static'; });
+    u.nestTok = tok; u.nestDone = false;
+  }
+  await PROCESS[u.id](u, u.nestTok);
+  if (u.id === 'U1') u.nestTok.loops++;
+  u.nestDone = true; u.count++;
+  return true;
+}
+async function sorterTick(u) {
+  const A = u.holder;
+  if (!mixReady()) { u.state = '等待来球'; return false; }
+  const ball = mixQ[0], bp = ball.mesh.position.clone(); busy(u);
+  u.state = '取球'; A.action = '从暂存杯出口取球';
+  await A.go({ p: up(bp, 0.05), grip: 1, pitch: null }, 0.55);
+  await A.go({ p: bp }, 0.28);
+  mixQ.shift(); await A.go({ grip: 0.08 }, 0.15); A.hold(ball);
+  await A.go({ p: up(bp, 0.07) }, 0.3);
+  u.state = '相机认颜色'; A.action = '在相机下认颜色'; flash('U6'); await sleep(0.3);
+  const lane = LANES[ball.color];
+  while (!outletFree(lane)) { u.state = `${COLOR_NAME[ball.color]}球滑道已满`; await sleep(0.3); }
+  const st = up(lane.at(0), R_BALL + 0.004);
+  u.state = `放进${COLOR_NAME[ball.color]}球滑道`; A.action = `放进${COLOR_NAME[ball.color]}球滑道`;
+  await A.go({ p: up(st, 0.03) }, 0.6);
+  await A.go({ p: st }, 0.2);
+  const b = A.release(); enqueue(lane, b, 0); await A.go({ grip: 1 }, 0.12);
+  await A.go({ p: up(st, 0.04) }, 0.25);
+  u.count++;
+  return true;
+}
+async function unitLoop(u) {
+  const armsOfUnit = u.arms.map((id) => arms[id]);
+  let atHome = true;
+  for (;;) {
+    let did = false;
+    try { did = u.id === 'U6' ? await sorterTick(u) : await bottleUnitTick(u); }
+    catch (e) { console.error(u.id, e); u.state = '出错,重试'; }
+    if (did) { atHome = false; continue; }
+    if (!atHome) { await Promise.all(armsOfUnit.map((a) => home(a))); atHome = true; }
+    armsOfUnit.forEach((a) => { a.idle = true; a.action = '待命'; });
+    await sleep(0.3);
+  }
+}
+
+// ---------- initial stock: 9 bottles, 6 caps, 33 balls ----------
+const rndColor = () => BALL_COLORS[Math.floor(Math.random() * 3)];
+function filledBottle(capped) {
+  const b = makeBottle();
+  for (let i = 0; i < 3; i++) addBallToBottle(makeBall(rndColor()), b);
+  if (capped) { const c = makeCap(); capOnBottle(c, b); }
+  return b;
+}
+for (let i = 0; i < 4; i++) enqueue(paths.P51, makeBottle(), 0, true);
+enqueue(paths.P12, filledBottle(false), 0, true);
+enqueue(paths.P23, filledBottle(true), 0, true); enqueue(paths.P23, filledBottle(true), 0, true);
+enqueue(paths.P34, filledBottle(true), 0, true);
+enqueue(paths.P45, filledBottle(false), 0, true);
+for (let i = 0; i < 3; i++) enqueue(paths.CAP, makeCap(), 0, true);
+for (const c of BALL_COLORS) for (let i = 0; i < 5; i++) enqueue(LANES[c], makeBall(c), 0, true);
+for (let i = 0; i < 3; i++) { const b = makeBall(rndColor()); toMix(b); mixTarget(mixQ.length - 1, b.mesh.position); }
+for (const u of UNITS) unitLoop(u);
+
+// ---------- stepping ----------
+function step(dt) {
+  simTime += dt;
+  runTimers();
+  updateTokens(dt);
+  for (const a of Object.values(arms)) a.update(dt);
+  for (const a of Object.values(arms)) a.placeHeld();
+  for (const [id, f] of Object.entries(flashers)) { const e = simTime - f.t; f.m.emissiveIntensity = e >= 0 && e < 0.35 ? 2.2 * (1 - e / 0.35) : 0; }
+}
+function counts() {
+  const r = { bottles: { chute: 0, unit: 0, hand: 0 }, balls: { red: 0, green: 0, blue: 0, inBottle: 0, mix: mixQ.length, moving: 0 }, caps: { chute: paths.CAP.q.length, onBottle: 0, hand: 0 } };
+  for (const t of tokens) {
+    if (t.kind === 'bottle') { if (t.mode === 'held') r.bottles.hand++; else if (t.mode === 'path') r.bottles.chute++; else r.bottles.unit++; }
+    else if (t.kind === 'ball') {
+      if (t.mode === 'child') r.balls.inBottle++;
+      else if (t.mode === 'path' && LANES[t.path?.key]) r.balls[t.path.key]++;
+      else if (t.mode !== 'free') r.balls.moving++;
+    } else if (t.kind === 'cap') { if (t.mode === 'child') r.caps.onBottle++; else if (t.mode === 'held') r.caps.hand++; }
+  }
+  return r;
+}
+globalThis.__loop = { step, counts, UNITS, arms, paths, mixQ, tokens, get t() { return simTime; } };
+
+// ---------- view ----------
+if (!HEADLESS) {
+  const stage = document.getElementById('stage');
+  const canvas = document.getElementById('view');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8a80, 2.1));
+  const sun = new THREE.DirectionalLight(0xffffff, 2.4);
+  sun.position.set(1.1, -1.3, 2.4); sun.castShadow = true;
+  Object.assign(sun.shadow.camera, { left: -1.1, right: 1.1, top: 1.1, bottom: -1.1, near: 0.5, far: 6 });
+  sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.02;
+  scene.add(sun);
+
+  const camera = new THREE.PerspectiveCamera(30, 1.6, 0.02, 40);
+  camera.up.set(0, 0, 1);
+  const controls = new OrbitControls(camera, canvas);
+  controls.enableDamping = true; controls.dampingFactor = 0.08;
+  controls.minDistance = 0.5; controls.maxDistance = 7; controls.maxPolarAngle = 1.48;
+  const VIEWS = {
+    oblique: { pos: new V3(0.72, -2.05, 1.55), tgt: new V3(0, -0.04, 0.03) },
+    top: { pos: new V3(0, -0.0205, 3.25), tgt: new V3(0, -0.02, 0) },
+    low: { pos: new V3(-1.55, -1.55, 0.52), tgt: new V3(-0.02, -0.02, 0.08) },
+  };
+  let camTween = null;
+  const fit = () => Math.max(1, 1.5 / camera.aspect);
+  function setView(name, instant) {
+    const v = VIEWS[name], f = fit();
+    const pos = v.tgt.clone().add(v.pos.clone().sub(v.tgt).multiplyScalar(f));
+    if (instant) { camera.position.copy(pos); controls.target.copy(v.tgt); controls.update(); return; }
+    camTween = { p0: camera.position.clone(), t0: controls.target.clone(), p1: pos, t1: v.tgt.clone(), u: 0 };
+  }
+  function resize() {
+    const w = stage.clientWidth, h = stage.clientHeight;
+    renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+  }
+  new ResizeObserver(resize).observe(stage); resize(); setView('oblique', true);
+
+  // labels
+  const labelsEl = document.getElementById('labels');
+  const labels = [];
+  for (const u of UNITS) {
+    const el = document.createElement('div'); el.className = 'lbl unit'; el.innerHTML = `<b>${u.id}</b>${u.name}`;
+    el.addEventListener('click', () => select(u.arms[0]));
+    labelsEl.append(el); labels.push({ el, p: new V3(u.c[0], u.c[1] - 0.142, PT) });
+  }
+  const armTags = {};
+  for (const a of Object.values(arms)) {
+    const el = document.createElement('button'); el.type = 'button'; el.className = 'lbl arm'; el.textContent = a.id; el.setAttribute('aria-label', `选中机械臂 ${a.id}`);
+    el.addEventListener('click', () => select(a.id));
+    labelsEl.append(el); labels.push({ el, p: a.base.clone().add(new V3(0, 0, 0.3)), arm: a }); armTags[a.id] = el;
+  }
+  const _p = new V3();
+  function placeLabels() {
+    const w = stage.clientWidth, h = stage.clientHeight;
+    for (const L of labels) {
+      _p.copy(L.p); _p.project(camera);
+      const vis = _p.z < 1 && Math.abs(_p.x) < 1.1 && Math.abs(_p.y) < 1.1;
+      L.el.style.visibility = vis ? 'visible' : 'hidden';
+      L.el.style.transform = `translate(${((_p.x + 1) / 2) * w}px, ${((1 - _p.y) / 2) * h}px) translate(-50%, -50%)`;
+    }
+  }
+
+  // selection
+  let selected = null;
+  function select(id) {
+    if (selected) { arms[selected].setSelected(false); armTags[selected].classList.remove('sel'); }
+    selected = selected === id ? null : id;
+    if (selected) { arms[selected].setSelected(true); armTags[selected].classList.add('sel'); }
+    renderBoard(true);
+  }
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+  let downAt = null;
+  canvas.addEventListener('pointerdown', (e) => { downAt = [e.clientX, e.clientY]; });
+  canvas.addEventListener('pointerup', (e) => {
+    if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 5) return;
+    const r = canvas.getBoundingClientRect();
+    ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    const hit = ray.intersectObjects(armPickables, false)[0];
+    if (hit) select(hit.object.userData.arm);
+  });
+
+  // board
+  const rowsEl = document.getElementById('unitRows');
+  rowsEl.innerHTML = UNITS.map((u) => `<tr class="unitrow" data-unit="${u.id}">
+    <td><span class="chip"><b>${u.id}</b>${u.name}</span></td>
+    <td><span class="armlist">${u.arms.map((a) => `<button type="button" class="armbtn" data-arm="${a}" aria-label="选中机械臂 ${a}">${a}</button>`).join('')}</span></td>
+    <td class="state" data-state="${u.id}"></td><td class="num" data-count="${u.id}"></td></tr>`).join('');
+  rowsEl.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-arm]'); if (b) { select(b.dataset.arm); return; }
+    const tr = e.target.closest('tr[data-unit]'); if (tr) select(unitById[tr.dataset.unit].arms[0]);
+  });
+  const stateEls = Object.fromEntries(UNITS.map((u) => [u.id, rowsEl.querySelector(`[data-state="${u.id}"]`)]));
+  const countEls = Object.fromEntries(UNITS.map((u) => [u.id, rowsEl.querySelector(`[data-count="${u.id}"]`)]));
+  const armCard = document.getElementById('armCard');
+  const stockEl = document.getElementById('stock');
+  const dot = (c) => `<span class="dot" style="background:${c}"></span>`;
+  let lastCard = '';
+  function renderBoard(force) {
+    for (const u of UNITS) {
+      const s = u.state || '';
+      stateEls[u.id].textContent = s + (u.id === 'U3' && u.lastRead ? `  (上一瓶 ${u.lastRead})` : '');
+      stateEls[u.id].classList.toggle('wait', /^等/.test(s));
+      countEls[u.id].textContent = u.id === 'U6' ? `${u.count} 球` : `${u.count} 瓶`;
+    }
+    rowsEl.querySelectorAll('.armbtn').forEach((b) => b.classList.toggle('sel', b.dataset.arm === selected));
+    let html;
+    if (!selected) html = '<p class="meta">点场景里的机械臂,或上表里的编号。</p>';
+    else {
+      const a = arms[selected], u = unitById[a.unit];
+      html = `<div class="who"><span class="armbtn sel">${a.id}</span><span class="chip"><b>${u.id}</b>${u.name}</span></div>
+        <p>${a.role}</p>
+        <dl class="kv"><dt>正在做</dt><dd>${a.action}</dd>
+        <dt>最远作业点</dt><dd class="mono">${(a.reach * 100).toFixed(1)} cm <span class="meta">(水平距离;末端朝下约 ${(REACH_NOTE * 100).toFixed(0)} cm 内)</span></dd>
+        <dt>底座位置</dt><dd class="mono">x ${(a.base.x * 100).toFixed(1)}, y ${(a.base.y * 100).toFixed(1)} cm</dd></dl>`;
+    }
+    if (force || html !== lastCard) { armCard.innerHTML = html; lastCard = html; }
+    const c = counts();
+    stockEl.innerHTML = `
+      <dt>瓶 9</dt><dd>滑道 ${c.bottles.chute} · 工位 ${c.bottles.unit} · 臂上 ${c.bottles.hand}</dd>
+      <dt>盖 6</dt><dd>盖滑道 ${c.caps.chute} · 瓶上 ${c.caps.onBottle} · 臂上 ${c.caps.hand}</dd>
+      <dt>球 33</dt><dd>${dot('var(--red)')}${c.balls.red} ${dot('var(--green)')}${c.balls.green} ${dot('var(--blue)')}${c.balls.blue} 在分色滑道 · 瓶内 ${c.balls.inBottle} · 暂存杯 ${c.balls.mix}${c.balls.moving ? ` · 途中 ${c.balls.moving}` : ''}</dd>
+      <dt>循环</dt><dd>已灌装 ${unitById.U1.count} 瓶 · 已分拣 ${unitById.U6.count} 球</dd>`;
+  }
+
+  // controls
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let running = !reduce, speed = 1;
+  const btnPlay = document.getElementById('btnPlay');
+  const syncPlay = () => { btnPlay.textContent = running ? '暂停' : '播放'; btnPlay.setAttribute('aria-pressed', String(!running)); };
+  syncPlay();
+  btnPlay.addEventListener('click', () => { running = !running; syncPlay(); });
+  document.querySelectorAll('[data-speed]').forEach((b) => b.addEventListener('click', () => {
+    speed = Number(b.dataset.speed);
+    document.querySelectorAll('[data-speed]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+  }));
+  document.querySelectorAll('[data-view]').forEach((b) => b.addEventListener('click', () => {
+    setView(b.dataset.view);
+    document.querySelectorAll('[data-view]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+  }));
+  const zoom = (k) => { const off = camera.position.clone().sub(controls.target).multiplyScalar(k); camera.position.copy(controls.target).add(off); };
+  document.getElementById('zoomIn').addEventListener('click', () => zoom(0.82));
+  document.getElementById('zoomOut').addEventListener('click', () => zoom(1 / 0.82));
+  const btnLabels = document.getElementById('btnLabels');
+  btnLabels.addEventListener('click', () => {
+    const on = labelsEl.classList.toggle('off'); btnLabels.setAttribute('aria-pressed', String(!on));
+  });
+  const clockEl = document.getElementById('clock');
+
+  const clock = new THREE.Clock();
+  let boardT = 0;
+  // settle the first frame so the page is complete at rest
+  step(0.0001);
+  function frame() {
+    const dt = Math.min(clock.getDelta(), 0.05);
+    if (running) { let left = dt * speed; while (left > 1e-6) { const h = Math.min(left, 0.034); step(h); left -= h; } }
+    if (camTween) {
+      camTween.u = Math.min(1, camTween.u + dt / 0.9); const e = ease(camTween.u);
+      camera.position.lerpVectors(camTween.p0, camTween.p1, e); controls.target.lerpVectors(camTween.t0, camTween.t1, e);
+      if (camTween.u >= 1) camTween = null;
+    }
+    controls.update();
+    renderer.render(scene, camera);
+    placeLabels();
+    boardT += dt;
+    if (boardT > 0.25) {
+      boardT = 0; renderBoard(false);
+      const s = Math.floor(simTime); clockEl.textContent = `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+    }
+    requestAnimationFrame(frame);
+  }
+  renderBoard(true);
+  requestAnimationFrame(frame);
+}
+</script>
