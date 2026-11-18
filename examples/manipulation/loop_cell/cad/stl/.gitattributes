@@ -1,0 +1,3 @@
+# Printable parts (~6 MB in all) are stored as plain binary files, not through Git LFS,
+# so a clone can open them in a slicer without git-lfs installed.
+*.stl -filter binary
