@@ -20,6 +20,7 @@
   --cap: #7963bc;
   --mix: #df922f;
   --chute: #9a9893;
+  --hover: #ecece8;
   --display: "Instrument Serif", "Noto Serif SC", Georgia, serif;
   --display-cjk: "Noto Serif SC", "Songti SC", serif;
   --body: "Noto Sans SC", "PingFang SC", system-ui, sans-serif;
@@ -77,7 +78,7 @@ figure { margin: 0; display: flex; flex-direction: column; gap: 10px; }
 }
 .group button:last-child { border-right: 0; }
 .group button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
-.group button:hover:not([aria-pressed="true"]) { background: #ececE8; }
+.group button:hover:not([aria-pressed="true"]) { background: var(--hover); }
 .group button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .clock { pointer-events: none; margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--muted); background: rgba(250,250,250,.92); padding: 4px 8px; border-radius: 4px; border: 1px solid var(--line); font-variant-numeric: tabular-nums; }
 figcaption { color: var(--muted); font-size: 13px; }
@@ -101,7 +102,6 @@ tr.unitrow:hover td { background: #f3f2ee; }
 }
 .armbtn.sel { background: var(--accent); border-color: var(--accent); }
 .armbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.state { color: var(--ink); }
 .state.wait { color: var(--muted); }
 
 .side { display: flex; flex-direction: column; gap: 28px; min-width: 0; }
@@ -109,26 +109,28 @@ tr.unitrow:hover td { background: #f3f2ee; }
 .card .who { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
 .card .who .armbtn { cursor: default; }
 .card p { margin: 0 0 6px; }
-.card .meta { color: var(--muted); font-size: 13px; }
-.kv { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 14px; font-size: 13px; }
+.card .meta, .meta { color: var(--muted); font-size: 13px; }
+.kv { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 14px; font-size: 13px; margin: 0; }
 .kv dt { color: var(--muted); }
 .kv dd { margin: 0; font-variant-numeric: tabular-nums; }
 .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; vertical-align: 0; }
 
+.specs { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; }
+@media (max-width: 860px) { .specs { grid-template-columns: minmax(0, 1fr); } }
 .legend { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; font-size: 13px; }
 .legend li { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .legend svg { flex: 0 0 34px; }
 .notes { margin: 0; padding-left: 18px; color: var(--ink); font-size: 14px; max-width: 78ch; }
 .notes li { margin-bottom: 6px; }
-.notes .mono { font-size: 12.5px; }
+.notes .mono, td .mono { font-size: 12.5px; }
 @media (prefers-reduced-motion: reduce) { .lbl.arm { transition: none; } }
 </style>
 
 <div class="page">
   <header>
-    <div class="eyebrow">SO-101 × 8 · 6 个单元 · 1 条闭环</div>
+    <div class="eyebrow">SO-101 × 8 · 6 个单元 · 打印版尺寸</div>
     <h1>八臂循环产线 <span class="lat">almost a line</span></h1>
-    <p class="lede">按你的示意图搭的 3D 布局,物料一直在循环。瓶子顺时针走外圈,瓶盖从 U4 斜穿圈内回到 U2,小球在左侧倒出、分色后回到灌装,不需要人补料。</p>
+    <p class="lede">打印版布局:底座是 200 mm 拼接块,瓶子插在带钢珠的托座里滚着走,滑道由标准模块拼成。页面尺寸和 CAD 零件来自同一份参数,改了参数两边一起更新。</p>
   </header>
 
   <figure>
@@ -157,7 +159,7 @@ tr.unitrow:hover td { background: #f3f2ee; }
         <div class="clock" id="clock">00:00</div>
       </div>
     </div>
-    <figcaption>拖动旋转,滚轮或双指缩放。点机械臂或它的编号,看它正在做什么。俯视和你的示意图方向一致。</figcaption>
+    <figcaption>拖动旋转,滚轮或双指缩放。点机械臂或它的编号,看它正在做什么。俯视和示意图方向一致;滑道上的细线是模块之间的接缝,下面是可调高度的支柱。</figcaption>
   </figure>
 
   <section class="board">
@@ -180,26 +182,33 @@ tr.unitrow:hover td { background: #f3f2ee; }
     </div>
   </section>
 
-  <section>
-    <h2>图例</h2>
-    <ul class="legend">
-      <li><svg width="34" height="10" aria-hidden="true"><line x1="1" y1="5" x2="33" y2="5" stroke="#9a9893" stroke-width="4"/></svg>瓶滑道(外圈,顺时针)</li>
-      <li><svg width="34" height="10" aria-hidden="true"><line x1="1" y1="5" x2="33" y2="5" stroke="#7963bc" stroke-width="4"/></svg>盖滑道(U4 → U2)</li>
-      <li><svg width="34" height="10" aria-hidden="true"><line x1="1" y1="5" x2="33" y2="5" stroke="#df922f" stroke-width="4"/></svg>混色球:漏斗 → 暂存杯 → U6</li>
-      <li><svg width="34" height="14" aria-hidden="true"><line x1="1" y1="2" x2="33" y2="2" stroke="#d6483b" stroke-width="3"/><line x1="1" y1="7" x2="33" y2="7" stroke="#4f9a45" stroke-width="3"/><line x1="1" y1="12" x2="33" y2="12" stroke="#3b72c8" stroke-width="3"/></svg>分色球滑道(U6 → U1)</li>
-      <li><svg width="34" height="14" aria-hidden="true"><rect x="1" y="2" width="32" height="10" rx="2" fill="#d3dfd5" stroke="#8fae98"/></svg>操作单元底板</li>
-      <li><svg width="34" height="14" aria-hidden="true"><rect x="12" y="2" width="10" height="10" fill="#2b2d31"/></svg>入口擒纵闸门(舵机)</li>
-    </ul>
+  <section class="specs">
+    <div>
+      <h2>规格</h2>
+      <table><tbody id="specRows"></tbody></table>
+    </div>
+    <div>
+      <h2>图例</h2>
+      <ul class="legend">
+        <li><svg width="34" height="10" aria-hidden="true"><line x1="1" y1="5" x2="33" y2="5" stroke="#9a9893" stroke-width="4"/></svg>瓶滑道(外圈,顺时针)</li>
+        <li><svg width="34" height="10" aria-hidden="true"><line x1="1" y1="5" x2="33" y2="5" stroke="#7963bc" stroke-width="4"/></svg>盖滑道(U4 → U2)</li>
+        <li><svg width="34" height="10" aria-hidden="true"><line x1="1" y1="5" x2="33" y2="5" stroke="#df922f" stroke-width="4"/></svg>混色球:漏斗 → 料斗 → U6</li>
+        <li><svg width="34" height="14" aria-hidden="true"><line x1="1" y1="2" x2="33" y2="2" stroke="#d6483b" stroke-width="3"/><line x1="1" y1="7" x2="33" y2="7" stroke="#4f9a45" stroke-width="3"/><line x1="1" y1="12" x2="33" y2="12" stroke="#3b72c8" stroke-width="3"/></svg>分色球道(U6 → U1)</li>
+        <li><svg width="34" height="14" aria-hidden="true"><rect x="1" y="2" width="15" height="10" rx="1" fill="#d3dfd5" stroke="#8fae98"/><rect x="18" y="2" width="15" height="10" rx="1" fill="#d3dfd5" stroke="#8fae98"/></svg>200 mm 底座拼接块</li>
+        <li><svg width="34" height="14" aria-hidden="true"><rect x="12" y="2" width="10" height="10" fill="#2b2d31"/></svg>末端闸门的舵机</li>
+      </ul>
+    </div>
   </section>
 
   <section>
-    <h2>布局里的几个取舍</h2>
+    <h2>和上一版相比</h2>
     <ul class="notes">
-      <li>尺寸按示意图换算,<span class="mono">1 px ≈ 1.5 mm</span>:台面 1.85 × 1.6 m,单元底板 38 × 23 cm,桌面印了 10 cm 网格。</li>
-      <li>SO-101 末端朝下时,有效半径大约 22–24 cm。每台臂的位置按「同时够到入口、工位、出口」来摆,所以和示意图里圆点的位置不完全一样;选中一台臂,可以看到它最远的作业点有多远。</li>
-      <li>出口滑道起点高 11 cm,入口闸门高 5 cm。每段滑道降 6 cm,这个高度靠臂把瓶子放进出口时补回来。外圈回程约 1.7 m,坡度只有 2° 左右,实物里空瓶最好躺着滚;图里为了好看,统一画成立着走。</li>
-      <li>环里一共 9 只瓶、6 个盖、33 个球。灌装配方暂时随机,按各色滑道的余量加权,避免某种颜色被用光。</li>
-      <li>没有做碰撞检测,也没有模拟真实的滑动摩擦。动作时长是估计值,用来看节拍和单元之间的等待关系。</li>
+      <li>底座改成 200 × 200 mm 打印拼接块:单臂单元 2 × 1 块,双臂单元(U2、U4)2 × 2 块,一共 16 块。臂、工位、相机都用 M4 螺丝固定在 25 mm 网格上。</li>
+      <li>瓶子改成「托座 + 买来的透明管」。托座底下 3 颗 Ø8 钢珠,所以在 3° 的滑道上就能滚起来,过弯不卡。</li>
+      <li>瓶盖改成四头卡口:任何角度放上去,转 30–120° 就会锁住,并有卡位凸点。</li>
+      <li>滑道由喇叭段、直段、R100 弯段、闸门段拼成;每个接头下面有一根可调高度的支柱。暂存杯换成单列出球的料斗。</li>
+      <li>布局重新排过:所有单元和臂都在 25 mm 网格上,外圈回程变成约 1.73 m(起点高 13.5 cm)。各臂作业点都够得到,最吃力的是 A7 把瓶子放进回程起点,需要工具倾斜约 50°。</li>
+      <li>零件清单、每条滑道的拼装顺序和每根支柱的高度见 <span class="mono">loop_cell/cad/BOM.md</span>。</li>
     </ul>
   </section>
 </div>
@@ -215,65 +224,41 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
+// Layout + part sizes, generated by loop_cell/build.py from layout.py (metres, z up).
+const LAYOUT = /*@LAYOUT@*/null;
+
 const V3 = THREE.Vector3;
 const HEADLESS = !!globalThis.__LOOP_HEADLESS__;
 
-// ---------- dimensions (metres, z up) ----------
-const PT = 0.018;                 // unit plate top
-const NEST_Z = PT + 0.008;        // bottle base when standing in a nest
-const BOT_H = 0.10, BOT_R = 0.0135;
-const R_BALL = 0.0085;
-const CAP_R = 0.0155, CAP_H = 0.016;
-const GRIP_Z = 0.075;             // grasp point above bottle base
-const L1 = 0.116, L2 = 0.135, LW = 0.03, LG = 0.075, LT = LW + LG, SH = 0.10;
+// ---------- dimensions ----------
+const PT = LAYOUT.PT;
+const CAR = LAYOUT.carrier;
+const NEST_Z = PT + 0.002;
+const BOT_H = CAR.tube_top;
+const R_BALL = LAYOUT.ball_d / 2;
+const CAP_R = LAYOUT.cap.d / 2, CAP_H = LAYOUT.cap.h, CAP_SEAT = LAYOUT.cap.seat;
+const GRIP_Z = CAR.grip_z;
+const { L1, L2, LW, LG, SH } = LAYOUT.arm;
+const LT = LW + LG;
 const REACH_NOTE = 0.24;
 
 const COL = {
   table: '#dddcd3', plate: '#d3dfd5', plateEdge: '#8fae98', clay: '#efebe3', claySel: '#f4c79c', servo: '#2b2d31',
-  post: '#bdbab0', chute: '#9a9893', cap: '#7963bc', mix: '#df922f', nest: '#5d6166',
+  post: '#bdbab0', chute: '#9a9893', cap: '#7963bc', mix: '#df922f', nest: '#5d6166', puck: '#e7e1d2',
   red: '#d6483b', green: '#4f9a45', blue: '#3b72c8', glass: '#bcd8e2',
 };
+const FAM_COLOR = { bottle: COL.chute, cap: COL.cap, ball: null };
 const BALL_COLORS = ['red', 'green', 'blue'];
 const COLOR_NAME = { red: '红', green: '绿', blue: '蓝' };
 
-const UNITS = [
-  { id: 'U1', name: '灌装', sub: '取球放入瓶口', c: [0.036, 0.5505], nest: [0.07, 0.60], arms: ['A1'], inP: 'P51', outP: 'P12' },
-  { id: 'U2', name: '封盖拧紧', sub: '扶瓶 + 放盖拧紧', c: [0.597, 0.2325], nest: [0.597, 0.2325], arms: ['A2', 'A3'], inP: 'P12', outP: 'P23' },
-  { id: 'U3', name: '质检追溯', sub: '相机读序列和码', c: [0.597, -0.288], nest: [0.597, -0.288], arms: ['A4'], inP: 'P23', outP: 'P34' },
-  { id: 'U4', name: '拆盖', sub: '扶瓶 + 拧开', c: [0.036, -0.6045], nest: [0.036, -0.6045], arms: ['A5', 'A6'], inP: 'P34', outP: 'P45' },
-  { id: 'U5', name: '倒球', sub: '倾倒 + 查空', c: [-0.525, -0.288], nest: [-0.62, -0.215], arms: ['A7'], inP: 'P45', outP: 'P51' },
-  { id: 'U6', name: '分拣', sub: '相机按色分球', c: [-0.525, 0.2325], nest: null, arms: ['A8'] },
-];
-const ARMS = [
-  { id: 'A1', unit: 'U1', xy: [0.03, 0.49], role: '取球放入瓶口;也负责把瓶子从入口搬进工位、再送到出口。' },
-  { id: 'A2', unit: 'U2', xy: [0.72, 0.2325], role: '扶瓶;负责瓶子进出工位。' },
-  { id: 'A3', unit: 'U2', xy: [0.47, 0.30], role: '从盖滑道取盖,放到瓶口并拧紧。' },
-  { id: 'A4', unit: 'U3', xy: [0.72, -0.288], role: '把瓶子举到相机前转一圈,读出球的颜色序列和瓶码。' },
-  { id: 'A5', unit: 'U4', xy: [0.036, -0.685], role: '扶瓶;负责瓶子进出工位。' },
-  { id: 'A6', unit: 'U4', xy: [-0.05, -0.53], role: '拧开瓶盖,放进盖滑道送回 U2。' },
-  { id: 'A7', unit: 'U5', xy: [-0.50, -0.30], role: '把瓶子倒扣在漏斗上倒出小球,确认倒空后放回。' },
-  { id: 'A8', unit: 'U6', xy: [-0.53, 0.27], role: '从暂存杯出口取球,相机认颜色,放进红、绿、蓝滑道。' },
-];
-const PATHS = {
-  P12: { pts: [[0.17, 0.552], [0.5955, 0.552], [0.5955, 0.325]], z: [0.11, 0.05], w: 0.042, h: 0.026, color: COL.chute, kind: 'bottle' },
-  P23: { pts: [[0.5955, 0.14], [0.5955, -0.2]], z: [0.11, 0.05], w: 0.042, h: 0.026, color: COL.chute, kind: 'bottle' },
-  P34: { pts: [[0.5955, -0.38], [0.5955, -0.603], [0.2, -0.603]], z: [0.11, 0.05], w: 0.042, h: 0.026, color: COL.chute, kind: 'bottle' },
-  P45: { pts: [[-0.13, -0.603], [-0.525, -0.603], [-0.525, -0.385]], z: [0.11, 0.05], w: 0.042, h: 0.026, color: COL.chute, kind: 'bottle' },
-  P51: { pts: [[-0.665, -0.30], [-0.7875, -0.30], [-0.7875, 0.6225], [-0.12, 0.6225]], z: [0.11, 0.05], w: 0.042, h: 0.026, color: COL.chute, kind: 'bottle' },
-  CAP: { pts: [[0.09, -0.505], [0.45, 0.19]], z: [0.12, 0.045], w: 0.036, h: 0.02, color: COL.cap, kind: 'cap' },
-  red: { pts: [[-0.355, 0.30], [-0.12, 0.535]], z: [0.095, 0.04], w: 0.019, h: 0.013, color: COL.red, kind: 'ball' },
-  green: { pts: [[-0.355, 0.258], [-0.12, 0.497]], z: [0.095, 0.04], w: 0.019, h: 0.013, color: COL.green, kind: 'ball' },
-  blue: { pts: [[-0.355, 0.216], [-0.12, 0.459]], z: [0.095, 0.04], w: 0.019, h: 0.013, color: COL.blue, kind: 'ball' },
-  M1: { pts: [[-0.525, -0.20], [-0.525, -0.072]], z: [0.10, 0.084], w: 0.02, h: 0.012, color: COL.mix, kind: 'ball', transit: true },
-  M2: { pts: [[-0.525, 0.012], [-0.525, 0.15]], z: [0.04, 0.028], w: 0.02, h: 0.012, color: COL.mix, kind: 'ball' },
-};
-const SPACING = { bottle: 0.034, ball: 0.0178, cap: 0.034 };
-const END_PAD = { bottle: 0.022, ball: 0.011, cap: 0.02 };
+const UNITS = LAYOUT.units.map((u) => ({ ...u, c: [(u.rect[0] + u.rect[2]) / 2, (u.rect[1] + u.rect[3]) / 2] }));
+const ARMS = LAYOUT.arms;
+const SPACING = { bottle: CAR.puck_d + 0.002, ball: LAYOUT.ball_d + 0.0005, cap: LAYOUT.cap.d + 0.002 };
 const SPEED = { bottle: 0.22, ball: 0.34, cap: 0.2 };
-const FUNNEL = new V3(-0.525, -0.215, 0.11);
-const CUP = new V3(-0.525, -0.03, 0.035);
-const INSPECT_P = new V3(0.555, -0.288, 0.215);
-const CAM3 = new V3(0.455, -0.288, 0.19);
+const FUN = LAYOUT.funnel, HOP = LAYOUT.hopper;
+const FUNNEL = new V3(FUN.xy[0], FUN.xy[1], FUN.z0);
+const HOPPER = new V3(HOP.xy[0], HOP.xy[1], HOP.z0);
+const INSPECT_P = new V3(...LAYOUT.inspect);
 
 // ---------- sim clock + tiny scheduler ----------
 let simTime = 0;
@@ -291,17 +276,18 @@ scene.background = new THREE.Color('#fafafa');
 const mat = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.82, metalness: 0, ...o });
 const M = {
   clay: mat(COL.clay), servo: mat(COL.servo, { roughness: 0.55 }), post: mat(COL.post), nest: mat(COL.nest, { roughness: 0.6 }),
-  plate: mat(COL.plate), plateEdge: mat(COL.plateEdge), cap: mat(COL.cap, { roughness: 0.6 }),
+  plate: mat(COL.plate), cap: mat(COL.cap, { roughness: 0.6 }), puck: mat(COL.puck, { roughness: 0.7 }), seam: mat('#5b5a55'),
   glass: new THREE.MeshStandardMaterial({ color: COL.glass, roughness: 0.15, metalness: 0, transparent: true, opacity: 0.32, depthWrite: false, side: THREE.DoubleSide }),
-  rim: mat('#97b6c1', { roughness: 0.4 }),
+  rim: mat('#f4f2ec', { roughness: 0.5 }),
   ball: { red: mat(COL.red, { roughness: 0.45 }), green: mat(COL.green, { roughness: 0.45 }), blue: mat(COL.blue, { roughness: 0.45 }) },
-  funnel: mat('#cfc9bb', { side: THREE.DoubleSide }), cup: mat('#e9e3d4', { side: THREE.DoubleSide }),
+  funnel: mat('#cfc9bb', { side: THREE.DoubleSide }), hopper: mat('#e9e3d4', { side: THREE.DoubleSide }),
 };
 const shadowy = (m, cast = true, recv = true) => { m.castShadow = cast; m.receiveShadow = recv; return m; };
 const zcyl = (r1, r2, h, seg = 24, open = false) => { const g = new THREE.CylinderGeometry(r1, r2, h, seg, 1, open); g.rotateX(Math.PI / 2); return g; };
 
 // table with a printed 10 cm grid
-const TABLE = { w: 1.85, d: 1.6, cx: 0, cy: -0.02 };
+const TB = LAYOUT.table;
+const TABLE = { w: TB.x[1] - TB.x[0], d: TB.y[1] - TB.y[0], cx: (TB.x[0] + TB.x[1]) / 2, cy: (TB.y[0] + TB.y[1]) / 2 };
 {
   const tex = HEADLESS ? null : (() => {
     const W = 2048, H = Math.round(2048 * TABLE.d / TABLE.w);
@@ -310,89 +296,99 @@ const TABLE = { w: 1.85, d: 1.6, cx: 0, cy: -0.02 };
     g.fillStyle = COL.table; g.fillRect(0, 0, W, H);
     const px = W / TABLE.w;
     for (let i = 0; i * 0.05 <= TABLE.w + 1e-6; i++) {
-      g.strokeStyle = i % 2 === 0 ? 'rgba(120,116,100,.28)' : 'rgba(120,116,100,.12)'; g.lineWidth = i % 2 === 0 ? 2 : 1;
+      g.strokeStyle = i % 2 === 0 ? 'rgba(120,116,100,.26)' : 'rgba(120,116,100,.11)'; g.lineWidth = i % 2 === 0 ? 2 : 1;
       g.beginPath(); g.moveTo(i * 0.05 * px, 0); g.lineTo(i * 0.05 * px, H); g.stroke();
     }
     for (let j = 0; j * 0.05 <= TABLE.d + 1e-6; j++) {
-      g.strokeStyle = j % 2 === 0 ? 'rgba(120,116,100,.28)' : 'rgba(120,116,100,.12)'; g.lineWidth = j % 2 === 0 ? 2 : 1;
+      g.strokeStyle = j % 2 === 0 ? 'rgba(120,116,100,.26)' : 'rgba(120,116,100,.11)'; g.lineWidth = j % 2 === 0 ? 2 : 1;
       g.beginPath(); g.moveTo(0, j * 0.05 * px); g.lineTo(W, j * 0.05 * px); g.stroke();
     }
     g.fillStyle = 'rgba(44,44,44,.55)'; g.font = '28px "Space Mono", monospace';
     g.fillText('10 cm', 0.06 * px, H - 0.075 * px);
     g.fillRect(0.06 * px, H - 0.06 * px, 0.1 * px, 6);
-    g.fillText('1.85 × 1.60 m · SO-101 × 8', W - 0.62 * px, H - 0.05 * px);
+    g.fillText(`${TABLE.w.toFixed(2)} × ${TABLE.d.toFixed(2)} m · SO-101 × 8`, W - 0.66 * px, H - 0.05 * px);
     const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
   })();
-  const top = shadowy(new THREE.Mesh(new THREE.BoxGeometry(TABLE.w, TABLE.d, 0.035),
-    [mat('#cfcdc3'), mat('#cfcdc3'), mat('#cfcdc3'), mat('#cfcdc3'), tex ? mat('#ffffff', { map: tex }) : mat(COL.table), mat('#cfcdc3')]), false, true);
+  const side = mat('#cfcdc3');
+  const top = shadowy(new THREE.Mesh(new THREE.BoxGeometry(TABLE.w, TABLE.d, 0.035), [side, side, side, side, tex ? mat('#ffffff', { map: tex }) : mat(COL.table), side]), false, true);
   top.position.set(TABLE.cx, TABLE.cy, -0.0175);
   scene.add(top);
 }
 
-// unit plates + nests
+// unit base: 200 mm tiles with the 25 mm insert grid printed on top
+const tileTopTex = HEADLESS ? null : (() => {
+  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 256;
+  const g = cv.getContext('2d'); g.fillStyle = COL.plate; g.fillRect(0, 0, 256, 256);
+  g.fillStyle = 'rgba(60,80,66,.55)';
+  for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) { g.beginPath(); g.arc(16 + 32 * i, 16 + 32 * j, 3.6, 0, 6.29); g.fill(); }
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return t;
+})();
 const unitById = {};
-for (const u of UNITS) {
-  unitById[u.id] = u;
-  const plate = shadowy(new THREE.Mesh(new RoundedBoxGeometry(0.38, 0.23, PT, 2, 0.006), M.plate));
-  plate.position.set(u.c[0], u.c[1], PT / 2);
-  plate.userData.unit = u.id;
-  scene.add(plate);
-  const edge = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(0.38, 0.23, PT)), new THREE.LineDashedMaterial({ color: COL.plateEdge, dashSize: 0.012, gapSize: 0.008 }));
-  edge.position.copy(plate.position); edge.computeLineDistances(); scene.add(edge);
-  if (u.nest) {
-    const n = shadowy(new THREE.Mesh(zcyl(0.022, 0.022, 0.008, 28), M.nest));
-    n.position.set(u.nest[0], u.nest[1], PT + 0.004); scene.add(n);
+{
+  const tg = new RoundedBoxGeometry(LAYOUT.tile - 0.0015, LAYOUT.tile - 0.0015, PT - 0.002, 2, 0.003);
+  const tm = tileTopTex ? [M.plate, M.plate, M.plate, M.plate, mat('#ffffff', { map: tileTopTex }), M.plate] : M.plate;
+  const nestG = new RoundedBoxGeometry(0.075, 0.075, 0.009, 2, 0.004);
+  for (const u of UNITS) {
+    unitById[u.id] = u;
+    const nx = Math.round((u.rect[2] - u.rect[0]) / LAYOUT.tile), ny = Math.round((u.rect[3] - u.rect[1]) / LAYOUT.tile);
+    for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) {
+      const t = shadowy(new THREE.Mesh(tg, tm), false, true);
+      t.position.set(u.rect[0] + LAYOUT.tile * (i + 0.5), u.rect[1] + LAYOUT.tile * (j + 0.5), 0.002 + (PT - 0.002) / 2);
+      scene.add(t);
+    }
+    if (u.nest) {
+      const n = shadowy(new THREE.Mesh(nestG, M.nest)); n.position.set(u.nest[0], u.nest[1], PT + 0.0045); scene.add(n);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.027, 0.0025, 8, 32), mat('#8a8e93')); ring.position.set(u.nest[0], u.nest[1], PT + 0.009); scene.add(ring);
+    }
+    u.state = '启动中'; u.count = 0;
   }
-  u.state = '启动中'; u.count = 0; u.busy = false;
 }
 
-// ---------- paths (chutes) ----------
+// ---------- chute routes ----------
 class Path {
-  constructor(key, def) {
-    Object.assign(this, def); this.key = key;
-    const P = def.pts.map(([x, y]) => new THREE.Vector2(x, y));
-    const D = [P[0].clone()];
-    for (let i = 1; i < P.length - 1; i++) {
-      const A = P[i - 1], C = P[i], B = P[i + 1];
-      const d1 = A.clone().sub(C), d2 = B.clone().sub(C);
-      const r = Math.min(0.06, d1.length() * 0.45, d2.length() * 0.45);
-      d1.normalize(); d2.normalize();
-      const s1 = C.clone().addScaledVector(d1, r), s2 = C.clone().addScaledVector(d2, r);
-      for (let k = 0; k <= 10; k++) {
-        const u = k / 10, a = (1 - u) * (1 - u), b = 2 * u * (1 - u), c = u * u;
-        D.push(new THREE.Vector2(a * s1.x + b * C.x + c * s2.x, a * s1.y + b * C.y + c * s2.y));
-      }
-    }
-    D.push(P[P.length - 1].clone());
-    this.d = D; this.cum = [0];
-    for (let i = 1; i < D.length; i++) this.cum.push(this.cum[i - 1] + D[i].distanceTo(D[i - 1]));
+  constructor(key, r) {
+    Object.assign(this, r); this.key = key; this.kind = r.family;
+    this.d = r.dense.map(([x, y]) => new THREE.Vector2(x, y));
+    this.cum = [0];
+    for (let i = 1; i < this.d.length; i++) this.cum.push(this.cum[i - 1] + this.d[i].distanceTo(this.d[i - 1]));
     this.len = this.cum[this.cum.length - 1];
-    this.sp = SPACING[def.kind]; this.pad = END_PAD[def.kind];
-    this.cap = Math.floor((this.len - this.pad) / this.sp) + 1;
+    this.sp = SPACING[this.kind];
+    this.cap = Math.floor((this.len - this.drop_s) / this.sp) + 1;
     this.q = [];
+    this.tanS = Math.tan(this.slope * Math.PI / 180);
   }
+  zAt(s) { return this.z_end + (this.len - s) * this.tanS; }
   at(s, out = new V3()) {
+    const z = this.zAt(s);
+    if (s > this.len) { const d = this.dir(this.len), e = this.d[this.d.length - 1], k = s - this.len; return out.set(e.x + d.x * k, e.y + d.y * k, z); }
     s = clamp(s, 0, this.len);
-    let i = 1; while (i < this.cum.length - 1 && this.cum[i] < s) i++;
-    const s0 = this.cum[i - 1], s1 = this.cum[i], u = s1 > s0 ? (s - s0) / (s1 - s0) : 0;
+    let lo = 1, hi = this.cum.length - 1;
+    while (lo < hi) { const m = (lo + hi) >> 1; if (this.cum[m] < s) lo = m + 1; else hi = m; }
+    const i = lo, s0 = this.cum[i - 1], s1 = this.cum[i], u = s1 > s0 ? (s - s0) / (s1 - s0) : 0;
     const a = this.d[i - 1], b = this.d[i];
-    return out.set(a.x + (b.x - a.x) * u, a.y + (b.y - a.y) * u, this.z[0] + (this.z[1] - this.z[0]) * (s / this.len));
+    return out.set(a.x + (b.x - a.x) * u, a.y + (b.y - a.y) * u, z);
   }
   dir(s) {
-    const a = this.at(Math.max(0, s - 0.004)), b = this.at(Math.min(this.len, s + 0.004));
+    s = clamp(s, 0.003, this.len - 0.003);
+    const a = this.at(s - 0.003), b = this.at(s + 0.003);
     return new THREE.Vector2(b.x - a.x, b.y - a.y).normalize();
+  }
+  width(s) {
+    const n = this.flare * 0.6;
+    return this.flare && s < n ? this.w + 0.02 * (1 - s / n) : this.w;
   }
 }
 const paths = {};
-for (const [k, def] of Object.entries(PATHS)) paths[k] = new Path(k, def);
+for (const [k, r] of Object.entries(LAYOUT.routes)) paths[k] = new Path(k, r);
 const LANES = { red: paths.red, green: paths.green, blue: paths.blue };
 
 function chuteMesh(p) {
-  const n = Math.max(2, Math.ceil(p.len / 0.008));
-  const pos = [], idx = [];
-  const T = 0.004;
+  const color = FAM_COLOR[p.kind] || (LANES[p.key] ? COL[p.key] : COL.mix);
+  const sEnd = p.len + p.end_ext;
+  const n = Math.max(2, Math.ceil(sEnd / 0.006));
+  const pos = [], idx = [], T = 0.003;
   for (let i = 0; i <= n; i++) {
-    const s = (i / n) * p.len, c = p.at(s), d = p.dir(s), nx = -d.y, ny = d.x, hw = p.w / 2;
+    const s = (i / n) * sEnd, c = p.at(s), d = p.dir(s), nx = -d.y, ny = d.x, hw = p.width(s) / 2;
     const L = [c.x + nx * hw, c.y + ny * hw], R = [c.x - nx * hw, c.y - ny * hw];
     pos.push(L[0], L[1], c.z, R[0], R[1], c.z, L[0], L[1], c.z - T, R[0], R[1], c.z - T, L[0], L[1], c.z + p.h, R[0], R[1], c.z + p.h);
   }
@@ -403,47 +399,58 @@ function chuteMesh(p) {
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
-  const m = shadowy(new THREE.Mesh(g, mat(p.color, { side: THREE.DoubleSide, roughness: 0.7 })));
-  scene.add(m);
-  // posts
-  const nPosts = Math.max(2, Math.round(p.len / 0.2) + 1);
-  for (let i = 0; i < nPosts; i++) {
-    const s = (i / (nPosts - 1)) * p.len * 0.94 + p.len * 0.03, c = p.at(s);
-    const h = c.z - 0.004;
-    const post = shadowy(new THREE.Mesh(zcyl(0.0032, 0.0032, h, 10), M.post));
-    post.position.set(c.x, c.y, h / 2); scene.add(post);
+  scene.add(shadowy(new THREE.Mesh(g, mat(color, { side: THREE.DoubleSide, roughness: 0.7 }))));
+  // module seams, saddles, posts
+  for (const m of p.modules.slice(0, -1)) {
+    const s = m.s1, c = p.at(s), d = p.dir(s), w = p.width(s);
+    const seam = new THREE.Mesh(new THREE.BoxGeometry(0.0015, w, 0.0008), M.seam);
+    seam.position.set(c.x, c.y, c.z + 0.0004); seam.rotation.z = Math.atan2(d.y, d.x); scene.add(seam);
   }
-  // escapement gate at the end (not on transit chutes)
+  for (const j of p.joints) {
+    const d = p.dir(j.s), w = p.width(j.s) + 0.012;
+    const sad = shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.03, w, 0.004), M.post));
+    sad.position.set(j.x, j.y, j.z - T - 0.002); sad.rotation.z = Math.atan2(d.y, d.x); scene.add(sad);
+    const h = j.z - T - 0.004 - j.g;
+    if (h > 0.002) {
+      const post = shadowy(new THREE.Mesh(zcyl(0.008, 0.008, h, 12), M.post)); post.position.set(j.x, j.y, j.g + h / 2); scene.add(post);
+      const foot = shadowy(new THREE.Mesh(zcyl(0.03, 0.03, 0.005, 20), M.post)); foot.position.set(j.x, j.y, j.g + 0.0025); scene.add(foot);
+    }
+  }
   if (!p.transit) {
-    const e = p.at(p.len), d = p.dir(p.len);
-    const gate = shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.004, p.w + 0.006, p.h + 0.012), M.clay));
-    gate.position.set(e.x, e.y, e.z + (p.h + 0.012) / 2); gate.rotation.z = Math.atan2(d.y, d.x);
-    scene.add(gate);
-    const sv = shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.012, 0.016), M.servo));
-    const nx = -d.y, ny = d.x, off = p.w / 2 + 0.012;
-    sv.position.set(e.x + nx * off - d.x * 0.008, e.y + ny * off - d.y * 0.008, e.z + 0.01); sv.rotation.z = Math.atan2(d.y, d.x);
-    scene.add(sv);
+    const sw = p.len + p.end_ext - 0.002, e = p.at(sw), d = p.dir(p.len), ang = Math.atan2(d.y, d.x);
+    const wall = shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.004, p.w + 0.006, p.h + 0.008), M.clay));
+    wall.position.set(e.x, e.y, e.z + (p.h + 0.008) / 2 - 0.003); wall.rotation.z = ang; scene.add(wall);
+    const sv = p.at(p.len - SPACING[p.kind] * 0.9);
+    const servo = shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.013, 0.023), M.servo));
+    servo.position.set(sv.x, sv.y, sv.z - T - 0.013); servo.rotation.z = ang; scene.add(servo);
+    const hd = p.at(p.len), nx = -d.y, ny = d.x, off = p.w / 2 + 0.006;
+    for (const s of [1, -1]) {
+      const ir = new THREE.Mesh(zcyl(0.0028, 0.0028, 0.008, 10).rotateY(Math.PI / 2), M.servo);
+      ir.position.set(hd.x + nx * off * s, hd.y + ny * off * s, hd.z + 0.01); ir.rotation.z = ang + Math.PI / 2; scene.add(ir);
+    }
   }
 }
 for (const p of Object.values(paths)) chuteMesh(p);
 
-// funnel, cup, cameras
-{
-  const fg = new THREE.LatheGeometry([new THREE.Vector2(0.009, 0), new THREE.Vector2(0.011, 0.006), new THREE.Vector2(0.042, 0.05)], 32);
-  fg.rotateX(Math.PI / 2);
-  const f = shadowy(new THREE.Mesh(fg, M.funnel)); f.position.copy(FUNNEL); scene.add(f);
-  const fp = shadowy(new THREE.Mesh(zcyl(0.004, 0.004, FUNNEL.z - PT, 10), M.post)); fp.position.set(FUNNEL.x + 0.03, FUNNEL.y, PT + (FUNNEL.z - PT) / 2); scene.add(fp);
-  const cg = new THREE.LatheGeometry([new THREE.Vector2(0, 0), new THREE.Vector2(0.034, 0), new THREE.Vector2(0.036, 0.045)], 32);
-  cg.rotateX(Math.PI / 2);
-  const c = shadowy(new THREE.Mesh(cg, M.cup)); c.position.copy(CUP); scene.add(c);
-  const cs = shadowy(new THREE.Mesh(zcyl(0.012, 0.016, CUP.z, 16), M.post)); cs.position.set(CUP.x, CUP.y, CUP.z / 2); scene.add(cs);
+// funnel, hopper, cameras
+function coneMesh(spec, m) {
+  const sp = 0.006;
+  const g = new THREE.LatheGeometry([new THREE.Vector2(spec.out_r, 0), new THREE.Vector2(spec.out_r, sp), new THREE.Vector2(spec.top_r, sp + spec.h)], 36);
+  g.rotateX(Math.PI / 2);
+  const o = shadowy(new THREE.Mesh(g, m)); o.position.set(spec.xy[0], spec.xy[1], spec.z0); scene.add(o);
+  const tabZ = spec.z0 + sp + spec.h * 0.6, px = spec.xy[0] + spec.top_r + 0.014;
+  const ground = UNITS.some((u) => px >= u.rect[0] && px <= u.rect[2] && spec.xy[1] >= u.rect[1] && spec.xy[1] <= u.rect[3]) ? PT : 0;
+  const post = shadowy(new THREE.Mesh(zcyl(0.008, 0.008, tabZ - ground, 12), M.post)); post.position.set(px, spec.xy[1], ground + (tabZ - ground) / 2); scene.add(post);
+  const tab = shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.016, 0.004), m)); tab.position.set(px - 0.008, spec.xy[1], tabZ + 0.002); scene.add(tab);
 }
+coneMesh(FUN, M.funnel);
+coneMesh(HOP, M.hopper);
 const flashers = {};
 function cameraRig(id, at, look) {
   const outer = new THREE.Group(); outer.position.copy(at);
-  const post = shadowy(new THREE.Mesh(zcyl(0.005, 0.005, at.z, 10), M.post)); post.position.set(0, 0, -at.z / 2); outer.add(post);
+  const post = shadowy(new THREE.Mesh(zcyl(0.006, 0.006, at.z - PT, 10), M.post)); post.position.set(0, 0, -(at.z - PT) / 2); outer.add(post);
   const g = new THREE.Group(); g.rotation.order = 'ZYX'; outer.add(g);
-  const body = shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.038, 0.03), M.servo)); g.add(body);
+  g.add(shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.038, 0.03), M.servo)));
   const lens = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.014, 18).rotateZ(-Math.PI / 2), M.servo)); lens.position.x = 0.021; g.add(lens);
   const ringMat = new THREE.MeshStandardMaterial({ color: '#f2efe6', emissive: '#ffffff', emissiveIntensity: 0, roughness: 0.4 });
   const ring = new THREE.Mesh(new THREE.TorusGeometry(0.016, 0.003, 10, 28).rotateY(Math.PI / 2), ringMat); ring.position.x = 0.028; g.add(ring);
@@ -453,29 +460,29 @@ function cameraRig(id, at, look) {
   scene.add(outer);
   flashers[id] = { m: ringMat, t: -9 };
 }
-cameraRig('U3', CAM3, INSPECT_P.clone().add(new V3(0, 0, -0.03)));
-cameraRig('U6', new V3(-0.44, 0.15, 0.2), paths.M2.at(paths.M2.len - 0.011));
+for (const [id, c] of Object.entries(LAYOUT.cameras)) cameraRig(id, new V3(...c.at), new V3(...c.look));
 const flash = (id) => { if (flashers[id]) flashers[id].t = simTime; };
 
 // ---------- tokens ----------
 const tokens = [];
 const G = {
   ball: new THREE.SphereGeometry(R_BALL, 20, 14),
-  bottleBody: (() => { const g = new THREE.CylinderGeometry(BOT_R, BOT_R, BOT_H, 28, 1, true); g.rotateX(Math.PI / 2); g.translate(0, 0, BOT_H / 2); return g; })(),
-  bottleFloor: (() => { const g = zcyl(BOT_R, BOT_R, 0.004, 28); g.translate(0, 0, 0.002); return g; })(),
-  rim: (() => { const g = new THREE.TorusGeometry(BOT_R, 0.0018, 8, 28); g.translate(0, 0, BOT_H); return g; })(),
-  band: (() => { const g = new THREE.CylinderGeometry(BOT_R + 0.0004, BOT_R + 0.0004, 0.022, 28, 1, true); g.rotateX(Math.PI / 2); g.translate(0, 0, 0.04); return g; })(),
-  cap: (() => { const g = zcyl(CAP_R, CAP_R, CAP_H, 24); g.translate(0, 0, CAP_H / 2); return g; })(),
-  capRib: new THREE.BoxGeometry(0.004, CAP_R * 2 + 0.002, 0.006),
+  puckBase: (() => { const g = zcyl(CAR.puck_d / 2, CAR.puck_d / 2, CAR.base_h, 32); g.translate(0, 0, CAR.base_h / 2); return g; })(),
+  puckNeck: (() => { const h = CAR.puck_top - CAR.base_h; const g = zcyl(CAR.neck_d / 2, CAR.neck_d / 2, h, 32); g.translate(0, 0, CAR.base_h + h / 2); return g; })(),
+  tube: (() => { const h = CAR.tube_top - CAR.puck_top; const g = new THREE.CylinderGeometry(CAR.tube_d / 2, CAR.tube_d / 2, h, 28, 1, true); g.rotateX(Math.PI / 2); g.translate(0, 0, CAR.puck_top + h / 2); return g; })(),
+  collar: (() => { const g = zcyl(CAR.collar_d / 2, CAR.collar_d / 2, CAR.collar_h, 28); g.translate(0, 0, CAR.tube_top - CAR.collar_h / 2); return g; })(),
+  band: (() => { const g = new THREE.CylinderGeometry(CAR.neck_d / 2 + 0.0004, CAR.neck_d / 2 + 0.0004, CAR.puck_top - CAR.base_h - 0.002, 28, 1, true); g.rotateX(Math.PI / 2); g.translate(0, 0, (CAR.base_h + CAR.puck_top) / 2); return g; })(),
+  cap: (() => { const g = zcyl(CAP_R, CAP_R, CAP_H, 28); g.translate(0, 0, CAP_H / 2); return g; })(),
+  capRib: new THREE.BoxGeometry(0.004, CAP_R * 2 - 0.01, 0.004),
 };
 class Tok {
   constructor(kind, mesh) { this.kind = kind; this.mesh = mesh; this.mode = 'static'; this.path = null; this.s = 0; this.sT = 0; this.target = new V3(); this.fly = null; tokens.push(this); scene.add(mesh); }
 }
-const ANCHOR = { bottle: new V3(0, 0, GRIP_Z), ball: new V3(0, 0, 0), cap: new V3(0, 0, 0.008) };
+const ANCHOR = { bottle: new V3(0, 0, GRIP_Z), ball: new V3(0, 0, 0), cap: new V3(0, 0, CAP_H / 2) };
+const ballZ = (i) => CAR.tube_bottom + R_BALL + i * 2 * R_BALL;
 
 function makeBall(color) {
-  const m = shadowy(new THREE.Mesh(G.ball, M.ball[color]), true, false);
-  const t = new Tok('ball', m); t.color = color; return t;
+  const t = new Tok('ball', shadowy(new THREE.Mesh(G.ball, M.ball[color]), true, false)); t.color = color; return t;
 }
 function makeCap() {
   const g = new THREE.Group();
@@ -487,26 +494,26 @@ let bottleSeq = 0;
 function makeBottle() {
   const id = 'B' + String(++bottleSeq).padStart(2, '0');
   const g = new THREE.Group();
-  g.add(new THREE.Mesh(G.bottleBody, M.glass));
-  g.add(shadowy(new THREE.Mesh(G.bottleFloor, M.rim), false, true));
-  g.add(new THREE.Mesh(G.rim, M.rim));
+  g.add(shadowy(new THREE.Mesh(G.puckBase, M.puck)));
+  g.add(shadowy(new THREE.Mesh(G.puckNeck, M.puck)));
+  g.add(new THREE.Mesh(G.tube, M.glass));
+  g.add(shadowy(new THREE.Mesh(G.collar, M.rim)));
   if (!HEADLESS) {
-    const cv = document.createElement('canvas'); cv.width = 256; cv.height = 64;
+    const cv = document.createElement('canvas'); cv.width = 256; cv.height = 48;
     const c = cv.getContext('2d');
-    c.fillStyle = '#ffffff'; c.fillRect(0, 0, 256, 64);
-    c.fillStyle = '#2c2c2c'; c.font = 'bold 30px "Space Mono", monospace'; c.fillText(id, 14, 42);
-    for (let i = 0; i < 6; i++) for (let j = 0; j < 6; j++) if ((i * 7 + j * 13 + bottleSeq * 5) % 3 === 0) c.fillRect(150 + i * 8, 8 + j * 8, 7, 7);
-    c.fillRect(204, 8, 40, 4); c.fillRect(204, 52, 40, 4);
+    c.fillStyle = '#ffffff'; c.fillRect(0, 0, 256, 48);
+    c.fillStyle = '#2c2c2c'; c.font = 'bold 26px "Space Mono", monospace'; c.fillText(id, 12, 34);
+    for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) if ((i * 7 + j * 13 + bottleSeq * 5) % 3 === 0) c.fillRect(150 + i * 8, 4 + j * 8, 7, 7);
     const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;
-    g.add(new THREE.Mesh(G.band, new THREE.MeshStandardMaterial({ map: t, roughness: 0.7, side: THREE.DoubleSide })));
+    g.add(new THREE.Mesh(G.band, new THREE.MeshStandardMaterial({ map: t, roughness: 0.7 })));
   }
-  const tok = new Tok('bottle', g); tok.id = id; tok.balls = []; tok.pending = 0; tok.capTok = null; tok.loops = 0; tok.lastRead = '';
+  const tok = new Tok('bottle', g); tok.id = id; tok.balls = []; tok.pending = 0; tok.capTok = null; tok.loops = 0;
   return tok;
 }
 function addBallToBottle(ball, bottle) {
   bottle.mesh.add(ball.mesh);
   ball.mode = 'child';
-  ball.mesh.position.set(0, 0, 0.0045 + R_BALL + bottle.balls.length * 2 * R_BALL);
+  ball.mesh.position.set(0, 0, ballZ(bottle.balls.length));
   ball.mesh.quaternion.identity();
   bottle.balls.push(ball);
 }
@@ -515,34 +522,31 @@ function capOnBottle(cap, bottle) {
   cap.mode = 'child';
   const e = new THREE.Euler().setFromQuaternion(cap.mesh.quaternion, 'ZYX');
   cap.mesh.quaternion.setFromAxisAngle(new V3(0, 0, 1), e.z);
-  cap.mesh.position.set(0, 0, BOT_H - 0.006);
+  cap.mesh.position.set(0, 0, CAP_SEAT);
   bottle.capTok = cap;
 }
-function retarget(p) { p.q.forEach((t, i) => { t.sT = Math.max(0, p.len - p.pad - i * p.sp); }); }
-function enqueue(p, tok, s = 0, snap = false) {
+function retarget(p) { p.q.forEach((t, i) => { t.sT = Math.max(p.drop_s, p.len - i * p.sp); }); }
+function enqueue(p, tok, s = p.drop_s, snap = false) {
   if (tok.mesh.parent !== scene) scene.attach(tok.mesh);
   tok.mode = 'path'; tok.path = p; tok.s = s; tok.transit = null; p.q.push(tok); retarget(p);
   if (snap) { tok.s = tok.sT; placeOnPath(tok); }
 }
 function takeHead(p) { const t = p.q.shift(); retarget(p); t.mode = 'static'; t.path = null; return t; }
 function arrived(p) { const t = p.q[0]; return !!t && Math.abs(t.s - t.sT) < 0.002; }
-function outletFree(p) { const q = p.q; if (q.length >= p.cap) return false; if (!q.length) return true; return q[q.length - 1].s > p.sp + 0.004; }
+function outletFree(p) { const q = p.q; if (q.length >= p.cap) return false; if (!q.length) return true; return q[q.length - 1].s > p.drop_s + p.sp + 0.004; }
 const _v = new V3();
-function placeOnPath(t) {
-  t.path.at(t.s, _v); if (t.kind === 'ball') _v.z += R_BALL;
-  t.mesh.position.copy(_v);
-}
-// mixed balls: head of queue on chute M2, the rest piled in the cup
+function placeOnPath(t) { t.path.at(t.s, _v); if (t.kind === 'ball') _v.z += R_BALL; t.mesh.position.copy(_v); }
+// mixed balls: the first few wait single-file on M2, the rest sit in the hopper
 const mixQ = [];
 function mixTarget(i, out) {
-  if (i < 4) { paths.M2.at(paths.M2.len - paths.M2.pad - i * paths.M2.sp, out); out.z += R_BALL; return out; }
+  const m2 = paths.M2;
+  if (i < 4) { m2.at(m2.len - i * m2.sp, out); out.z += R_BALL; return out; }
   const j = i - 4, layer = Math.floor(j / 7), k = j % 7;
-  const a = (k - 1) * Math.PI / 3 + layer * 0.5, r = k === 0 ? 0 : 0.0185;
-  return out.set(CUP.x + Math.cos(a) * r, CUP.y + Math.sin(a) * r, CUP.z + 0.003 + R_BALL + layer * 0.015);
+  const a = (k - 1) * Math.PI / 3 + layer * 0.5, r = k === 0 ? 0 : 0.016 + layer * 0.006;
+  return out.set(HOPPER.x + Math.cos(a) * r, HOPPER.y + Math.sin(a) * r, HOPPER.z + 0.006 + 0.012 + R_BALL + layer * 0.013);
 }
 function toMix(ball) { if (ball.mesh.parent !== scene) scene.attach(ball.mesh); ball.mode = 'free'; mixQ.push(ball); }
 function mixReady() { const b = mixQ[0]; if (!b) return false; mixTarget(0, _v); return b.mesh.position.distanceTo(_v) < 0.003; }
-
 function flyTo(tok, p1, dur, arc, done) {
   if (tok.mesh.parent !== scene) scene.attach(tok.mesh);
   tok.mode = 'fly'; tok.fly = { p0: tok.mesh.position.clone(), p1: p1.clone(), t0: simTime, dur, arc, done };
@@ -551,8 +555,7 @@ const IDQ = new THREE.Quaternion();
 function updateTokens(dt) {
   for (const t of tokens) {
     if (t.mode === 'path') {
-      const v = SPEED[t.kind];
-      if (t.s < t.sT) t.s = Math.min(t.sT, t.s + v * dt);
+      if (t.s < t.sT) t.s = Math.min(t.sT, t.s + SPEED[t.kind] * dt);
       placeOnPath(t);
       if (t.kind !== 'bottle') t.mesh.quaternion.slerp(IDQ, 1 - Math.exp(-dt * 8));
       if (t.transit && t.s >= t.path.len - 1e-4) { const cb = t.transit; t.transit = null; cb(); }
@@ -561,8 +564,8 @@ function updateTokens(dt) {
       if (i >= 0) mixTarget(i, t.target);
       t.mesh.position.lerp(t.target, 1 - Math.exp(-dt * 7));
     } else if (t.mode === 'fly') {
-      const f = t.fly, u = clamp((simTime - f.t0) / f.dur, 0, 1), e = u * u;
-      t.mesh.position.lerpVectors(f.p0, f.p1, e);
+      const f = t.fly, u = clamp((simTime - f.t0) / f.dur, 0, 1);
+      t.mesh.position.lerpVectors(f.p0, f.p1, u * u);
       t.mesh.position.z += f.arc * Math.sin(Math.PI * u);
       if (u >= 1) { t.mode = 'static'; f.done && f.done(); }
     }
@@ -583,7 +586,7 @@ class Arm {
     this.homeP = this.base.clone().addScaledVector(dir, 0.1); this.homeP.z = PT + 0.2;
     this.cur = { p: this.homeP.clone(), pitch: null, roll: 0, grip: 0.75 };
     this.tw = null; this.held = null; this.holdMode = 'upright'; this.action = '待命'; this.idle = true;
-    this.lastPan = Math.atan2(dir.y, dir.x); this.phase = Math.random() * 6.28; this.breath = 1;
+    this.lastPan = Math.atan2(dir.y, dir.x); this.phase = Math.random() * 6.28; this.breath = 1; this.liveRoll = 0;
     this.mClay = M.clay.clone();
     this.build(dir);
   }
@@ -593,6 +596,9 @@ class Arm {
     const baseG = new THREE.Group(); baseG.rotation.z = Math.atan2(dir.y, dir.x) + Math.PI / 2; root.add(baseG);
     add(baseG, new RoundedBoxGeometry(0.1, 0.082, 0.03, 2, 0.006), this.mClay, 0, 0, 0.015);
     add(baseG, new THREE.BoxGeometry(0.045, 0.034, 0.04), M.servo, 0, 0, 0.05);
+    for (const [x, y] of [[-0.062, 0.025], [-0.062, -0.025], [0.062, 0.025], [0.062, -0.025]]) {
+      const dog = shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.02, 0.01), M.post)); dog.position.set(x, y, 0.005); baseG.add(dog);
+    }
     const pan = new THREE.Group(); pan.position.z = 0.07; root.add(pan); this.pan = pan;
     add(pan, zcyl(0.026, 0.026, 0.01, 24), this.mClay, 0, 0, 0.004);
     add(pan, new RoundedBoxGeometry(0.03, 0.056, 0.028, 2, 0.005), this.mClay, 0, 0, 0.018);
@@ -656,7 +662,7 @@ class Arm {
       p = w.from.p.clone().lerp(w.to.p, u);
       pitch = w.pa + (w.pb - w.pa) * u; roll = w.from.roll + (w.to.roll - w.from.roll) * u; grip = w.from.grip + (w.to.grip - w.from.grip) * u;
       if (w.t >= w.dur) { this.cur = { p: w.to.p.clone(), pitch: w.to.pitch, roll: w.to.roll, grip: w.to.grip }; this.tw = null; w.res(); }
-      else this.cur = { p, pitch: this.cur.pitch, roll, grip, live: true };
+      else this.cur = { p, pitch: this.cur.pitch, roll, grip };
     }
     const pp = p.clone();
     this.breath += ((this.idle && !this.tw ? 1 : 0) - this.breath) * Math.min(1, dt * 2.5);
@@ -678,11 +684,8 @@ class Arm {
     const t = this.held; if (!t) return;
     const tp = this.tip.getWorldPosition(new V3());
     let q;
-    if (this.holdMode === 'rigid') {
-      q = this.tip.getWorldQuaternion(new THREE.Quaternion()).multiply(new THREE.Quaternion().setFromAxisAngle(new V3(0, 1, 0), -Math.PI / 2));
-    } else {
-      q = new THREE.Quaternion().setFromAxisAngle(new V3(0, 0, 1), this.pan.rotation.z - this.liveRoll);
-    }
+    if (this.holdMode === 'rigid') q = this.tip.getWorldQuaternion(new THREE.Quaternion()).multiply(new THREE.Quaternion().setFromAxisAngle(new V3(0, 1, 0), -Math.PI / 2));
+    else q = new THREE.Quaternion().setFromAxisAngle(new V3(0, 0, 1), this.pan.rotation.z - this.liveRoll);
     t.mesh.quaternion.copy(q);
     t.mesh.position.copy(tp).sub(ANCHOR[t.kind].clone().applyQuaternion(q));
   }
@@ -693,19 +696,18 @@ for (const u of UNITS) { u.holder = arms[u.arms[0]]; u.worker = arms[u.arms[u.ar
 
 // how far each arm reaches for its work (horizontal, from the base)
 const nestV = (u) => new V3(u.nest[0], u.nest[1], NEST_Z);
+const stopP = (k) => paths[k].at(paths[k].len), dropP = (k) => paths[k].at(paths[k].drop_s);
 const reachPts = {
-  A1: [paths.P51.at(paths.P51.len), nestV(unitById.U1), paths.P12.at(0), paths.red.at(paths.red.len), paths.blue.at(paths.blue.len)],
-  A2: [paths.P12.at(paths.P12.len), nestV(unitById.U2), paths.P23.at(0)],
-  A3: [nestV(unitById.U2), paths.CAP.at(paths.CAP.len)],
-  A4: [paths.P23.at(paths.P23.len), nestV(unitById.U3), paths.P34.at(0), INSPECT_P],
-  A5: [paths.P34.at(paths.P34.len), nestV(unitById.U4), paths.P45.at(0)],
-  A6: [nestV(unitById.U4), paths.CAP.at(0)],
-  A7: [paths.P45.at(paths.P45.len), nestV(unitById.U5), paths.P51.at(0), FUNNEL],
-  A8: [paths.M2.at(paths.M2.len), paths.red.at(0), paths.blue.at(0)],
+  A1: [stopP('P51'), nestV(unitById.U1), dropP('P12'), stopP('red'), stopP('blue')],
+  A2: [stopP('P12'), nestV(unitById.U2), dropP('P23')],
+  A3: [nestV(unitById.U2), stopP('CAP')],
+  A4: [stopP('P23'), nestV(unitById.U3), dropP('P34'), INSPECT_P],
+  A5: [stopP('P34'), nestV(unitById.U4), dropP('P45')],
+  A6: [nestV(unitById.U4), dropP('CAP')],
+  A7: [stopP('P45'), nestV(unitById.U5), dropP('P51'), FUNNEL],
+  A8: [stopP('M2'), dropP('red'), dropP('blue')],
 };
-for (const [id, pts] of Object.entries(reachPts)) {
-  const a = arms[id]; a.reach = Math.max(...pts.map((p) => Math.hypot(p.x - a.base.x, p.y - a.base.y)));
-}
+for (const [id, pts] of Object.entries(reachPts)) { const a = arms[id]; a.reach = Math.max(...pts.map((p) => Math.hypot(p.x - a.base.x, p.y - a.base.y))); }
 
 // ---------- choreography ----------
 const up = (p, dz) => p.clone().add(new V3(0, 0, dz));
@@ -719,12 +721,12 @@ async function pickBottle(arm, base) {
 async function carry(arm, tok, from, to, onPlaced) {
   await pickBottle(arm, from);
   arm.hold(tok);
-  await arm.go({ p: up(from, GRIP_Z + 0.07) }, 0.4);
-  await arm.go({ p: up(to, GRIP_Z + 0.07) }, 0.9);
+  await arm.go({ p: up(from, GRIP_Z + 0.06) }, 0.4);
+  await arm.go({ p: up(to, GRIP_Z + 0.06) }, 0.9);
   await arm.go({ p: up(to, GRIP_Z) }, 0.42);
   const t = arm.release(); t.mesh.position.copy(to); onPlaced && onPlaced(t);
   await arm.go({ grip: 1 }, 0.2);
-  await arm.go({ p: up(to, GRIP_Z + 0.06) }, 0.32);
+  await arm.go({ p: up(to, GRIP_Z + 0.05) }, 0.32);
 }
 async function sideHold(arm, nb) {
   const hp = up(nb, 0.05);
@@ -742,12 +744,13 @@ function pickLane() {
   for (const c of ready) { r -= LANES[c].q.length; if (r <= 0) return c; }
   return ready[ready.length - 1];
 }
+const capTop = (nb) => up(nb, CAP_SEAT + CAP_H / 2);
 const PROCESS = {
   async U1(u, bottle) {
-    const A = u.worker, nb = nestV(u), recipe = [];
+    const A = u.worker, nb = nestV(u);
     for (let k = 0; k < 3; k++) {
       let c; while (!(c = pickLane())) { u.state = '等待来球'; await sleep(0.3); }
-      u.state = `灌装 ${k + 1}/3 · 取${COLOR_NAME[c]}球`; A.action = `从${COLOR_NAME[c]}球滑道取球`;
+      u.state = `灌装 ${k + 1}/3 · 取${COLOR_NAME[c]}球`; A.action = `从${COLOR_NAME[c]}球道取球`;
       const lane = LANES[c], ball = lane.q[0], bp = ball.mesh.position.clone();
       await A.go({ p: up(bp, 0.05), grip: 1, pitch: null }, 0.6);
       await A.go({ p: bp }, 0.3);
@@ -757,19 +760,17 @@ const PROCESS = {
       await A.go({ p: up(nb, BOT_H + 0.035) }, 0.75);
       const b = A.release(); await A.go({ grip: 1 }, 0.12);
       bottle.mesh.updateMatrixWorld(true);
-      const slot = bottle.mesh.localToWorld(new V3(0, 0, 0.0045 + R_BALL + (bottle.balls.length + bottle.pending) * 2 * R_BALL));
+      const slot = bottle.mesh.localToWorld(new V3(0, 0, ballZ(bottle.balls.length + bottle.pending)));
       bottle.pending++;
-      flyTo(b, slot, 0.26, 0, () => { bottle.pending--; addBallToBottle(b, bottle); });
-      recipe.push(COLOR_NAME[c]);
+      flyTo(b, slot, 0.3, 0, () => { bottle.pending--; addBallToBottle(b, bottle); });
     }
-    bottle.recipe = recipe.join('');
-    await sleep(0.3);
+    await sleep(0.35);
   },
   async U2(u, bottle) {
     const A = u.holder, W = u.worker, nb = nestV(u), capP = paths.CAP;
     while (!arrived(capP)) { u.state = '等待瓶盖'; await sleep(0.3); }
     u.state = '扶瓶 · 取盖';
-    const capTok = capP.q[0], cp = up(capTok.mesh.position, 0.008);
+    const capTok = capP.q[0], cp = up(capTok.mesh.position, CAP_H / 2);
     A.action = '扶住瓶身'; W.action = '从盖滑道取盖';
     await Promise.all([
       sideHold(A, nb),
@@ -780,11 +781,11 @@ const PROCESS = {
         await W.go({ p: up(cp, 0.06) }, 0.3);
       })(),
     ]);
-    u.state = '放盖 · 拧紧'; W.action = '放盖并拧紧';
-    const top = up(nb, BOT_H + 0.002);
+    u.state = '放盖 · 转动锁紧'; W.action = '放盖并转动锁紧';
+    const top = capTop(nb);
     await W.go({ p: up(top, 0.04), pitch: -Math.PI / 2 }, 0.75);
     await W.go({ p: top }, 0.32);
-    await W.go({ roll: Math.PI / 2 }, 0.6);
+    await W.go({ roll: Math.PI * 0.6 }, 0.7);
     const c = W.release(); capOnBottle(c, bottle);
     await W.go({ grip: 1 }, 0.18);
     await W.go({ p: up(top, 0.05), roll: 0, pitch: null }, 0.4);
@@ -797,11 +798,10 @@ const PROCESS = {
     await pickBottle(A, nb); A.hold(bottle);
     await A.go({ p: up(nb, GRIP_Z + 0.06) }, 0.35);
     await A.go({ p: INSPECT_P }, 0.8);
-    u.state = '读球序列和瓶码'; A.action = '转一圈读码';
+    u.state = '读球序列和托座码'; A.action = '转一圈读码';
     flash('U3'); await A.go({ roll: Math.PI }, 0.8); flash('U3'); await A.go({ roll: 2 * Math.PI }, 0.8);
     A.cur.roll = 0;
-    bottle.lastRead = bottle.balls.map((b) => COLOR_NAME[b.color]).join('');
-    u.lastRead = `${bottle.id} · ${bottle.lastRead || '空'} · 合格`;
+    u.lastRead = `${bottle.id} · ${bottle.balls.map((b) => COLOR_NAME[b.color]).join('') || '空'} · 合格`;
     u.state = '放回工位'; A.action = '放回工位';
     await A.go({ p: up(nb, GRIP_Z + 0.06) }, 0.8);
     await A.go({ p: up(nb, GRIP_Z) }, 0.38);
@@ -810,25 +810,25 @@ const PROCESS = {
   },
   async U4(u, bottle) {
     const A = u.holder, W = u.worker, nb = nestV(u), capP = paths.CAP;
-    u.state = '扶瓶 · 拧开'; A.action = '扶住瓶身'; W.action = '拧开瓶盖';
-    const top = up(nb, BOT_H + 0.002);
+    u.state = '扶瓶 · 反转开盖'; A.action = '扶住瓶身'; W.action = '反向转开瓶盖';
+    const top = capTop(nb);
     await Promise.all([
       sideHold(A, nb),
       (async () => { await W.go({ p: up(top, 0.05), grip: 1, pitch: -Math.PI / 2 }, 0.75); await W.go({ p: top }, 0.32); await W.go({ grip: 0.42 }, 0.2); })(),
     ]);
     const cap = bottle.capTok; bottle.capTok = null;
-    if (cap) { W.hold(cap, 'rigid'); }
-    await W.go({ roll: -Math.PI / 2 }, 0.6);
+    if (cap) W.hold(cap, 'rigid');
+    await W.go({ roll: -Math.PI * 0.6 }, 0.7);
     await W.go({ p: up(top, 0.06) }, 0.35);
     u.state = '瓶盖送回 U2'; W.action = '把盖放进盖滑道';
-    const start = capP.at(0);
+    const start = dropP('CAP');
     await Promise.all([
       sideRelease(A, nb),
       (async () => {
-        await W.go({ p: up(start, 0.05), pitch: null, roll: 0 }, 0.75);
+        await W.go({ p: up(start, 0.05 + CAP_H / 2), pitch: null, roll: 0 }, 0.75);
         while (!outletFree(capP)) await sleep(0.3);
-        await W.go({ p: up(start, 0.012) }, 0.3);
-        const c = W.release(); if (c) enqueue(capP, c, 0);
+        await W.go({ p: up(start, CAP_H / 2 + 0.004) }, 0.3);
+        const c = W.release(); if (c) enqueue(capP, c);
         await W.go({ grip: 1 }, 0.18);
         await home(W);
       })(),
@@ -838,7 +838,7 @@ const PROCESS = {
     const A = u.holder, nb = nestV(u);
     u.state = '取瓶'; A.action = '拿起瓶子';
     await pickBottle(A, nb); A.hold(bottle);
-    await A.go({ p: up(nb, GRIP_Z + 0.07) }, 0.35);
+    await A.go({ p: up(nb, GRIP_Z + 0.06) }, 0.35);
     const pre = new V3(FUNNEL.x - 0.004, FUNNEL.y + 0.03, 0.235);
     await A.go({ p: pre }, 0.75);
     u.state = '倾倒'; A.action = '倒扣在漏斗上';
@@ -857,7 +857,7 @@ const PROCESS = {
     u.state = '查空'; A.action = '确认倒空';
     await A.go({ p: pre, pitch: -Math.PI / 2 }, 0.9);
     A.holdMode = 'upright';
-    await A.go({ p: up(nb, GRIP_Z + 0.07), pitch: null }, 0.7);
+    await A.go({ p: up(nb, GRIP_Z + 0.06), pitch: null }, 0.7);
     await A.go({ p: up(nb, GRIP_Z) }, 0.38);
     const t = A.release(); t.mesh.position.copy(nb);
     await A.go({ grip: 1 }, 0.2);
@@ -868,22 +868,20 @@ async function bottleUnitTick(u) {
   const A = u.holder;
   if (u.nestTok && u.nestDone) {
     if (!outletFree(u.out)) { u.state = '等出口空位'; return false; }
-    u.state = '送往下一单元'; A.action = '把瓶子放进出口滑道';
+    u.state = '送往下一单元'; A.action = '把瓶子放进出口喇叭口';
     const tok = u.nestTok; busy(u);
-    await carry(A, tok, nestV(u), u.out.at(0), (t) => enqueue(u.out, t, 0));
+    await carry(A, tok, nestV(u), u.out.at(u.out.drop_s), (t) => enqueue(u.out, t));
     u.nestTok = null; u.nestDone = false;
     return true;
   }
   if (!u.nestTok) {
     if (!arrived(u.in)) { u.state = '等待来瓶'; return false; }
     const tok = takeHead(u.in); busy(u);
-    u.state = '取瓶进工位'; A.action = '从入口取瓶';
-    const from = tok.mesh.position.clone();
-    await carry(A, tok, from, nestV(u), (t) => { t.mode = 'static'; });
+    u.state = '取瓶进工位'; A.action = '从入口闸门取瓶';
+    await carry(A, tok, tok.mesh.position.clone(), nestV(u), (t) => { t.mode = 'static'; });
     u.nestTok = tok; u.nestDone = false;
   }
   await PROCESS[u.id](u, u.nestTok);
-  if (u.id === 'U1') u.nestTok.loops++;
   u.nestDone = true; u.count++;
   return true;
 }
@@ -891,19 +889,19 @@ async function sorterTick(u) {
   const A = u.holder;
   if (!mixReady()) { u.state = '等待来球'; return false; }
   const ball = mixQ[0], bp = ball.mesh.position.clone(); busy(u);
-  u.state = '取球'; A.action = '从暂存杯出口取球';
+  u.state = '取球'; A.action = '从料斗出口取球';
   await A.go({ p: up(bp, 0.05), grip: 1, pitch: null }, 0.55);
   await A.go({ p: bp }, 0.28);
   mixQ.shift(); await A.go({ grip: 0.08 }, 0.15); A.hold(ball);
   await A.go({ p: up(bp, 0.07) }, 0.3);
   u.state = '相机认颜色'; A.action = '在相机下认颜色'; flash('U6'); await sleep(0.3);
   const lane = LANES[ball.color];
-  while (!outletFree(lane)) { u.state = `${COLOR_NAME[ball.color]}球滑道已满`; await sleep(0.3); }
-  const st = up(lane.at(0), R_BALL + 0.004);
-  u.state = `放进${COLOR_NAME[ball.color]}球滑道`; A.action = `放进${COLOR_NAME[ball.color]}球滑道`;
+  while (!outletFree(lane)) { u.state = `${COLOR_NAME[ball.color]}球道已满`; await sleep(0.3); }
+  const st = up(dropP(ball.color), R_BALL + 0.004);
+  u.state = `放进${COLOR_NAME[ball.color]}球道`; A.action = `放进${COLOR_NAME[ball.color]}球道`;
   await A.go({ p: up(st, 0.03) }, 0.6);
   await A.go({ p: st }, 0.2);
-  const b = A.release(); enqueue(lane, b, 0); await A.go({ grip: 1 }, 0.12);
+  const b = A.release(); enqueue(lane, b); await A.go({ grip: 1 }, 0.12);
   await A.go({ p: up(st, 0.04) }, 0.25);
   u.count++;
   return true;
@@ -922,22 +920,25 @@ async function unitLoop(u) {
   }
 }
 
-// ---------- initial stock: 9 bottles, 6 caps, 33 balls ----------
+// ---------- initial stock ----------
 const rndColor = () => BALL_COLORS[Math.floor(Math.random() * 3)];
 function filledBottle(capped) {
   const b = makeBottle();
   for (let i = 0; i < 3; i++) addBallToBottle(makeBall(rndColor()), b);
-  if (capped) { const c = makeCap(); capOnBottle(c, b); }
+  if (capped) capOnBottle(makeCap(), b);
   return b;
 }
-for (let i = 0; i < 4; i++) enqueue(paths.P51, makeBottle(), 0, true);
+const C = LAYOUT.counts;
+const capsOnChute = C.caps - 3, emptyBottles = C.bottles - 5;
+for (let i = 0; i < emptyBottles; i++) enqueue(paths.P51, makeBottle(), 0, true);
 enqueue(paths.P12, filledBottle(false), 0, true);
 enqueue(paths.P23, filledBottle(true), 0, true); enqueue(paths.P23, filledBottle(true), 0, true);
 enqueue(paths.P34, filledBottle(true), 0, true);
 enqueue(paths.P45, filledBottle(false), 0, true);
-for (let i = 0; i < 3; i++) enqueue(paths.CAP, makeCap(), 0, true);
-for (const c of BALL_COLORS) for (let i = 0; i < 5; i++) enqueue(LANES[c], makeBall(c), 0, true);
-for (let i = 0; i < 3; i++) { const b = makeBall(rndColor()); toMix(b); mixTarget(mixQ.length - 1, b.mesh.position); }
+for (let i = 0; i < capsOnChute; i++) enqueue(paths.CAP, makeCap(), 0, true);
+const ballsLeft = C.balls - 15, perLane = Math.floor((ballsLeft - 3) / 3);
+for (const c of BALL_COLORS) for (let i = 0; i < perLane; i++) enqueue(LANES[c], makeBall(c), 0, true);
+for (let i = 0; i < ballsLeft - 3 * perLane; i++) { const b = makeBall(rndColor()); toMix(b); mixTarget(mixQ.length - 1, b.mesh.position); }
 for (const u of UNITS) unitLoop(u);
 
 // ---------- stepping ----------
@@ -947,7 +948,7 @@ function step(dt) {
   updateTokens(dt);
   for (const a of Object.values(arms)) a.update(dt);
   for (const a of Object.values(arms)) a.placeHeld();
-  for (const [id, f] of Object.entries(flashers)) { const e = simTime - f.t; f.m.emissiveIntensity = e >= 0 && e < 0.35 ? 2.2 * (1 - e / 0.35) : 0; }
+  for (const f of Object.values(flashers)) { const e = simTime - f.t; f.m.emissiveIntensity = e >= 0 && e < 0.35 ? 2.2 * (1 - e / 0.35) : 0; }
 }
 function counts() {
   const r = { bottles: { chute: 0, unit: 0, hand: 0 }, balls: { red: 0, green: 0, blue: 0, inBottle: 0, mix: mixQ.length, moving: 0 }, caps: { chute: paths.CAP.q.length, onBottle: 0, hand: 0 } };
@@ -973,7 +974,7 @@ if (!HEADLESS) {
   scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8a80, 2.1));
   const sun = new THREE.DirectionalLight(0xffffff, 2.4);
   sun.position.set(1.1, -1.3, 2.4); sun.castShadow = true;
-  Object.assign(sun.shadow.camera, { left: -1.1, right: 1.1, top: 1.1, bottom: -1.1, near: 0.5, far: 6 });
+  Object.assign(sun.shadow.camera, { left: -1.2, right: 1.2, top: 1.2, bottom: -1.2, near: 0.5, far: 6 });
   sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.02;
   scene.add(sun);
 
@@ -981,11 +982,12 @@ if (!HEADLESS) {
   camera.up.set(0, 0, 1);
   const controls = new OrbitControls(camera, canvas);
   controls.enableDamping = true; controls.dampingFactor = 0.08;
-  controls.minDistance = 0.5; controls.maxDistance = 7; controls.maxPolarAngle = 1.48;
+  controls.minDistance = 0.4; controls.maxDistance = 7; controls.maxPolarAngle = 1.48;
+  const C0 = new V3(TABLE.cx, TABLE.cy + 0.05, 0.03);
   const VIEWS = {
-    oblique: { pos: new V3(0.72, -2.05, 1.55), tgt: new V3(0, -0.04, 0.03) },
-    top: { pos: new V3(0, -0.0205, 3.25), tgt: new V3(0, -0.02, 0) },
-    low: { pos: new V3(-1.55, -1.55, 0.52), tgt: new V3(-0.02, -0.02, 0.08) },
+    oblique: { pos: C0.clone().add(new V3(0.72, -2.05, 1.55)), tgt: C0.clone() },
+    top: { pos: C0.clone().add(new V3(0, -0.0005, 3.2)), tgt: C0.clone().setZ(0) },
+    low: { pos: C0.clone().add(new V3(-1.55, -1.55, 0.5)), tgt: C0.clone().setZ(0.08) },
   };
   let camTween = null;
   const fit = () => Math.max(1, 1.5 / camera.aspect);
@@ -1007,19 +1009,19 @@ if (!HEADLESS) {
   for (const u of UNITS) {
     const el = document.createElement('div'); el.className = 'lbl unit'; el.innerHTML = `<b>${u.id}</b>${u.name}`;
     el.addEventListener('click', () => select(u.arms[0]));
-    labelsEl.append(el); labels.push({ el, p: new V3(u.c[0], u.c[1] - 0.142, PT) });
+    labelsEl.append(el); labels.push({ el, p: new V3(u.c[0], u.rect[1] - 0.03, PT) });
   }
   const armTags = {};
   for (const a of Object.values(arms)) {
     const el = document.createElement('button'); el.type = 'button'; el.className = 'lbl arm'; el.textContent = a.id; el.setAttribute('aria-label', `选中机械臂 ${a.id}`);
     el.addEventListener('click', () => select(a.id));
-    labelsEl.append(el); labels.push({ el, p: a.base.clone().add(new V3(0, 0, 0.3)), arm: a }); armTags[a.id] = el;
+    labelsEl.append(el); labels.push({ el, p: a.base.clone().add(new V3(0, 0, 0.3)) }); armTags[a.id] = el;
   }
   const _p = new V3();
   function placeLabels() {
     const w = stage.clientWidth, h = stage.clientHeight;
     for (const L of labels) {
-      _p.copy(L.p); _p.project(camera);
+      _p.copy(L.p).project(camera);
       const vis = _p.z < 1 && Math.abs(_p.x) < 1.1 && Math.abs(_p.y) < 1.1;
       L.el.style.visibility = vis ? 'visible' : 'hidden';
       L.el.style.transform = `translate(${((_p.x + 1) / 2) * w}px, ${((1 - _p.y) / 2) * h}px) translate(-50%, -50%)`;
@@ -1061,6 +1063,23 @@ if (!HEADLESS) {
   const armCard = document.getElementById('armCard');
   const stockEl = document.getElementById('stock');
   const dot = (c) => `<span class="dot" style="background:${c}"></span>`;
+  const mm = (m) => `${(m * 1000).toFixed(0)}`;
+  const chuteLen = (fam) => Object.values(paths).filter((p) => p.kind === fam).reduce((s, p) => s + p.len + p.end_ext, 0);
+  const nTiles = UNITS.reduce((s, u) => s + Math.round((u.rect[2] - u.rect[0]) / LAYOUT.tile) * Math.round((u.rect[3] - u.rect[1]) / LAYOUT.tile), 0);
+  const nModules = Object.values(paths).reduce((s, p) => s + p.modules.length, 0);
+  const nPosts = Object.values(paths).reduce((s, p) => s + p.joints.length, 0) + 2;
+  const R = LAYOUT.routes;
+  document.getElementById('specRows').innerHTML = [
+    ['台面', `${TABLE.w.toFixed(2)} × ${TABLE.d.toFixed(2)} m`],
+    ['底座', `${nTiles} 块 ${mm(LAYOUT.tile)} × ${mm(LAYOUT.tile)} mm 拼接块,顶面离台面 ${mm(PT)} mm`],
+    ['托座 + 管', `托座 Ø${mm(CAR.puck_d)} mm(底部 3 颗 Ø8 钢珠);透明管 Ø${mm(CAR.tube_d)} mm,管口离滑道底面 ${mm(CAR.tube_top)} mm`],
+    ['瓶盖', `Ø${mm(LAYOUT.cap.d)} × ${mm(CAP_H)} mm,四头卡口`],
+    ['小球', `Ø${mm(LAYOUT.ball_d)} mm × ${C.balls}`],
+    ['瓶滑道', `内宽 ${mm(R.P12.w)} mm,墙高 ${mm(R.P12.h)} mm,R100 弯道,3°;共 ${chuteLen('bottle').toFixed(2)} m`],
+    ['盖滑道', `内宽 ${mm(R.CAP.w)} mm,9°,${chuteLen('cap').toFixed(2)} m`],
+    ['球道', `内宽 ${mm(R.red.w)} mm,3°,${chuteLen('ball').toFixed(2)} m(含料斗前后两段)`],
+    ['模块 / 支柱', `${nModules} 个滑道模块,${nPosts} 根支柱`],
+  ].map(([k, v]) => `<tr><td style="color:var(--muted);white-space:nowrap">${k}</td><td>${v}</td></tr>`).join('');
   let lastCard = '';
   function renderBoard(force) {
     for (const u of UNITS) {
@@ -1083,9 +1102,9 @@ if (!HEADLESS) {
     if (force || html !== lastCard) { armCard.innerHTML = html; lastCard = html; }
     const c = counts();
     stockEl.innerHTML = `
-      <dt>瓶 9</dt><dd>滑道 ${c.bottles.chute} · 工位 ${c.bottles.unit} · 臂上 ${c.bottles.hand}</dd>
-      <dt>盖 6</dt><dd>盖滑道 ${c.caps.chute} · 瓶上 ${c.caps.onBottle} · 臂上 ${c.caps.hand}</dd>
-      <dt>球 33</dt><dd>${dot('var(--red)')}${c.balls.red} ${dot('var(--green)')}${c.balls.green} ${dot('var(--blue)')}${c.balls.blue} 在分色滑道 · 瓶内 ${c.balls.inBottle} · 暂存杯 ${c.balls.mix}${c.balls.moving ? ` · 途中 ${c.balls.moving}` : ''}</dd>
+      <dt>瓶 ${C.bottles}</dt><dd>滑道 ${c.bottles.chute} · 工位 ${c.bottles.unit} · 臂上 ${c.bottles.hand}</dd>
+      <dt>盖 ${C.caps}</dt><dd>盖滑道 ${c.caps.chute} · 瓶上 ${c.caps.onBottle} · 臂上 ${c.caps.hand}</dd>
+      <dt>球 ${C.balls}</dt><dd>${dot('var(--red)')}${c.balls.red} ${dot('var(--green)')}${c.balls.green} ${dot('var(--blue)')}${c.balls.blue} 在分色球道 · 瓶内 ${c.balls.inBottle} · 料斗 ${c.balls.mix}${c.balls.moving ? ` · 途中 ${c.balls.moving}` : ''}</dd>
       <dt>循环</dt><dd>已灌装 ${unitById.U1.count} 瓶 · 已分拣 ${unitById.U6.count} 球</dd>`;
   }
 
@@ -1108,14 +1127,11 @@ if (!HEADLESS) {
   document.getElementById('zoomIn').addEventListener('click', () => zoom(0.82));
   document.getElementById('zoomOut').addEventListener('click', () => zoom(1 / 0.82));
   const btnLabels = document.getElementById('btnLabels');
-  btnLabels.addEventListener('click', () => {
-    const on = labelsEl.classList.toggle('off'); btnLabels.setAttribute('aria-pressed', String(!on));
-  });
+  btnLabels.addEventListener('click', () => { const off = labelsEl.classList.toggle('off'); btnLabels.setAttribute('aria-pressed', String(!off)); });
   const clockEl = document.getElementById('clock');
 
   const clock = new THREE.Clock();
   let boardT = 0;
-  // settle the first frame so the page is complete at rest
   step(0.0001);
   function frame() {
     const dt = Math.min(clock.getDelta(), 0.05);
