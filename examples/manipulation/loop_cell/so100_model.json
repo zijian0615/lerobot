@@ -1,0 +1,271 @@
+{
+ "source": "TheRobotStudio/SO-ARM100 Simulation/SO100 (Apache-2.0)",
+ "joints": [
+  {
+   "name": "shoulder_pan",
+   "parent": "base",
+   "child": "shoulder",
+   "xyz": [
+    0.0,
+    -0.0452,
+    0.0165
+   ],
+   "rpy": [
+    1.57079,
+    0.0,
+    0.0
+   ],
+   "axis": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "lower": -2.0,
+   "upper": 2.0
+  },
+  {
+   "name": "shoulder_lift",
+   "parent": "shoulder",
+   "child": "upper_arm",
+   "xyz": [
+    0.0,
+    0.1025,
+    0.0306
+   ],
+   "rpy": [
+    -1.8,
+    0.0,
+    0.0
+   ],
+   "axis": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "lower": 0.0,
+   "upper": 3.5
+  },
+  {
+   "name": "elbow_flex",
+   "parent": "upper_arm",
+   "child": "lower_arm",
+   "xyz": [
+    0.0,
+    0.11257,
+    0.028
+   ],
+   "rpy": [
+    1.57079,
+    0.0,
+    0.0
+   ],
+   "axis": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "lower": -3.14158,
+   "upper": 0.0
+  },
+  {
+   "name": "wrist_flex",
+   "parent": "lower_arm",
+   "child": "wrist",
+   "xyz": [
+    0.0,
+    0.0052,
+    0.1349
+   ],
+   "rpy": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "axis": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "lower": -2.5,
+   "upper": 1.2
+  },
+  {
+   "name": "wrist_roll",
+   "parent": "wrist",
+   "child": "gripper",
+   "xyz": [
+    0.0,
+    -0.0601,
+    0.0
+   ],
+   "rpy": [
+    0.0,
+    1.57079,
+    0.0
+   ],
+   "axis": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "lower": -3.14158,
+   "upper": 3.14158
+  },
+  {
+   "name": "gripper",
+   "parent": "gripper",
+   "child": "jaw",
+   "xyz": [
+    -0.0202,
+    -0.0244,
+    0.0
+   ],
+   "rpy": [
+    0.0,
+    3.14158,
+    0.0
+   ],
+   "axis": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "lower": -0.2,
+   "upper": 2.0
+  }
+ ],
+ "visuals": {
+  "base": [
+   {
+    "mesh": "Base",
+    "kind": "printed"
+   },
+   {
+    "mesh": "Base_Motor",
+    "kind": "motor"
+   }
+  ],
+  "shoulder": [
+   {
+    "mesh": "Rotation_Pitch",
+    "kind": "printed"
+   },
+   {
+    "mesh": "Rotation_Pitch_Motor",
+    "kind": "motor"
+   }
+  ],
+  "upper_arm": [
+   {
+    "mesh": "Upper_Arm",
+    "kind": "printed"
+   },
+   {
+    "mesh": "Upper_Arm_Motor",
+    "kind": "motor"
+   }
+  ],
+  "lower_arm": [
+   {
+    "mesh": "Lower_Arm",
+    "kind": "printed"
+   },
+   {
+    "mesh": "Lower_Arm_Motor",
+    "kind": "motor"
+   }
+  ],
+  "wrist": [
+   {
+    "mesh": "Wrist_Pitch_Roll",
+    "kind": "printed"
+   },
+   {
+    "mesh": "Wrist_Pitch_Roll_Motor",
+    "kind": "motor"
+   }
+  ],
+  "gripper": [
+   {
+    "mesh": "Fixed_Jaw",
+    "kind": "printed"
+   },
+   {
+    "mesh": "Fixed_Jaw_Motor",
+    "kind": "motor"
+   }
+  ],
+  "jaw": [
+   {
+    "mesh": "Moving_Jaw",
+    "kind": "printed"
+   }
+  ]
+ },
+ "tip": {
+  "link": "gripper",
+  "xyz": [
+   -0.0029999999999399812,
+   -0.08637500137090684,
+   1.8980384690005577e-08
+  ],
+  "tool": [
+   9.837340738330367e-17,
+   -1.0,
+   -6.525137565596996e-22
+  ]
+ },
+ "base_bottom": -1.2012782558179935e-17,
+ "plane": {
+  "pan_xy": [
+   0.0,
+   -0.0452
+  ],
+  "forward_yaw": -1.5707963267948966,
+  "sign": -1.0,
+  "lateral": 0.0,
+  "p1": [
+   0.030599351502910647,
+   0.11900019359787238
+  ],
+  "L1": 0.11600002112068773,
+  "L2": 0.13500018518505816,
+  "LT": 0.14650572011565677,
+  "a1_0": 3.127015760409697,
+  "a2_0": 0.26774432363703526,
+  "a3_0": -0.32110155252848543,
+  "phi0": -0.34157999999999983,
+  "limits": {
+   "shoulder_pan": [
+    -2.0,
+    2.0
+   ],
+   "shoulder_lift": [
+    0.0,
+    3.5
+   ],
+   "elbow_flex": [
+    -3.14158,
+    0.0
+   ],
+   "wrist_flex": [
+    -2.5,
+    1.2
+   ],
+   "wrist_roll": [
+    -3.14158,
+    3.14158
+   ],
+   "gripper": [
+    -0.2,
+    2.0
+   ]
+  },
+  "base_box": [
+   -0.05546249821782112,
+   -0.02580000232458115,
+   0.05546249821782112,
+   0.07010000054240226
+  ]
+ }
+}

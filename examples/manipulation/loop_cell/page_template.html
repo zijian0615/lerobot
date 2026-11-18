@@ -66,6 +66,7 @@ figure { margin: 0; display: flex; flex-direction: column; gap: 10px; }
 .lbl.arm:hover { border-color: var(--accent); }
 .lbl.arm.sel { background: var(--accent); border-color: #fff; }
 .labels.off .lbl { display: none; }
+.loadnote { position: absolute; left: 12px; top: 10px; font-family: var(--mono); font-size: 12px; color: var(--muted); background: rgba(250,250,250,.92); border: 1px solid var(--line); border-radius: 4px; padding: 4px 8px; }
 
 .controls {
   position: absolute; left: max(10px, env(safe-area-inset-left, 0px)); bottom: 10px; right: 10px;
@@ -128,7 +129,7 @@ tr.unitrow:hover td { background: #f3f2ee; }
 
 <div class="page">
   <header>
-    <div class="eyebrow">SO-101 × 8 · 6 个单元 · 打印版尺寸</div>
+    <div class="eyebrow">SO-100 × 8 · 6 个单元 · 打印版尺寸</div>
     <h1>八臂循环产线 <span class="lat">almost a line</span></h1>
     <p class="lede">打印版布局:底座是 200 mm 拼接块,瓶子插在带钢珠的托座里滚着走,滑道由标准模块拼成。页面尺寸和 CAD 零件来自同一份参数,改了参数两边一起更新。</p>
   </header>
@@ -137,6 +138,7 @@ tr.unitrow:hover td { background: #f3f2ee; }
     <div class="stage" id="stage">
       <canvas id="view" tabindex="0" aria-label="产线三维视图。拖动旋转,滚轮或双指缩放。"></canvas>
       <div class="labels" id="labels"></div>
+      <div class="loadnote" id="loadNote">正在加载 SO-100 模型…</div>
       <div class="controls">
         <div class="group" role="group" aria-label="播放">
           <button id="btnPlay" type="button" aria-pressed="false">暂停</button>
@@ -203,12 +205,11 @@ tr.unitrow:hover td { background: #f3f2ee; }
   <section>
     <h2>和上一版相比</h2>
     <ul class="notes">
-      <li>底座改成 200 × 200 mm 打印拼接块:单臂单元 2 × 1 块,双臂单元(U2、U4)2 × 2 块,一共 16 块。臂、工位、相机都用 M4 螺丝固定在 25 mm 网格上。</li>
-      <li>瓶子改成「托座 + 买来的透明管」。托座底下 3 颗 Ø8 钢珠,所以在 3° 的滑道上就能滚起来,过弯不卡。</li>
-      <li>瓶盖改成四头卡口:任何角度放上去,转 30–120° 就会锁住,并有卡位凸点。</li>
-      <li>滑道由喇叭段、直段、R100 弯段、闸门段拼成;每个接头下面有一根可调高度的支柱。暂存杯换成单列出球的料斗。</li>
-      <li>布局重新排过:所有单元和臂都在 25 mm 网格上,外圈回程变成约 1.73 m(起点高 13.5 cm)。各臂作业点都够得到,最吃力的是 A7 把瓶子放进回程起点,需要工具倾斜约 50°。</li>
-      <li>零件清单、每条滑道的拼装顺序和每根支柱的高度见 <span class="mono">loop_cell/cad/BOM.md</span>。</li>
+      <li>机械臂换成 SO-100 官方模型:网格和关节链来自 TheRobotStudio/SO-ARM100 的 URDF(Apache-2.0),动作用和 URDF 正运动学核对过的逆运动学驱动,并遵守官方关节限位。</li>
+      <li>按真实尺寸重新摆了臂:SO-100 的抬臂轴在旋转轴前 3 cm,腕到夹爪中心 14.6 cm,底座在旋转轴后面还有 7 cm。离底座太近的点反而够不到,所以 U1、U5 扩成 2 × 2 块,底座一共 20 块。</li>
+      <li>8 台臂的作业点都够得到,底座都落在自己的底板上、不压滑道和工位。最吃力的是 A7(倾倒和放回程起点,工具要倾斜约 46°),其余在 32° 以内。选中一台臂可以看到实时关节角。</li>
+      <li>瓶子是「托座 + 买来的透明管」,托座底下 3 颗 Ø8 钢珠,在 3° 的滑道上就能滚;瓶盖是四头卡口;滑道由喇叭段、直段、R100 弯段和闸门段拼成,每个接头下面一根可调支柱。</li>
+      <li>零件清单、拼装顺序、支柱高度和可达性表见 <span class="mono">loop_cell/cad/BOM.md</span>。</li>
     </ul>
   </section>
 </div>
@@ -238,9 +239,6 @@ const BOT_H = CAR.tube_top;
 const R_BALL = LAYOUT.ball_d / 2;
 const CAP_R = LAYOUT.cap.d / 2, CAP_H = LAYOUT.cap.h, CAP_SEAT = LAYOUT.cap.seat;
 const GRIP_Z = CAR.grip_z;
-const { L1, L2, LW, LG, SH } = LAYOUT.arm;
-const LT = LW + LG;
-const REACH_NOTE = 0.24;
 
 const COL = {
   table: '#dddcd3', plate: '#d3dfd5', plateEdge: '#8fae98', clay: '#efebe3', claySel: '#f4c79c', servo: '#2b2d31',
@@ -572,78 +570,77 @@ function updateTokens(dt) {
   }
 }
 
-// ---------- arms ----------
+// ---------- arms: SO-100 from TheRobotStudio's URDF ----------
+const SO = LAYOUT.so100, PLN = SO.plane, LIM = PLN.limits;
+const TWO_PI = Math.PI * 2;
+const ZAX = new V3(0, 0, 1);
+const QALIGN = new THREE.Quaternion().setFromUnitVectors(ZAX, new V3(...SO.tip.tool).negate());
+function into(q, lo, hi) {
+  for (const k of [0, -1, 1, -2, 2]) { const v = q + k * TWO_PI; if (v >= lo - 1e-6 && v <= hi + 1e-6) return v; }
+  return null;
+}
 const arms = {};
 const armPickables = [];
 class Arm {
   constructor(def) {
     Object.assign(this, def);
-    this.base = new V3(def.xy[0], def.xy[1], PT);
-    this.shoulder = new V3(def.xy[0], def.xy[1], PT + SH);
+    this.base = new V3(def.xy[0], def.xy[1], PT);  // pan axis on the tile top
     const u = unitById[def.unit];
     const work = u.nest ? new V3(u.nest[0], u.nest[1], 0) : paths.M2.at(paths.M2.len);
     const dir = new V3(work.x - this.base.x, work.y - this.base.y, 0).normalize();
-    this.homeP = this.base.clone().addScaledVector(dir, 0.1); this.homeP.z = PT + 0.2;
+    this.homeP = this.base.clone().addScaledVector(dir, 0.14); this.homeP.z = PT + 0.2;
     this.cur = { p: this.homeP.clone(), pitch: null, roll: 0, grip: 0.75 };
     this.tw = null; this.held = null; this.holdMode = 'upright'; this.action = '待命'; this.idle = true;
-    this.lastPan = Math.atan2(dir.y, dir.x); this.phase = Math.random() * 6.28; this.breath = 1; this.liveRoll = 0;
+    this.phase = Math.random() * 6.28; this.breath = 1; this.liveRoll = 0; this.q = [0, 0, 0, 0];
     this.mClay = M.clay.clone();
-    this.build(dir);
-  }
-  build(dir) {
-    const root = new THREE.Group(); root.position.copy(this.base); this.root = root;
-    const add = (parent, geo, m, x = 0, y = 0, z = 0) => { const o = shadowy(new THREE.Mesh(geo, m)); o.position.set(x, y, z); o.userData.arm = this.id; parent.add(o); armPickables.push(o); return o; };
-    const baseG = new THREE.Group(); baseG.rotation.z = Math.atan2(dir.y, dir.x) + Math.PI / 2; root.add(baseG);
-    add(baseG, new RoundedBoxGeometry(0.1, 0.082, 0.03, 2, 0.006), this.mClay, 0, 0, 0.015);
-    add(baseG, new THREE.BoxGeometry(0.045, 0.034, 0.04), M.servo, 0, 0, 0.05);
-    for (const [x, y] of [[-0.062, 0.025], [-0.062, -0.025], [0.062, 0.025], [0.062, -0.025]]) {
-      const dog = shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.02, 0.01), M.post)); dog.position.set(x, y, 0.005); baseG.add(dog);
+    const root = new THREE.Group(); this.root = root;
+    const c = Math.cos(this.yaw), s = Math.sin(this.yaw), [px, py] = PLN.pan_xy;
+    root.position.set(def.xy[0] - (c * px - s * py), def.xy[1] - (s * px + c * py), PT - SO.base_bottom);
+    root.rotation.z = this.yaw;
+    this.links = { base: root }; this.jq = {};
+    for (const j of SO.joints) {
+      const o = new THREE.Group(); o.position.set(...j.xyz); o.rotation.set(j.rpy[0], j.rpy[1], j.rpy[2], 'ZYX');
+      this.links[j.parent].add(o);
+      const g = new THREE.Group(); o.add(g);
+      this.jq[j.name] = { g, axis: new V3(...j.axis) };
+      this.links[j.child] = g;
     }
-    const pan = new THREE.Group(); pan.position.z = 0.07; root.add(pan); this.pan = pan;
-    add(pan, zcyl(0.026, 0.026, 0.01, 24), this.mClay, 0, 0, 0.004);
-    add(pan, new RoundedBoxGeometry(0.03, 0.056, 0.028, 2, 0.005), this.mClay, 0, 0, 0.018);
-    const sh = new THREE.Group(); sh.position.z = SH - 0.07; pan.add(sh); this.sh = sh;
-    add(sh, new THREE.BoxGeometry(0.034, 0.046, 0.03), M.servo);
-    add(sh, new RoundedBoxGeometry(L1, 0.026, 0.034, 2, 0.006), this.mClay, L1 / 2, 0, 0);
-    const el = new THREE.Group(); el.position.x = L1; sh.add(el); this.el = el;
-    add(el, new THREE.BoxGeometry(0.032, 0.044, 0.028), M.servo);
-    add(el, new RoundedBoxGeometry(L2, 0.024, 0.03, 2, 0.006), this.mClay, L2 / 2, 0, 0);
-    const wr = new THREE.Group(); wr.position.x = L2; el.add(wr); this.wr = wr;
-    add(wr, new THREE.BoxGeometry(0.028, 0.04, 0.026), M.servo);
-    add(wr, new THREE.BoxGeometry(LW, 0.022, 0.022), this.mClay, LW / 2, 0, 0);
-    const roll = new THREE.Group(); roll.position.x = LW; wr.add(roll); this.rollG = roll;
-    add(roll, new RoundedBoxGeometry(0.03, 0.05, 0.03, 2, 0.005), this.mClay, 0.015, 0, 0);
-    add(roll, new THREE.BoxGeometry(0.02, 0.026, 0.02), M.servo, 0.012, 0, 0.022);
-    this.f1 = add(roll, new RoundedBoxGeometry(0.053, 0.006, 0.014, 1, 0.002), this.mClay, 0.0565, 0, 0);
-    this.f2 = add(roll, new RoundedBoxGeometry(0.053, 0.006, 0.014, 1, 0.002), this.mClay, 0.0565, 0, 0);
-    const tip = new THREE.Object3D(); tip.position.x = LG; roll.add(tip); this.tip = tip;
+    this.tip = new THREE.Object3D(); this.tip.position.set(...SO.tip.xyz); this.links[SO.tip.link].add(this.tip);
     scene.add(root);
   }
-  feasible(p, psi) {
-    const h = Math.hypot(p.x - this.base.x, p.y - this.base.y);
-    const wr = h - LT * Math.cos(psi), wz = p.z - LT * Math.sin(psi) - this.shoulder.z;
-    const d = Math.hypot(wr, wz);
-    return d <= L1 + L2 - 0.003 && d >= Math.abs(L1 - L2) + 0.006;
+  attachMeshes(geoms) {
+    for (const [link, vs] of Object.entries(SO.visuals)) for (const v of vs) {
+      if (!geoms[v.mesh]) continue;
+      const m = shadowy(new THREE.Mesh(geoms[v.mesh], v.kind === 'motor' ? M.servo : this.mClay));
+      m.userData.arm = this.id; this.links[link].add(m); armPickables.push(m);
+    }
+  }
+  // joint angles [pan, lift, elbow, wrist_flex] for pinch point p and tool angle phi; null if unreachable
+  solve(p, phi) {
+    const dx = p.x - this.base.x, dy = p.y - this.base.y, h = Math.hypot(dx, dy);
+    const pan = h > 1e-4 ? into(Math.atan2(dy, dx) - (this.yaw + PLN.forward_yaw), ...LIM.shoulder_pan) : 0;
+    if (pan === null) return null;
+    const a3 = phi + (PLN.a3_0 - PLN.phi0);
+    const wr = h - PLN.LT * Math.cos(a3) - PLN.p1[0], wz = p.z - PT - PLN.LT * Math.sin(a3) - PLN.p1[1];
+    const d = Math.hypot(wr, wz), L1 = PLN.L1, L2 = PLN.L2, sg = PLN.sign;
+    if (!(d > Math.abs(L1 - L2) + 1e-4 && d < L1 + L2 - 1e-4)) return null;
+    const b = Math.atan2(wz, wr), off = Math.acos(clamp((L1 * L1 + d * d - L2 * L2) / (2 * L1 * d), -1, 1));
+    let best = null;
+    for (const a1 of [b + off, b - off]) {
+      const ex = L1 * Math.cos(a1), ez = L1 * Math.sin(a1), a2 = Math.atan2(wz - ez, wr - ex);
+      const q1 = into((a1 - PLN.a1_0) / sg, ...LIM.shoulder_lift); if (q1 === null) continue;
+      const q2 = into((a2 - PLN.a2_0) / sg - q1, ...LIM.elbow_flex); if (q2 === null) continue;
+      const q3 = into((a3 - PLN.a3_0) / sg - q1 - q2, ...LIM.wrist_flex); if (q3 === null) continue;
+      if (!best || ez > best.ez) best = { ez, q: [pan, q1, q2, q3] };
+    }
+    return best ? best.q : null;
   }
   autoPitch(p) {
-    const lo = -Math.PI / 2, step = Math.PI / 36;
-    if (this.feasible(p, lo)) return lo;
-    let a = lo, b = null;
-    for (let k = 1; k <= 16; k++) { const psi = lo + k * step; if (this.feasible(p, psi)) { b = psi; break; } a = psi; }
-    if (b === null) return lo + 16 * step;
-    for (let i = 0; i < 8; i++) { const m = (a + b) / 2; if (this.feasible(p, m)) b = m; else a = m; }
-    return b;
-  }
-  solve(p, psi) {
-    const dx = p.x - this.base.x, dy = p.y - this.base.y, h = Math.hypot(dx, dy);
-    const pan = h > 0.02 ? Math.atan2(dy, dx) : this.lastPan; this.lastPan = pan;
-    const wr = h - LT * Math.cos(psi), wz = p.z - LT * Math.sin(psi) - this.shoulder.z;
-    let d = Math.hypot(wr, wz); const a0 = Math.atan2(wz, wr);
-    d = clamp(d, Math.abs(L1 - L2) + 0.006, L1 + L2 - 0.003);
-    const th1 = a0 + Math.acos(clamp((L1 * L1 + d * d - L2 * L2) / (2 * L1 * d), -1, 1));
-    const ex = L1 * Math.cos(th1), ez = L1 * Math.sin(th1);
-    const th2 = Math.atan2(d * Math.sin(a0) - ez, d * Math.cos(a0) - ex);
-    return { pan, th1, th2 };
+    for (let k = 0; k <= 80; k += 1) for (const sg of [1, -1]) {
+      const phi = -Math.PI / 2 + sg * k * Math.PI / 180;
+      if (this.solve(p, phi)) return phi;
+    }
+    return -Math.PI / 2;
   }
   go(pose, dur) {
     return new Promise((res) => {
@@ -655,6 +652,7 @@ class Arm {
   }
   hold(tok, mode = 'upright') { this.held = tok; this.holdMode = mode; if (tok.mesh.parent !== scene) scene.attach(tok.mesh); tok.mode = 'held'; }
   release() { const t = this.held; this.held = null; if (t) t.mode = 'static'; return t; }
+  setJ(name, q) { const J = this.jq[name]; J.g.quaternion.setFromAxisAngle(J.axis, q); }
   update(dt) {
     let p = this.cur.p, pitch = this.cur.pitch, roll = this.cur.roll, grip = this.cur.grip;
     if (this.tw) {
@@ -668,24 +666,23 @@ class Arm {
     this.breath += ((this.idle && !this.tw ? 1 : 0) - this.breath) * Math.min(1, dt * 2.5);
     pp.z += this.breath * 0.006 * Math.sin(simTime * 1.1 + this.phase);
     pp.x += this.breath * 0.004 * Math.sin(simTime * 0.7 + this.phase * 2);
-    const psi = pitch ?? this.autoPitch(pp);
+    let phi = pitch ?? this.autoPitch(pp);
+    let q = this.solve(pp, phi);
+    if (!q) { phi = this.autoPitch(pp); q = this.solve(pp, phi); }
+    if (q) this.q = q;  // out of reach: hold the last pose
     this.liveRoll = roll;
-    const s = this.solve(pp, psi);
-    this.pan.rotation.z = s.pan;
-    this.sh.rotation.y = -s.th1;
-    this.el.rotation.y = -(s.th2 - s.th1);
-    this.wr.rotation.y = -(psi - s.th2);
-    this.rollG.rotation.x = roll;
-    const gap = 0.008 + 0.038 * clamp(grip, 0, 1);
-    this.f1.position.y = gap / 2 + 0.003; this.f2.position.y = -gap / 2 - 0.003;
+    this.setJ('shoulder_pan', this.q[0]); this.setJ('shoulder_lift', this.q[1]);
+    this.setJ('elbow_flex', this.q[2]); this.setJ('wrist_flex', this.q[3]);
+    this.setJ('wrist_roll', roll);
+    const [glo] = LIM.gripper; this.setJ('gripper', glo + clamp(grip, 0, 1) * (1.0 - glo));
     this.root.updateMatrixWorld(true);
   }
   placeHeld() {
     const t = this.held; if (!t) return;
     const tp = this.tip.getWorldPosition(new V3());
-    let q;
-    if (this.holdMode === 'rigid') q = this.tip.getWorldQuaternion(new THREE.Quaternion()).multiply(new THREE.Quaternion().setFromAxisAngle(new V3(0, 1, 0), -Math.PI / 2));
-    else q = new THREE.Quaternion().setFromAxisAngle(new V3(0, 0, 1), this.pan.rotation.z - this.liveRoll);
+    const qr = this.tip.getWorldQuaternion(new THREE.Quaternion()).multiply(QALIGN);
+    let q = qr;
+    if (this.holdMode !== 'rigid') { const xw = new V3(1, 0, 0).applyQuaternion(qr); q = new THREE.Quaternion().setFromAxisAngle(ZAX, Math.atan2(xw.y, xw.x)); }
     t.mesh.quaternion.copy(q);
     t.mesh.position.copy(tp).sub(ANCHOR[t.kind].clone().applyQuaternion(q));
   }
@@ -1079,6 +1076,7 @@ if (!HEADLESS) {
     ['盖滑道', `内宽 ${mm(R.CAP.w)} mm,9°,${chuteLen('cap').toFixed(2)} m`],
     ['球道', `内宽 ${mm(R.red.w)} mm,3°,${chuteLen('ball').toFixed(2)} m(含料斗前后两段)`],
     ['模块 / 支柱', `${nModules} 个滑道模块,${nPosts} 根支柱`],
+    ['机械臂', `SO-100(TheRobotStudio 官方 URDF 和网格,Apache-2.0):大臂 ${mm(PLN.L1)} mm,小臂 ${mm(PLN.L2)} mm,腕到夹爪中心 ${mm(PLN.LT)} mm`],
   ].map(([k, v]) => `<tr><td style="color:var(--muted);white-space:nowrap">${k}</td><td>${v}</td></tr>`).join('');
   let lastCard = '';
   function renderBoard(force) {
@@ -1096,8 +1094,9 @@ if (!HEADLESS) {
       html = `<div class="who"><span class="armbtn sel">${a.id}</span><span class="chip"><b>${u.id}</b>${u.name}</span></div>
         <p>${a.role}</p>
         <dl class="kv"><dt>正在做</dt><dd>${a.action}</dd>
-        <dt>最远作业点</dt><dd class="mono">${(a.reach * 100).toFixed(1)} cm <span class="meta">(水平距离;末端朝下约 ${(REACH_NOTE * 100).toFixed(0)} cm 内)</span></dd>
-        <dt>底座位置</dt><dd class="mono">x ${(a.base.x * 100).toFixed(1)}, y ${(a.base.y * 100).toFixed(1)} cm</dd></dl>`;
+        <dt>最远作业点</dt><dd class="mono">${(a.reach * 100).toFixed(1)} cm <span class="meta">(离旋转轴的水平距离)</span></dd>
+        <dt>关节角</dt><dd class="mono">${a.q.map((v) => (v * 180 / Math.PI).toFixed(0) + '°').join(' / ')} <span class="meta">(旋转 / 抬臂 / 肘 / 腕)</span></dd>
+        <dt>底座位置</dt><dd class="mono">x ${(a.base.x * 100).toFixed(1)}, y ${(a.base.y * 100).toFixed(1)} cm,朝向 ${((a.yaw * 180 / Math.PI) % 360).toFixed(0)}°</dd></dl>`;
     }
     if (force || html !== lastCard) { armCard.innerHTML = html; lastCard = html; }
     const c = counts();
@@ -1153,5 +1152,21 @@ if (!HEADLESS) {
   }
   renderBoard(true);
   requestAnimationFrame(frame);
+
+  // SO-100 meshes (published next to the page)
+  const loadNote = document.getElementById('loadNote');
+  const b64 = (s, T) => { const bin = atob(s), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); return new T(u8.buffer); };
+  fetch('so100_mesh.json').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }).then((data) => {
+    const geoms = {};
+    for (const [name, m] of Object.entries(data.meshes)) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(b64(m.pos, Float32Array), 3));
+      g.setIndex(new THREE.BufferAttribute(b64(m.idx, m.idx_type === 'u16' ? Uint16Array : Uint32Array), 1));
+      const flat = g.toNonIndexed(); flat.computeVertexNormals();  // faceted, like the CAD
+      geoms[name] = flat;
+    }
+    for (const a of Object.values(arms)) a.attachMeshes(geoms);
+    loadNote.hidden = true;
+  }).catch(() => { loadNote.textContent = 'SO-100 模型(so100_mesh.json)加载失败,机械臂暂不显示。'; });
 }
 </script>

@@ -206,36 +206,14 @@ def build_all() -> dict[str, Route]:
     return {k: build_route(k, v) for k, v in L.ROUTES.items()}
 
 
-# ---------------- arm reach (same model as the 3D page) ----------------
-def _feasible(base, p, psi):
-    a = L.ARM
-    lt = a["LW"] + a["LG"]
-    h = math.hypot(p[0] - base[0], p[1] - base[1])
-    wr, wz = h - lt * math.cos(psi), p[2] - lt * math.sin(psi) - (L.PT + a["SH"])
-    d = math.hypot(wr, wz)
-    return abs(a["L1"] - a["L2"]) + 0.006 <= d <= a["L1"] + a["L2"] - 0.003
-
-
-def tool_pitch_needed(base, p) -> float | None:
-    """Smallest tilt from straight-down (deg) that reaches ``p``; None if out of reach."""
-    for k in range(0, 81):
-        if _feasible(base, p, -math.pi / 2 + math.radians(k)):
-            return float(k)
-    return None
-
-
-def reach_report(routes: dict[str, Route]) -> list[dict]:
+# ---------------- arm reach (SO-100 model, same maths as the 3D page) ----------------
+def arm_targets(routes: dict[str, Route]) -> dict[str, list[tuple[str, tuple[float, float, float]]]]:
+    """Every point each arm's gripper has to reach (pinch point, world m), with a label."""
     g = L.GRIP_Z / 1000
     top = L.TUBE_TOP_Z / 1000
     nest_z = L.PT + 0.002
-    arms = {a["id"]: a for a in L.ARMS}
     units = {u["id"]: u for u in L.UNITS}
-    rows = []
-
-    def chk(arm_id, label, p):
-        b = arms[arm_id]["xy"]
-        need = tool_pitch_needed(b, p)
-        rows.append(dict(arm=arm_id, what=label, horiz=math.hypot(p[0] - b[0], p[1] - b[1]), z=p[2], tilt=need))
+    out: dict[str, list] = {a["id"]: [] for a in L.ARMS}
 
     def stop(rt):
         (x, y), _ = rt.at(rt.length)
@@ -253,30 +231,98 @@ def reach_report(routes: dict[str, Route]) -> list[dict]:
         ix, iy, iz = stop(routes[u["inP"]])
         ox, oy, oz = drop(routes[u["outP"]])
         nx, ny = u["nest"]
-        chk(holder, "入口取瓶(悬停)", (ix, iy, iz + g + 0.06))
-        chk(holder, "工位(悬停)", (nx, ny, nest_z + g + 0.07))
-        chk(holder, "出口放瓶(悬停)", (ox, oy, oz + g + 0.07))
+        out[holder] += [("入口取瓶", (ix, iy, iz + g)), ("入口上方", (ix, iy, iz + g + 0.06)),
+                        ("工位", (nx, ny, nest_z + g)), ("工位上方", (nx, ny, nest_z + g + 0.06)),
+                        ("出口放瓶", (ox, oy, oz + g)), ("出口上方", (ox, oy, oz + g + 0.06))]
+    r = L.BALL_D / 2000
     for c in ("red", "green", "blue"):
         x, y, z = stop(routes[c])
-        chk("A1", f"{c} 球道末端(悬停)", (x, y, z + L.BALL_D / 2000 + 0.05))
+        out["A1"] += [(f"{c} 球道末端取球", (x, y, z + r)), (f"{c} 球道上方", (x, y, z + r + 0.05))]
         x, y, z = drop(routes[c])
-        chk("A8", f"{c} 球道入口(放球)", (x, y, z + L.BALL_D / 2000 + 0.03))
+        out["A8"] += [(f"{c} 球道入口放球", (x, y, z + r + 0.004)), (f"{c} 球道入口上方", (x, y, z + r + 0.034))]
     nx, ny = units["U1"]["nest"]
-    chk("A1", "瓶口上方投球", (nx, ny, nest_z + top + 0.035))
+    out["A1"].append(("瓶口上方投球", (nx, ny, nest_z + top + 0.035)))
+    cap_c = (L.TUBE_TOP_Z - (L.CAP_H - L.CAP_TOP_T) + L.CAP_H / 2) / 1000
     x, y, z = stop(routes["CAP"])
-    chk("A3", "盖滑道末端(悬停)", (x, y, z + 0.008 + 0.05))
-    nx, ny = units["U2"]["nest"]
-    chk("A3", "瓶口放盖(悬停)", (nx, ny, nest_z + top + 0.045))
-    nx, ny = units["U4"]["nest"]
-    chk("A6", "瓶口拆盖", (nx, ny, nest_z + top + 0.003))
+    out["A3"] += [("盖滑道末端取盖", (x, y, z + L.CAP_H / 2000)), ("盖滑道上方", (x, y, z + L.CAP_H / 2000 + 0.05))]
+    for uid, arm in (("U2", "A3"), ("U4", "A6")):
+        nx, ny = units[uid]["nest"]
+        out[arm] += [("瓶口取/放盖", (nx, ny, nest_z + cap_c)), ("瓶口上方", (nx, ny, nest_z + cap_c + 0.05))]
+    for uid, arm in (("U2", "A2"), ("U4", "A5")):
+        nx, ny = units[uid]["nest"]
+        out[arm].append(("侧面扶瓶", (nx, ny, nest_z + 0.05)))
     x, y, z = drop(routes["CAP"])
-    chk("A6", "盖滑道入口(悬停)", (x, y, z + 0.008 + 0.05))
-    chk("A4", "相机前", tuple(L.INSPECT))
+    out["A6"] += [("盖滑道入口放盖", (x, y, z + L.CAP_H / 2000 + 0.004)), ("盖滑道入口上方", (x, y, z + L.CAP_H / 2000 + 0.05))]
+    out["A4"].append(("相机前", tuple(L.INSPECT)))
     fx, fy = L.FUNNEL["xy"]
-    chk("A7", "漏斗上方", (fx, fy + 0.03, 0.235))
+    out["A7"] += [("漏斗上方", (fx - 0.004, fy + 0.03, 0.235)), ("倒扣位置", (fx - 0.004, fy + 0.035, 0.215))]
     x, y, z = stop(routes["M2"])
-    chk("A8", "料斗出口取球(悬停)", (x, y, z + L.BALL_D / 2000 + 0.05))
+    out["A8"] += [("料斗出口取球", (x, y, z + r)), ("料斗出口上方", (x, y, z + r + 0.05))]
+    return out
+
+
+def arm_yaws(targets) -> dict[str, float]:
+    """Base yaw per arm so the middle of its work sits straight ahead of the pan zero."""
+    from . import arm_model as A
+
+    yaws = {}
+    for a in L.ARMS:
+        bx, by = a["xy"]
+        sx = sum(math.cos(math.atan2(p[1] - by, p[0] - bx)) for _, p in targets[a["id"]])
+        sy = sum(math.sin(math.atan2(p[1] - by, p[0] - bx)) for _, p in targets[a["id"]])
+        yaws[a["id"]] = math.atan2(sy, sx) - A.P["forward_yaw"]
+    return yaws
+
+
+def reach_report(routes: dict[str, Route]) -> list[dict]:
+    from . import arm_model as A
+
+    targets = arm_targets(routes)
+    yaws = arm_yaws(targets)
+    rows = []
+    for a in L.ARMS:
+        b = a["xy"]
+        for label, p in targets[a["id"]]:
+            rows.append(dict(arm=a["id"], what=label, horiz=math.hypot(p[0] - b[0], p[1] - b[1]), z=p[2], tilt=A.tilt_needed(b, L.PT, yaws[a["id"]], p)))
     return rows
+
+
+def base_clearance(routes: dict[str, Route]) -> list[str]:
+    """Things the SO-100 base footprint would sit on (chutes, nests, other bases, cones)."""
+    from . import arm_model as A
+
+    yaws = arm_yaws(arm_targets(routes))
+    x0, y0, x1, y1 = A.P["base_box"]
+    problems = []
+
+    def inside(arm, x, y, margin):
+        bx, by = arm["xy"]
+        c, s = math.cos(-yaws[arm["id"]]), math.sin(-yaws[arm["id"]])
+        lx, ly = c * (x - bx) - s * (y - by), s * (x - bx) + c * (y - by)
+        return x0 - margin <= lx <= x1 + margin and y0 - margin <= ly <= y1 + margin
+
+    for a in L.ARMS:
+        for k, r in routes.items():
+            half = (r.fam["W"] / 2 + L.WALL_T) / 1000
+            n = int((r.length + r.end_ext) / 0.005) + 1
+            if any(inside(a, *r.at(i * 0.005)[0], half) for i in range(n)):
+                problems.append(f"{a['id']} 底座压到滑道 {k}")
+        for u in L.UNITS:
+            if u["nest"] and any(inside(a, u["nest"][0] + dx, u["nest"][1] + dy, 0.0) for dx in (-0.0375, 0, 0.0375) for dy in (-0.0375, 0, 0.0375)):
+                problems.append(f"{a['id']} 底座压到 {u['id']} 工位")
+        for spec, name in ((L.FUNNEL, "漏斗"), (L.HOPPER, "料斗")):
+            cx, cy = spec["xy"]
+            rr = spec["top_r"] / 1000
+            if any(inside(a, cx + rr * math.cos(t / 8 * math.pi), cy + rr * math.sin(t / 8 * math.pi), 0.0) for t in range(16)):
+                problems.append(f"{a['id']} 底座在{name}下面(漏斗/料斗架在空中,只需确认高度)")
+        u = next(u for u in L.UNITS if u["id"] == a["unit"])
+        corners = []
+        c, s = math.cos(yaws[a["id"]]), math.sin(yaws[a["id"]])
+        for lx, ly in ((x0, y0), (x0, y1), (x1, y0), (x1, y1)):
+            corners.append((a["xy"][0] + c * lx - s * ly, a["xy"][1] + s * lx + c * ly))
+        if not all(u["rect"][0] - 0.005 <= x <= u["rect"][2] + 0.005 and u["rect"][1] - 0.005 <= y <= u["rect"][3] + 0.005 for x, y in corners):
+            problems.append(f"{a['id']} 底座伸出 {u['id']} 底板")
+    return problems
 
 
 def drop_s(rt: Route) -> float:

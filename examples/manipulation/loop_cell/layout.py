@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""One parameter set for the 8 x SO-101 loop cell: part sizes, unit layout, chute routes.
+"""One parameter set for the 8 x SO-100 loop cell: part sizes, unit layout, chute routes.
 
 ``build.py`` turns this into printable CAD, a BOM and the 3D page's layout, so the page and
 the parts never disagree. Lengths in mm for parts, metres for the table layout (z up, x right,
@@ -68,27 +68,27 @@ SADDLE_L, SADDLE_T, SADDLE_STEP = 30.0, 4.0, 0.5  # joint saddle; downstream sid
 FOOT_H = 20.0  # post foot incl. boss; spacers stack on top
 SPACERS = (20.0, 10.0, 5.0, 2.0)
 
-# ---------------- arm (SO-101 estimate, m) ----------------
-ARM = dict(L1=0.116, L2=0.135, LW=0.03, LG=0.075, SH=0.10)
+# Arms are SO-100 from TheRobotStudio's URDF: see so100.py / so100_model.json. ``xy`` below is the
+# pan axis; the base yaw is chosen by routes.arm_yaws so the arm faces the middle of its work.
 
 # ---------------- layout (m) ----------------
 UNITS = [
-    dict(id="U1", name="灌装", sub="取球放入瓶口", rect=[-0.2, 0.4, 0.2, 0.6], nest=[0.0375, 0.5375], arms=["A1"], inP="P51", outP="P12"),
+    dict(id="U1", name="灌装", sub="取球放入瓶口", rect=[-0.2, 0.2, 0.2, 0.6], nest=[0.0375, 0.5375], arms=["A1"], inP="P51", outP="P12"),
     dict(id="U2", name="封盖拧紧", sub="扶瓶 + 放盖拧紧", rect=[0.4, 0.0, 0.8, 0.4], nest=[0.6, 0.2125], arms=["A2", "A3"], inP="P12", outP="P23"),
     dict(id="U3", name="质检追溯", sub="相机读序列和码", rect=[0.4, -0.4, 0.8, -0.2], nest=[0.7, -0.3], arms=["A4"], inP="P23", outP="P34"),
     dict(id="U4", name="拆盖", sub="扶瓶 + 拧开", rect=[-0.2, -0.8, 0.2, -0.4], nest=[0.0, -0.6], arms=["A5", "A6"], inP="P34", outP="P45"),
-    dict(id="U5", name="倒球", sub="倾倒 + 查空", rect=[-0.6, -0.4, -0.2, -0.2], nest=[-0.5125, -0.275], arms=["A7"], inP="P45", outP="P51"),
+    dict(id="U5", name="倒球", sub="倾倒 + 查空", rect=[-0.6, -0.6, -0.2, -0.2], nest=[-0.5125, -0.275], arms=["A7"], inP="P45", outP="P51"),
     dict(id="U6", name="分拣", sub="相机按色分球", rect=[-0.6, 0.0, -0.2, 0.2], nest=None, arms=["A8"]),
 ]
 ARMS = [
-    dict(id="A1", unit="U1", xy=[0.0125, 0.45], role="取球放入瓶口;也负责把瓶子从入口搬进工位、再送到出口。"),
-    dict(id="A2", unit="U2", xy=[0.7375, 0.2125], role="扶瓶;负责瓶子进出工位。"),
-    dict(id="A3", unit="U2", xy=[0.4625, 0.2875], role="从盖滑道取盖,放到瓶口,转约 90–120° 锁紧。"),
-    dict(id="A4", unit="U3", xy=[0.5125, -0.3], role="把瓶子举到相机前转一圈,读出球的颜色序列和托座码。"),
-    dict(id="A5", unit="U4", xy=[0.0, -0.725], role="扶瓶;负责瓶子进出工位。"),
-    dict(id="A6", unit="U4", xy=[0.0, -0.475], role="反向转开瓶盖,放进盖滑道送回 U2。"),
-    dict(id="A7", unit="U5", xy=[-0.4125, -0.325], role="把瓶子倒扣在漏斗上倒出小球,确认倒空后放回。"),
-    dict(id="A8", unit="U6", xy=[-0.4, 0.1375], role="从料斗出口取球,相机认颜色,放进红、绿、蓝球道。"),
+    dict(id="A1", unit="U1", xy=[0.0375, 0.3875], role="取球放入瓶口;也负责把瓶子从入口搬进工位、再送到出口。"),
+    dict(id="A2", unit="U2", xy=[0.725, 0.2125], role="扶瓶;负责瓶子进出工位。"),
+    dict(id="A3", unit="U2", xy=[0.4875, 0.3], role="从盖滑道取盖,放到瓶口,转约 90–120° 锁紧。"),
+    dict(id="A4", unit="U3", xy=[0.4875, -0.275], role="把瓶子举到相机前转一圈,读出球的颜色序列和托座码。"),
+    dict(id="A5", unit="U4", xy=[0.0125, -0.7125], role="扶瓶;负责瓶子进出工位。"),
+    dict(id="A6", unit="U4", xy=[-0.0625, -0.4875], role="反向转开瓶盖,放进盖滑道送回 U2。"),
+    dict(id="A7", unit="U5", xy=[-0.4125, -0.4625], role="把瓶子倒扣在漏斗上倒出小球,确认倒空后放回。"),
+    dict(id="A8", unit="U6", xy=[-0.4625, 0.125], role="从料斗出口取球,相机认颜色,放进红、绿、蓝球道。"),
 ]
 
 

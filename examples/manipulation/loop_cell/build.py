@@ -30,7 +30,7 @@ from collections import Counter
 from pathlib import Path
 
 from . import layout as L
-from .routes import build_all, drop_s, reach_report
+from .routes import arm_targets, arm_yaws, base_clearance, build_all, drop_s, reach_report
 
 HERE = Path(__file__).resolve().parent
 PLA = 1.24  # g/cm³
@@ -48,7 +48,7 @@ def part_list(routes) -> list[dict]:
         dict(name="tile_200", make=("tile",), qty=n_tiles, mat="PLA", note="底座拼接块,25 mm 网格装 M4 热熔螺母"),
         dict(name="tile_joiner", make=("joiner",), qty=joiners, mat="PLA", note="拼接块底面跨缝连接板"),
         dict(name="tile_foot_pad", make=("foot_pad",), qty=4 * n_tiles, mat="TPU", note="拼接块四角脚垫"),
-        dict(name="arm_clamp_dog", make=("clamp_dog",), qty=4 * len(L.ARMS), mat="PETG", note="压住 SO-101 底座;先量底座法兰厚度再改参数"),
+        dict(name="arm_clamp_dog", make=("clamp_dog",), qty=4 * len(L.ARMS), mat="PETG", note="压住 SO-100 底座;先量底座法兰厚度再改参数"),
         dict(name="puck_body", make=("puck_body",), qty=L.N_BOTTLES + 1, mat="PETG", note="托座;3 颗 Ø8 钢珠装进盲孔"),
         dict(name="puck_sole", make=("puck_sole",), qty=L.N_BOTTLES + 1, mat="PETG", note="粘在托座底面,挡住钢珠"),
         dict(name="tube_collar", make=("collar",), qty=L.N_BOTTLES + 1, mat="PETG", note="粘在管口,四头卡口螺纹 + 卡位凸点"),
@@ -143,6 +143,7 @@ def export_parts(parts, out: Path) -> dict[str, float]:
 
 
 def page_layout(routes) -> dict:
+    yaws = arm_yaws(arm_targets(routes))
     def dense(r):
         n = max(2, int(r.length / 0.004))
         return [[round(c, 5) for c in r.at(r.length * i / n)[0]] for i in range(n + 1)]
@@ -158,7 +159,8 @@ def page_layout(routes) -> dict:
         )
     mm = 1 / 1000
     return dict(
-        PT=L.PT, END_Z=L.END_Z, tile=L.TILE * mm, table=L.TABLE, units=L.UNITS, arms=L.ARMS, routes=rts, arm=L.ARM,
+        PT=L.PT, END_Z=L.END_Z, tile=L.TILE * mm, table=L.TABLE, units=L.UNITS, arms=[dict(a, yaw=yaws[a['id']]) for a in L.ARMS], routes=rts,
+        so100=json.loads((HERE / "so100_model.json").read_text(encoding="utf-8")),
         funnel=dict(xy=L.FUNNEL["xy"], top_r=L.FUNNEL["top_r"] * mm, out_r=L.FUNNEL["out_r"] * mm, h=L.FUNNEL["h"] * mm, z0=routes["M1"].z(0) + 0.002),
         hopper=dict(xy=L.HOPPER["xy"], top_r=L.HOPPER["top_r"] * mm, out_r=L.HOPPER["out_r"] * mm, h=L.HOPPER["h"] * mm, z0=routes["M2"].z(0) + 0.002),
         inspect=L.INSPECT, cameras=L.CAMERAS,
@@ -217,7 +219,7 @@ def write_bom(parts, vols, routes, reach, out: Path) -> None:
             lines.append(f"| {k} | {i} | {g} | {j['post_mm']:.0f} | {' + '.join(_fmt(s) for s in j['spacers']) or '–'} | {j['adjust_mm']:.1f} |")
     for name, post, stack, rest in extra_posts(routes)["rows"]:
         lines.append(f"| {name} | – | {'拼接块' if name == 'funnel' else '台面'} | {post:.0f} | {' + '.join(_fmt(s) for s in stack) or '–'} | {rest:.1f} |")
-    lines += ["", "## 机械臂可达性", "", "末端朝下够不到时,允许工具倾斜;倾斜越大越吃力(超过 60° 需要调布局)。", "", "| 臂 | 作业点 | 水平距离 cm | 高度 cm | 需要倾斜 |", "|---|---|---:|---:|---:|"]
+    lines += ["", "## 机械臂可达性", "", "用 TheRobotStudio SO-100 URDF 的真实尺寸和关节限位算的。末端朝下够不到时允许工具倾斜;倾斜越大越吃力(超过 60° 需要调布局)。", "", "| 臂 | 作业点 | 水平距离 cm | 高度 cm | 需要倾斜 |", "|---|---|---:|---:|---:|"]
     for row in reach:
         t = "够不到" if row["tilt"] is None else f"{row['tilt']:.0f}°"
         lines.append(f"| {row['arm']} | {row['what']} | {row['horiz'] * 100:.1f} | {row['z'] * 100:.1f} | {t} |")
@@ -226,7 +228,7 @@ def write_bom(parts, vols, routes, reach, out: Path) -> None:
               "- 滑道零件按导出的方向打印(底面贴平台),层纹顺着流动方向;底面贴 PTFE 胶带的只有盖滑道。",
               "- 瓶盖顶面朝下打印;托座、套环 PETG,0.2 mm 层高。",
               "- 闸门的舵机托架和摇臂尺寸按 SG90 标称值画的,装之前用实物比一下。",
-              "- `arm_clamp_dog` 的唇口高度要按你的 SO-101 底座法兰厚度改(`cad.clamp_dog(flange_h=...)`)。"]
+              "- `arm_clamp_dog` 的唇口高度要按你的 SO-100 底座法兰厚度改(`cad.clamp_dog(flange_h=...)`)。"]
     (out / "BOM.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -252,6 +254,8 @@ def main(argv=None) -> int:
     bad = [r for r in reach if r["tilt"] is None or r["tilt"] > 60]
     for r in bad:
         print(f"WARNING reach: {r['arm']} {r['what']} tilt={r['tilt']}")
+    for msg in base_clearance(routes):
+        print(f"WARNING base: {msg}")
     for k, r in routes.items():
         for j in r.joints:
             if not j["ok"]:
