@@ -129,9 +129,9 @@ tr.unitrow:hover td { background: #f3f2ee; }
 
 <div class="page">
   <header>
-    <div class="eyebrow">SO-100 × 8 · 6 个单元 · 打印版尺寸</div>
+    <div class="eyebrow">SO-100 × 8 · 6 个单元 · 打印版尺寸 · <a href="parts.html" style="color:inherit">零件模拟</a></div>
     <h1>八臂循环产线 <span class="lat">almost a line</span></h1>
-    <p class="lede">打印版布局:底座是 200 mm 拼接块,瓶子插在带钢珠的托座里滚着走,滑道由标准模块拼成。页面尺寸和 CAD 零件来自同一份参数,改了参数两边一起更新。</p>
+    <p class="lede">打印版布局:台面 145 × 119 cm,底座是 160 mm 拼接块,每台臂单独站一块;瓶子插在带钢珠的托座里滚着走,滑道由标准模块拼成。页面尺寸和 CAD 零件来自同一份参数,改了参数两边一起更新。</p>
   </header>
 
   <figure>
@@ -196,20 +196,19 @@ tr.unitrow:hover td { background: #f3f2ee; }
         <li><svg width="34" height="10" aria-hidden="true"><line x1="1" y1="5" x2="33" y2="5" stroke="#7963bc" stroke-width="4"/></svg>盖滑道(U4 → U2)</li>
         <li><svg width="34" height="10" aria-hidden="true"><line x1="1" y1="5" x2="33" y2="5" stroke="#df922f" stroke-width="4"/></svg>混色球:漏斗 → 料斗 → U6</li>
         <li><svg width="34" height="14" aria-hidden="true"><line x1="1" y1="2" x2="33" y2="2" stroke="#d6483b" stroke-width="3"/><line x1="1" y1="7" x2="33" y2="7" stroke="#4f9a45" stroke-width="3"/><line x1="1" y1="12" x2="33" y2="12" stroke="#3b72c8" stroke-width="3"/></svg>分色球道(U6 → U1)</li>
-        <li><svg width="34" height="14" aria-hidden="true"><rect x="1" y="2" width="15" height="10" rx="1" fill="#d3dfd5" stroke="#8fae98"/><rect x="18" y="2" width="15" height="10" rx="1" fill="#d3dfd5" stroke="#8fae98"/></svg>200 mm 底座拼接块</li>
+        <li><svg width="34" height="14" aria-hidden="true"><rect x="1" y="2" width="15" height="10" rx="1" fill="#d3dfd5" stroke="#8fae98"/><rect x="18" y="2" width="15" height="10" rx="1" fill="#d3dfd5" stroke="#8fae98"/></svg>160 mm 底座拼接块(深色的是臂座)</li>
         <li><svg width="34" height="14" aria-hidden="true"><rect x="12" y="2" width="10" height="10" fill="#2b2d31"/></svg>末端闸门的舵机</li>
       </ul>
     </div>
   </section>
 
   <section>
-    <h2>和上一版相比</h2>
+    <h2>这一版</h2>
     <ul class="notes">
-      <li>机械臂换成 SO-100 官方模型:网格和关节链来自 TheRobotStudio/SO-ARM100 的 URDF(Apache-2.0),动作用和 URDF 正运动学核对过的逆运动学驱动,并遵守官方关节限位。</li>
-      <li>按真实尺寸重新摆了臂:SO-100 的抬臂轴在旋转轴前 3 cm,腕到夹爪中心 14.6 cm,底座在旋转轴后面还有 7 cm。离底座太近的点反而够不到,所以 U1、U5 扩成 2 × 2 块,底座一共 20 块。</li>
-      <li>8 台臂的作业点都够得到,底座都落在自己的底板上、不压滑道和工位。最吃力的是 A7(倾倒和放回程起点,工具要倾斜约 46°),其余在 32° 以内。选中一台臂可以看到实时关节角。</li>
-      <li>瓶子是「托座 + 买来的透明管」,托座底下 3 颗 Ø8 钢珠,在 3° 的滑道上就能滚;瓶盖是四头卡口;滑道由喇叭段、直段、R100 弯段和闸门段拼成,每个接头下面一根可调支柱。</li>
-      <li>零件清单、拼装顺序、支柱高度和可达性表见 <span class="mono">loop_cell/cad/BOM.md</span>。</li>
+      <li>按 145 × 119 cm 的台面排:底座是 160 mm 拼接块,每台 SO-100 单独站一块(深色的那几块),底座摆正,压块压在两侧。瓶子滑道沿桌边绕一圈,臂都在圈里面,中间留给球道、盖滑道和漏斗 → 料斗。</li>
+      <li>机械臂是 SO-100 官方模型(TheRobotStudio/SO-ARM100 的 URDF 和网格,Apache-2.0),动作用和 URDF 正运动学核对过的逆运动学驱动,遵守官方关节限位。8 台臂的作业点都够得到,最吃力的是 A7 倒球(工具倾斜约 44°)。</li>
+      <li>零件改了几处:脚垫加到 5 mm,缝下连接板不再顶住桌面;闸门的 SG90 侧躺,挡销偏到一边、从两个挨着的圆之间的缝里升起;漏斗和料斗出口离球道底面 18 mm,球能从下面滚出去;漏斗后面那段球道的末端高过料斗口。</li>
+      <li>每个零件怎么装、怎么干活,见 <a href="parts.html">零件模拟</a>;零件清单、拼装顺序、支柱高度和可达性表见 <span class="mono">loop_cell/cad/BOM.md</span>。</li>
     </ul>
   </section>
 </div>
@@ -241,7 +240,7 @@ const CAP_R = LAYOUT.cap.d / 2, CAP_H = LAYOUT.cap.h, CAP_SEAT = LAYOUT.cap.seat
 const GRIP_Z = CAR.grip_z;
 
 const COL = {
-  table: '#dddcd3', plate: '#d3dfd5', plateEdge: '#8fae98', clay: '#efebe3', claySel: '#f4c79c', servo: '#2b2d31',
+  table: '#dddcd3', plate: '#d3dfd5', armPlate: '#b9cdbf', plateEdge: '#8fae98', clay: '#efebe3', claySel: '#f4c79c', servo: '#2b2d31',
   post: '#bdbab0', chute: '#9a9893', cap: '#7963bc', mix: '#df922f', nest: '#5d6166', puck: '#e7e1d2',
   red: '#d6483b', green: '#4f9a45', blue: '#3b72c8', glass: '#bcd8e2',
 };
@@ -304,7 +303,7 @@ const TABLE = { w: TB.x[1] - TB.x[0], d: TB.y[1] - TB.y[0], cx: (TB.x[0] + TB.x[
     g.fillStyle = 'rgba(44,44,44,.55)'; g.font = '28px "Space Mono", monospace';
     g.fillText('10 cm', 0.06 * px, H - 0.075 * px);
     g.fillRect(0.06 * px, H - 0.06 * px, 0.1 * px, 6);
-    g.fillText(`${TABLE.w.toFixed(2)} × ${TABLE.d.toFixed(2)} m · SO-101 × 8`, W - 0.66 * px, H - 0.05 * px);
+    g.fillText(`${TABLE.w.toFixed(2)} × ${TABLE.d.toFixed(2)} m · SO-100 × 8`, W - 0.66 * px, H - 0.05 * px);
     const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
   })();
   const side = mat('#cfcdc3');
@@ -313,25 +312,31 @@ const TABLE = { w: TB.x[1] - TB.x[0], d: TB.y[1] - TB.y[0], cx: (TB.x[0] + TB.x[
   scene.add(top);
 }
 
-// unit base: 200 mm tiles with the 25 mm insert grid printed on top
-const tileTopTex = HEADLESS ? null : (() => {
+// unit base: 160 mm tiles with the 20 mm insert grid printed on top; an arm stands on its own tile
+const tileTex = (fill) => HEADLESS ? null : (() => {
   const cv = document.createElement('canvas'); cv.width = 256; cv.height = 256;
-  const g = cv.getContext('2d'); g.fillStyle = COL.plate; g.fillRect(0, 0, 256, 256);
+  const g = cv.getContext('2d'); g.fillStyle = fill; g.fillRect(0, 0, 256, 256);
   g.fillStyle = 'rgba(60,80,66,.55)';
-  for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) { g.beginPath(); g.arc(16 + 32 * i, 16 + 32 * j, 3.6, 0, 6.29); g.fill(); }
+  const n = Math.round(LAYOUT.tile / LAYOUT.grid), p = 256 / n;
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) { g.beginPath(); g.arc(p / 2 + p * i, p / 2 + p * j, 3.6, 0, 6.29); g.fill(); }
   const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return t;
 })();
+const tileTopTex = tileTex(COL.plate), armTileTex = tileTex(COL.armPlate);
 const unitById = {};
 {
   const tg = new RoundedBoxGeometry(LAYOUT.tile - 0.0015, LAYOUT.tile - 0.0015, PT - 0.002, 2, 0.003);
   const tm = tileTopTex ? [M.plate, M.plate, M.plate, M.plate, mat('#ffffff', { map: tileTopTex }), M.plate] : M.plate;
+  const armM = mat(COL.armPlate);
+  const am = armTileTex ? [armM, armM, armM, armM, mat('#ffffff', { map: armTileTex }), armM] : armM;
+  const isArmTile = (x, y) => LAYOUT.arms.some((a) => Math.abs(a.plate[0] - x) < 1e-3 && Math.abs(a.plate[1] - y) < 1e-3);
   const nestG = new RoundedBoxGeometry(0.075, 0.075, 0.009, 2, 0.004);
   for (const u of UNITS) {
     unitById[u.id] = u;
     const nx = Math.round((u.rect[2] - u.rect[0]) / LAYOUT.tile), ny = Math.round((u.rect[3] - u.rect[1]) / LAYOUT.tile);
     for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) {
-      const t = shadowy(new THREE.Mesh(tg, tm), false, true);
-      t.position.set(u.rect[0] + LAYOUT.tile * (i + 0.5), u.rect[1] + LAYOUT.tile * (j + 0.5), 0.002 + (PT - 0.002) / 2);
+      const x = u.rect[0] + LAYOUT.tile * (i + 0.5), y = u.rect[1] + LAYOUT.tile * (j + 0.5);
+      const t = shadowy(new THREE.Mesh(tg, isArmTile(x, y) ? am : tm), false, true);
+      t.position.set(x, y, 0.002 + (PT - 0.002) / 2);
       scene.add(t);
     }
     if (u.nest) {
@@ -836,11 +841,11 @@ const PROCESS = {
     u.state = '取瓶'; A.action = '拿起瓶子';
     await pickBottle(A, nb); A.hold(bottle);
     await A.go({ p: up(nb, GRIP_Z + 0.06) }, 0.35);
-    const pre = new V3(FUNNEL.x - 0.004, FUNNEL.y + 0.03, 0.235);
+    const pre = new V3(FUNNEL.x - 0.004, FUNNEL.y + 0.03, LAYOUT.hopper.pour.above);
     await A.go({ p: pre }, 0.75);
     u.state = '倾倒'; A.action = '倒扣在漏斗上';
     A.holdMode = 'rigid';
-    await A.go({ p: new V3(FUNNEL.x - 0.004, FUNNEL.y + 0.035, 0.215), pitch: 0.55 }, 1.0);
+    await A.go({ p: new V3(FUNNEL.x - 0.004, FUNNEL.y + 0.035, LAYOUT.hopper.pour.at), pitch: 0.55 }, 1.0);
     const throat = new V3(FUNNEL.x, FUNNEL.y, FUNNEL.z + 0.012);
     const balls = bottle.balls.splice(0).reverse();
     for (const b of balls) {
@@ -1068,11 +1073,11 @@ if (!HEADLESS) {
   const R = LAYOUT.routes;
   document.getElementById('specRows').innerHTML = [
     ['台面', `${TABLE.w.toFixed(2)} × ${TABLE.d.toFixed(2)} m`],
-    ['底座', `${nTiles} 块 ${mm(LAYOUT.tile)} × ${mm(LAYOUT.tile)} mm 拼接块,顶面离台面 ${mm(PT)} mm`],
+    ['底座', `${nTiles} 块 ${mm(LAYOUT.tile)} × ${mm(LAYOUT.tile)} mm 拼接块(其中 ${LAYOUT.arms.length} 块是臂座,底座摆正,压块压在两侧),顶面离台面 ${mm(PT)} mm`],
     ['托座 + 管', `托座 Ø${mm(CAR.puck_d)} mm(底部 3 颗 Ø8 钢珠);透明管 Ø${mm(CAR.tube_d)} mm,管口离滑道底面 ${mm(CAR.tube_top)} mm`],
     ['瓶盖', `Ø${mm(LAYOUT.cap.d)} × ${mm(CAP_H)} mm,四头卡口`],
     ['小球', `Ø${mm(LAYOUT.ball_d)} mm × ${C.balls}`],
-    ['瓶滑道', `内宽 ${mm(R.P12.w)} mm,墙高 ${mm(R.P12.h)} mm,R100 弯道,3°;共 ${chuteLen('bottle').toFixed(2)} m`],
+    ['瓶滑道', `内宽 ${mm(R.P12.w)} mm,墙高 ${mm(R.P12.h)} mm,R${LAYOUT.bottle_r} 弯道,3°;共 ${chuteLen('bottle').toFixed(2)} m`],
     ['盖滑道', `内宽 ${mm(R.CAP.w)} mm,9°,${chuteLen('cap').toFixed(2)} m`],
     ['球道', `内宽 ${mm(R.red.w)} mm,3°,${chuteLen('ball').toFixed(2)} m(含料斗前后两段)`],
     ['模块 / 支柱', `${nModules} 个滑道模块,${nPosts} 根支柱`],

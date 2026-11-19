@@ -1,0 +1,947 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>循环产线零件</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Noto+Sans+SC:wght@400;500&family=Noto+Serif+SC:wght@500&family=Space+Mono:wght@400;700&display=swap">
+<style>
+/* Layout: a parts drawer on the left, one live bench on the right; same paper-and-ink notebook as the line page. */
+:root {
+  --paper: #fafafa;
+  --surface: #f1f0ec;
+  --ink: #2c2c2c;
+  --muted: #6b6a64;
+  --line: #dddcd5;
+  --unit: #24493f;
+  --unit-ink: #e7efe9;
+  --accent: #e87420;
+  --sel: #f2a868;
+  --hover: #ecece8;
+  --display: "Instrument Serif", "Noto Serif SC", Georgia, serif;
+  --display-cjk: "Noto Serif SC", "Songti SC", serif;
+  --body: "Noto Sans SC", "PingFang SC", system-ui, sans-serif;
+  --mono: "Space Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: light;
+}
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+html, body { background: var(--paper); color: var(--ink); }
+[hidden] { display: none !important; }
+body { margin: 0; font-family: var(--body); font-size: 15px; line-height: 1.7; -webkit-font-smoothing: antialiased; }
+.page {
+  max-width: 1240px; margin: 0 auto;
+  padding-block: 32px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 24px;
+}
+header { display: flex; flex-direction: column; gap: 8px; max-width: 780px; }
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); display: flex; gap: 14px; flex-wrap: wrap; }
+.eyebrow a { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--line); }
+.eyebrow a:hover { border-color: var(--accent); }
+h1 { margin: 0; font-family: var(--display-cjk); font-weight: 500; font-size: clamp(30px, 4.2vw, 44px); line-height: 1.15; text-wrap: balance; }
+h1 .lat { font-family: var(--display); font-weight: 400; font-style: italic; letter-spacing: -.01em; }
+.lede { margin: 0; max-width: 66ch; }
+.mono { font-family: var(--mono); }
+
+.bench { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 900px) { .bench { grid-template-columns: minmax(0, 1fr); } .drawer { order: 2; } }
+
+.drawer { display: flex; flex-direction: column; gap: 14px; min-width: 0; max-height: 82vh; overflow-y: auto; padding-right: 4px; }
+@media (max-width: 900px) { .drawer { max-height: none; } }
+.drawer h3 { margin: 0 0 4px; font-family: var(--display-cjk); font-weight: 500; font-size: 14px; color: var(--muted); }
+.drawer ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.pbtn {
+  width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: baseline; text-align: left;
+  font: inherit; font-size: 13.5px; color: var(--ink); background: transparent; border: 0; border-radius: 3px; padding: 5px 8px; cursor: pointer;
+}
+.pbtn:hover { background: var(--hover); }
+.pbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.pbtn[aria-current="true"] { background: var(--ink); color: var(--paper); }
+.pbtn .q { font-family: var(--mono); font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.pbtn[aria-current="true"] .q { color: #cfcfca; }
+.pbtn .nm { min-width: 0; overflow-wrap: anywhere; }
+
+.view { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.stage { position: relative; width: 100%; max-width: 100%; aspect-ratio: 16 / 10; background: var(--paper); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+@media (max-width: 640px) { .stage { aspect-ratio: 4 / 5; } }
+.stage canvas { display: block; width: 100%; height: 100%; touch-action: pan-y; cursor: grab; }
+.stage canvas:active { cursor: grabbing; }
+.step {
+  position: absolute; left: 12px; top: 10px; right: 12px; pointer-events: none; display: flex; flex-direction: column; gap: 6px; align-items: flex-start;
+}
+.step .now { background: rgba(250,250,250,.94); border: 1px solid var(--line); border-radius: 4px; padding: 5px 10px; font-size: 14px; max-width: 46ch; }
+.step .hud { font-family: var(--mono); font-size: 12px; background: var(--unit); color: var(--unit-ink); border-radius: 3px; padding: 2px 8px; font-variant-numeric: tabular-nums; }
+.step .hud:empty { display: none; }
+.tags { position: absolute; inset: 0; pointer-events: none; }
+.tag { position: absolute; left: 0; top: 0; transform: translate(-50%, -120%); white-space: nowrap; font-family: var(--mono); font-size: 11px; color: var(--ink); background: rgba(250,250,250,.9); border: 1px solid var(--line); border-radius: 3px; padding: 0 5px; }
+.loadnote { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.controls { position: absolute; left: 10px; bottom: 10px; right: 10px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; pointer-events: none; }
+.group { display: inline-flex; background: rgba(250,250,250,.94); border: 1px solid var(--line); border-radius: 4px; pointer-events: auto; }
+.group button { font: inherit; font-family: var(--mono); font-size: 12px; color: var(--ink); background: transparent; border: 0; padding: 6px 10px; min-height: 32px; cursor: pointer; border-right: 1px solid var(--line); }
+.group button:last-child { border-right: 0; }
+.group button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.group button:hover:not([aria-pressed="true"]) { background: var(--hover); }
+.group button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.timebar { flex: 1 1 120px; height: 3px; background: var(--line); border-radius: 2px; position: relative; pointer-events: none; min-width: 80px; }
+.timebar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--ink); border-radius: 2px; }
+
+.info { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 28px; }
+@media (max-width: 760px) { .info { grid-template-columns: minmax(0, 1fr); } }
+.info h2 { margin: 0 0 2px; font-family: var(--display-cjk); font-weight: 500; font-size: 22px; line-height: 1.3; }
+.info .code { font-family: var(--mono); font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
+.kv { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 14px; font-size: 13.5px; margin: 12px 0 0; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.steps { margin: 0; padding-left: 20px; font-size: 14px; display: flex; flex-direction: column; gap: 6px; }
+.steps li { color: var(--muted); transition: color .2s; }
+.steps li.on { color: var(--ink); }
+.steps li.on::marker { color: var(--accent); font-weight: 700; }
+.infohead { font-family: var(--display-cjk); font-weight: 500; font-size: 15px; margin: 0 0 8px; }
+.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: var(--sel); border: 1px solid #c97a3a; vertical-align: -1px; margin-right: 6px; }
+@media (prefers-reduced-motion: reduce) { .steps li { transition: none; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <div class="eyebrow"><span>八臂循环产线 · 打印零件</span><a href="loop_cell.html">回到整条产线</a></div>
+    <h1>零件模拟 <span class="lat">bench tests</span></h1>
+    <p class="lede">每个打印零件放到它实际干活的地方单独演示一遍:怎么装、东西怎么从它上面过去。模型就是导出的 STL,尺寸和 BOM 同一份参数;<span class="swatch" aria-hidden="true"></span>橙色的是当前选中的零件。</p>
+  </header>
+
+  <div class="bench">
+    <nav class="drawer" id="drawer" aria-label="零件"></nav>
+    <div class="view">
+      <figure style="margin:0">
+        <div class="stage" id="stage">
+          <canvas id="cv" aria-label="零件三维演示,可拖动旋转、滚轮缩放"></canvas>
+          <div class="tags" id="tags"></div>
+          <div class="step"><div class="now" id="stepNow">加载零件模型…</div><div class="hud" id="hud"></div></div>
+          <div class="loadnote" id="loadnote">加载零件模型…</div>
+          <div class="controls">
+            <div class="group" role="group" aria-label="播放">
+              <button type="button" id="play" aria-pressed="false">暂停</button>
+              <button type="button" id="restart">重播</button>
+            </div>
+            <div class="group" role="group" aria-label="速度">
+              <button type="button" data-speed="0.5" aria-pressed="false">0.5×</button>
+              <button type="button" data-speed="1" aria-pressed="true">1×</button>
+            </div>
+            <div class="timebar" aria-hidden="true"><i id="tbar"></i></div>
+          </div>
+        </div>
+      </figure>
+      <section class="info" aria-live="polite">
+        <div>
+          <h2 id="pName">—</h2>
+          <div class="code" id="pCode"></div>
+          <dl class="kv" id="pKv"></dl>
+        </div>
+        <div>
+          <div class="infohead" id="sceneTitle">演示步骤</div>
+          <ol class="steps" id="steps"></ol>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// Part list, sizes and gate geometry, generated by loop_cell/build.py from layout.py (all mm here, z up).
+const DATA = {"groups":[["base","底座与臂座"],["bottle","瓶子"],["chute_bottle","瓶滑道"],["chute_cap","盖滑道"],["chute_ball","球道"],["post","支柱"],["balls","倒球与料斗"],["misc","相机与试配"]],"parts":[{"name":"tile_160","qty":17,"mat":"PLA","note":"底座拼接块,20 mm 网格装 M4 热熔螺母;其中 8 块是臂座","vol":147.6,"scene":"base","fam":"bottle","group":"base","make":["tile"]},{"name":"tile_joiner","qty":14,"mat":"PLA","note":"拼接块底面每条缝中间一块,沉头 M4","vol":9.6,"scene":"base","fam":"bottle","group":"base","make":["joiner"]},{"name":"tile_foot_pad","qty":68,"mat":"TPU","note":"拼接块四角脚垫,离两边各 15 mm","vol":2.0,"scene":"base","fam":"bottle","group":"base","make":["foot_pad"]},{"name":"arm_clamp_dog","qty":32,"mat":"PETG","note":"每台臂 4 个,压在底座离块边最宽的两侧;先量底座法兰厚度再改参数","vol":4.7,"scene":"clamp","fam":"bottle","group":"base","make":["clamp_dog"]},{"name":"puck_body","qty":10,"mat":"PETG","note":"托座;3 颗 Ø8 钢珠装进盲孔","vol":12.3,"scene":"carrier","fam":"bottle","group":"bottle","make":["puck_body"]},{"name":"puck_sole","qty":10,"mat":"PETG","note":"粘在托座底面,挡住钢珠","vol":1.5,"scene":"carrier","fam":"bottle","group":"bottle","make":["puck_sole"]},{"name":"tube_collar","qty":10,"mat":"PETG","note":"粘在管口,四头卡口螺纹 + 卡位凸点","vol":2.0,"scene":"cap","fam":"bottle","group":"bottle","make":["collar"]},{"name":"cap","qty":7,"mat":"PETG","note":"顶面朝下打印","vol":6.1,"scene":"cap","fam":"bottle","group":"bottle","make":["cap"]},{"name":"nest","qty":5,"mat":"PLA","note":"工位托座,带 45° 导口","vol":35.7,"scene":"nest","fam":"bottle","group":"bottle","make":["nest"]},{"name":"hopper","qty":1,"mat":"PLA","note":"暂存料斗,单列出球","vol":19.1,"scene":"cones","fam":"ball","group":"balls","make":["hopper"]},{"name":"funnel","qty":1,"mat":"PLA","note":"U5 倒球漏斗","vol":16.0,"scene":"cones","fam":"ball","group":"balls","make":["funnel"]},{"name":"fit_coupon","qty":1,"mat":"PETG","note":"先打这个:试管孔、钢珠挡圈、热熔孔各 3 档","vol":15.1,"scene":"coupon","fam":"bottle","group":"misc","make":["fit_coupon"]},{"name":"camera_post_U3_185","qty":1,"mat":"PLA","note":"U3 相机立柱","vol":37.6,"scene":"camera","fam":"bottle","group":"misc","make":["camera_post",185]},{"name":"camera_post_U6_165","qty":1,"mat":"PLA","note":"U6 相机立柱","vol":34.7,"scene":"camera","fam":"bottle","group":"misc","make":["camera_post",165]},{"name":"chute_bottle_C90_R80","qty":4,"mat":"PETG","note":"90° 弯段,反向用就是另一侧转弯","vol":38.7,"scene":"chute","fam":"bottle","group":"chute_bottle","make":["curve","bottle"]},{"name":"chute_bottle_flare","qty":5,"mat":"PETG","note":"入口喇叭段(臂放东西的地方)","vol":24.2,"scene":"chute","fam":"bottle","group":"chute_bottle","make":["flare","bottle"]},{"name":"chute_bottle_gate","qty":5,"mat":"PETG","note":"末端闸门:挡墙 + 对射光电孔 + SG90 托架","vol":30.7,"scene":"gate","fam":"bottle","group":"chute_bottle","make":["gate","bottle"]},{"name":"gate_lever_bottle","qty":5,"mat":"PETG","note":"闸门挡销摇臂,按舵盘修长度","vol":0.5,"scene":"gate","fam":"bottle","group":"chute_bottle","make":["gate_lever","bottle"]},{"name":"chute_bottle_S160","qty":11,"mat":"PETG","note":"直段","vol":45.5,"scene":"chute","fam":"bottle","group":"chute_bottle","make":["straight","bottle",160.0]},{"name":"chute_bottle_S152.5","qty":2,"mat":"PETG","note":"直段(按布局裁出的长度)","vol":43.4,"scene":"chute","fam":"bottle","group":"chute_bottle","make":["straight","bottle",152.5]},{"name":"chute_bottle_S137.5","qty":1,"mat":"PETG","note":"直段(按布局裁出的长度)","vol":39.1,"scene":"chute","fam":"bottle","group":"chute_bottle","make":["straight","bottle",137.5]},{"name":"chute_bottle_S135","qty":1,"mat":"PETG","note":"直段(按布局裁出的长度)","vol":38.4,"scene":"chute","fam":"bottle","group":"chute_bottle","make":["straight","bottle",135.0]},{"name":"chute_bottle_S115","qty":2,"mat":"PETG","note":"直段(按布局裁出的长度)","vol":32.7,"scene":"chute","fam":"bottle","group":"chute_bottle","make":["straight","bottle",115.0]},{"name":"chute_bottle_S37.5","qty":2,"mat":"PETG","note":"直段(按布局裁出的长度)","vol":10.6,"scene":"chute","fam":"bottle","group":"chute_bottle","make":["straight","bottle",37.5]},{"name":"saddle_bottle","qty":33,"mat":"PLA","note":"接头托架,装在 M4 螺杆上","vol":8.3,"scene":"post","fam":"bottle","group":"chute_bottle","make":["saddle","bottle"]},{"name":"saddle_bottle_flat","qty":5,"mat":"PLA","note":"喇叭口起点用的平托架","vol":6.8,"scene":"post","fam":"bottle","group":"chute_bottle","make":["saddle","bottle",true]},{"name":"chute_cap_flare","qty":1,"mat":"PETG","note":"入口喇叭段(臂放东西的地方)","vol":18.4,"scene":"chute","fam":"cap","group":"chute_cap","make":["flare","cap"]},{"name":"chute_cap_gate","qty":1,"mat":"PETG","note":"末端闸门:挡墙 + 对射光电孔 + SG90 托架","vol":22.8,"scene":"gate","fam":"cap","group":"chute_cap","make":["gate","cap"]},{"name":"gate_lever_cap","qty":1,"mat":"PETG","note":"闸门挡销摇臂,按舵盘修长度","vol":0.5,"scene":"gate","fam":"cap","group":"chute_cap","make":["gate_lever","cap"]},{"name":"chute_cap_S160","qty":1,"mat":"PETG","note":"直段","vol":34.0,"scene":"chute","fam":"cap","group":"chute_cap","make":["straight","cap",160.0]},{"name":"chute_cap_S120.7","qty":1,"mat":"PETG","note":"直段(按布局裁出的长度)","vol":25.6,"scene":"chute","fam":"cap","group":"chute_cap","make":["straight","cap",120.7]},{"name":"saddle_cap","qty":4,"mat":"PLA","note":"接头托架,装在 M4 螺杆上","vol":7.4,"scene":"post","fam":"cap","group":"chute_cap","make":["saddle","cap"]},{"name":"saddle_cap_flat","qty":1,"mat":"PLA","note":"喇叭口起点用的平托架","vol":5.9,"scene":"post","fam":"cap","group":"chute_cap","make":["saddle","cap",true]},{"name":"chute_ball_flare","qty":3,"mat":"PETG","note":"入口喇叭段(臂放东西的地方)","vol":10.1,"scene":"chute","fam":"ball","group":"chute_ball","make":["flare","ball"]},{"name":"chute_ball_gate","qty":4,"mat":"PETG","note":"末端闸门:挡墙 + 对射光电孔 + SG90 托架","vol":12.9,"scene":"gate","fam":"ball","group":"chute_ball","make":["gate","ball"]},{"name":"gate_lever_ball","qty":4,"mat":"PETG","note":"闸门挡销摇臂,按舵盘修长度","vol":0.5,"scene":"gate","fam":"ball","group":"chute_ball","make":["gate_lever","ball"]},{"name":"chute_ball_S135","qty":3,"mat":"PETG","note":"直段(按布局裁出的长度)","vol":19.0,"scene":"chute","fam":"ball","group":"chute_ball","make":["straight","ball",135.0]},{"name":"chute_ball_S75","qty":1,"mat":"PETG","note":"直段(按布局裁出的长度)","vol":10.5,"scene":"chute","fam":"ball","group":"chute_ball","make":["straight","ball",75.0]},{"name":"chute_ball_S19","qty":1,"mat":"PETG","note":"直段(按布局裁出的长度)","vol":2.6,"scene":"chute","fam":"ball","group":"chute_ball","make":["straight","ball",19.0]},{"name":"saddle_ball","qty":14,"mat":"PLA","note":"接头托架,装在 M4 螺杆上","vol":4.9,"scene":"post","fam":"ball","group":"chute_ball","make":["saddle","ball"]},{"name":"saddle_ball_flat","qty":3,"mat":"PLA","note":"喇叭口起点用的平托架","vol":3.4,"scene":"post","fam":"ball","group":"chute_ball","make":["saddle","ball",true]},{"name":"post_foot","qty":62,"mat":"PLA","note":"支柱底座,M4 螺杆从中间穿过","vol":16.4,"scene":"post","fam":"bottle","group":"post","make":["post_foot"]},{"name":"post_spacer_20","qty":89,"mat":"PLA","note":"20 mm 垫块","vol":3.7,"scene":"post","fam":"bottle","group":"post","make":["spacer",20.0]},{"name":"post_spacer_10","qty":27,"mat":"PLA","note":"10 mm 垫块","vol":1.9,"scene":"post","fam":"bottle","group":"post","make":["spacer",10.0]},{"name":"post_spacer_5","qty":28,"mat":"PLA","note":"5 mm 垫块","vol":0.9,"scene":"post","fam":"bottle","group":"post","make":["spacer",5.0]},{"name":"post_spacer_2","qty":38,"mat":"PLA","note":"2 mm 垫块","vol":0.4,"scene":"post","fam":"bottle","group":"post","make":["spacer",2.0]}],"dims":{"TILE":160.0,"TILE_T":10.0,"PAD_T":5.0,"JOINER_T":4.0,"GRID":20.0,"PUCK_D":45.0,"SOLE_T":1.0,"BASE_H":8.0,"NECK_D":30.0,"NECK_H":8.0,"SOCKET_DEPTH":9.0,"BB_D":8.0,"BB_RING":17.5,"BB_PROTRUDE":1.256440422583731,"TUBE_OD":25.0,"TUBE_L":100.0,"COLLAR_ID":25.3,"COLLAR_OD":29.0,"COLLAR_H":12.0,"THREAD_SPAN":60.0,"THREAD_LEAD":16.0,"CAP_OD":36.0,"CAP_H":16.0,"CAP_TOP_T":2.5,"BALL_D":16.0,"FLOOR_T":3.0,"WALL_T":3.0,"SADDLE_L":30.0,"SADDLE_T":4.0,"SADDLE_STEP":0.5,"FOOT_H":20.0,"LEVER_R":18.0,"LEVER_T":3.0,"LEVER_H":6.0,"GRIP_Z":70.0},"families":{"bottle":{"W":49.0,"H":20.0,"R":80.0,"slope":3.0,"flare":80.0,"gate":80.0,"item":45.0,"beam_z":10.0},"cap":{"W":41.0,"H":12.0,"R":80.0,"slope":9.0,"flare":80.0,"gate":80.0,"item":36.0,"beam_z":8.0},"ball":{"W":19.0,"H":11.0,"R":48.0,"slope":3.0,"flare":64.0,"gate":64.0,"item":16.0,"beam_z":8.0}},"gates":{"bottle":{"head_x":52.5,"beam_z":13.0,"pin_x":30.0,"pin_y":11.0,"dir":-1,"shaft_x":48.0,"shaft_z":-12.0,"servo_cx":53.5,"pin_len":22.0,"hold":10.0,"release_deg":28.0,"slot":[19.544582586350167,31.6],"plate_y":[-4.5,-0.5]},"cap":{"head_x":57.0,"beam_z":11.0,"pin_x":39.0,"pin_y":10.0,"dir":1,"shaft_x":21.0,"shaft_z":-12.0,"servo_cx":26.5,"pin_len":18.0,"hold":6.0,"release_deg":19.0,"slot":[37.4,45.62657063189096],"plate_y":[-5.5,-1.5]},"ball":{"head_x":51.0,"beam_z":11.0,"pin_x":43.0,"pin_y":7.0,"dir":1,"shaft_x":25.0,"shaft_z":-12.0,"servo_cx":30.5,"pin_len":17.5,"hold":5.5,"release_deg":18.0,"slot":[41.4,49.254209133848335],"plate_y":[-8.5,-4.5]}},"sg90":{"body":[22.8,12.2],"ear_w":32.4,"hole_pitch":27.8,"shaft_off":5.5,"below_ears":15.9,"shaft_tip":11.0},"spacers":[20.0,10.0,5.0,2.0],"funnel":{"xy":[-0.5,-0.29],"top_r":45.0,"out_r":11.0,"h":35.0},"hopper":{"xy":[-0.5,-0.17],"top_r":50.0,"out_r":10.5,"h":40.0},"cameras":{"U3":{"h":185,"look_mm":[-110,0,0]},"U6":{"h":165,"look_mm":[-70,0,-120]}},"arm":{"id":"A5","xy_mm":[-30.0,0.0],"yaw":270,"base_box":[-0.05546249821782112,-0.02580000232458115,0.05546249821782112,0.07010000054240226],"pan_xy":[0.0,-0.0452],"base_bottom":-1.2012782558179935e-17,"visuals":[{"mesh":"Base","kind":"printed"},{"mesh":"Base_Motor","kind":"motor"}],"joint0":{"name":"shoulder_pan","parent":"base","child":"shoulder","xyz":[0.0,-0.0452,0.0165],"rpy":[1.57079,0.0,0.0],"axis":[0.0,1.0,0.0],"lower":-2.0,"upper":2.0}},"plate_margin":8};
+const D = DATA.dims, FAM = DATA.families, GATE = DATA.gates;
+const V3 = THREE.Vector3, Z = new V3(0, 0, 1);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lin = (t, a, b) => clamp((t - a) / (b - a), 0, 1);
+const ease = (u) => (u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2);
+const seg = (t, a, b) => ease(lin(t, a, b));
+const lerp = (a, b, u) => a + (b - a) * u;
+const deg = Math.PI / 180;
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ---------- names ----------
+const tileName = DATA.parts.find((p) => /^tile_\d/.test(p.name)).name;
+function title(n) {
+  let m;
+  if (n === tileName) return '底座拼接块';
+  const fixed = { tile_joiner: '缝下连接板', tile_foot_pad: 'TPU 脚垫', arm_clamp_dog: '臂座压块', puck_body: '托座', puck_sole: '托座底片', tube_collar: '瓶口套环',
+    cap: '瓶盖', nest: '工位托座', hopper: '料斗', funnel: '漏斗', fit_coupon: '试配件', post_foot: '支柱底座' };
+  if (fixed[n]) return fixed[n];
+  if ((m = n.match(/^camera_post_(U\d)_(\d+)/))) return `${m[1]} 相机立柱`;
+  if ((m = n.match(/^chute_\w+?_S([\d.]+)$/))) return `直段 ${m[1]} mm`;
+  if ((m = n.match(/^chute_\w+?_C90_R(\d+)/))) return `90° 弯段 R${m[1]}`;
+  if (/_flare$/.test(n)) return '喇叭段';
+  if (/_gate$/.test(n)) return '闸门段';
+  if (/^gate_lever/.test(n)) return '挡销摇臂';
+  if (/^saddle_.*_flat$/.test(n)) return '起点平托架';
+  if (/^saddle_/.test(n)) return '接头托架';
+  if ((m = n.match(/^post_spacer_([\d.]+)/))) return `垫块 ${m[1]} mm`;
+  return n;
+}
+const FAM_CN = { bottle: '瓶', cap: '盖', ball: '球' };
+const hashOf = (n) => n.replace(/[_.]/g, '-');
+const byHash = Object.fromEntries(DATA.parts.map((p) => [hashOf(p.name), p]));
+const byName = Object.fromEntries(DATA.parts.map((p) => [p.name, p]));
+const straightLen = (n) => parseFloat(n.match(/_S([\d.]+)$/)[1]);
+const straightsOf = (fam) => DATA.parts.filter((p) => p.name.startsWith(`chute_${fam}_S`)).map((p) => p.name).sort((a, b) => straightLen(b) - straightLen(a));
+
+// ---------- renderer ----------
+const canvas = document.getElementById('cv');
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#fafafa');
+const camera = new THREE.PerspectiveCamera(32, 1.6, 2, 20000);
+camera.up.set(0, 0, 1);
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8a80, 2.0));
+const sun = new THREE.DirectionalLight(0xffffff, 2.3);
+sun.position.set(350, -500, 900); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -450, right: 450, top: 450, bottom: -450, near: 10, far: 3000 });
+sun.shadow.bias = -0.0004;
+scene.add(sun);
+{
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), new THREE.MeshStandardMaterial({ color: '#efeee9', roughness: 1 }));
+  ground.receiveShadow = true; ground.position.z = -0.05; scene.add(ground);
+  const grid = new THREE.GridHelper(1200, 60, '#d6d4cc', '#e4e2db'); grid.rotation.x = Math.PI / 2; grid.position.z = 0.01; scene.add(grid);
+}
+
+// ---------- materials ----------
+const mat = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.78, metalness: 0, ...o });
+const M = {
+  pla: mat('#d3dfd5'), armTile: mat('#b9cdbf'), tpu: mat('#3d3f42', { roughness: 0.95 }), chute: mat('#a9a69e'), chuteBall: mat('#bdbab2'),
+  cap: mat('#7963bc', { roughness: 0.6 }), puck: mat('#e7e1d2', { roughness: 0.7 }), collar: mat('#f4f2ec', { roughness: 0.55 }), nest: mat('#5d6166', { roughness: 0.6 }),
+  post: mat('#c9c5b9'), saddle: mat('#b7b3a7'), cone: mat('#e9e3d4', { side: THREE.DoubleSide }), funnel: mat('#d4cebf', { side: THREE.DoubleSide }),
+  steel: mat('#b8bcc2', { metalness: 0.85, roughness: 0.3 }), brass: mat('#c9a24a', { metalness: 0.8, roughness: 0.35 }), screw: mat('#7d8086', { metalness: 0.7, roughness: 0.4 }),
+  servo: mat('#2f5ea8', { roughness: 0.5 }), dark: mat('#2b2d31', { roughness: 0.55 }), white: mat('#f1f0ec'),
+  glass: new THREE.MeshStandardMaterial({ color: '#bcd8e2', roughness: 0.15, transparent: true, opacity: 0.3, depthWrite: false, side: THREE.DoubleSide }),
+  ghost: new THREE.MeshStandardMaterial({ color: '#8f969d', roughness: 0.6, transparent: true, opacity: 0.45, depthWrite: false }),
+  view: new THREE.MeshBasicMaterial({ color: '#e87420', transparent: true, opacity: 0.08, depthWrite: false, side: THREE.DoubleSide }),
+  sel: mat('#f2a868', { roughness: 0.6, emissive: '#6a3000', emissiveIntensity: 0.16 }),
+  ball: { red: mat('#d6483b', { roughness: 0.45 }), green: mat('#4f9a45', { roughness: 0.45 }), blue: mat('#3b72c8', { roughness: 0.45 }) },
+  so: { printed: mat('#efebe3', { roughness: 0.7 }), motor: mat('#2b2d31', { roughness: 0.55 }) },
+};
+const EDGE = new THREE.LineBasicMaterial({ color: '#c75e10' });
+const BEAM_ON = new THREE.LineBasicMaterial({ color: '#d6483b' });
+const BEAM_OFF = new THREE.LineBasicMaterial({ color: '#b4b2ab', transparent: true, opacity: 0.6 });
+const VIEW_LINE = new THREE.LineBasicMaterial({ color: '#e87420', transparent: true, opacity: 0.55 });
+function partMat(n) {
+  if (n === 'tile_foot_pad') return M.tpu;
+  if (n.startsWith('tile')) return M.pla;
+  if (n.startsWith('chute_cap')) return M.cap;
+  if (n.startsWith('chute_ball')) return M.chuteBall;
+  if (n.startsWith('chute_')) return M.chute;
+  if (n === 'cap') return M.cap;
+  if (n === 'tube_collar') return M.collar;
+  if (n === 'nest') return M.nest;
+  if (n.startsWith('saddle')) return M.saddle;
+  if (n.startsWith('post') || n.startsWith('camera')) return M.post;
+  if (n === 'hopper') return M.cone;
+  if (n === 'funnel') return M.funnel;
+  return M.puck;
+}
+
+// ---------- meshes ----------
+const b64 = (s, T) => { const bin = atob(s), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); return new T(u8.buffer); };
+const GEO = {}, BBOX = {}, EDGES = {};
+let SO = null;  // SO-100 base meshes (metres), optional
+function decode(m, scale = 1) {
+  const g = new THREE.BufferGeometry();
+  const pos = b64(m.pos, Float32Array);
+  if (scale !== 1) for (let i = 0; i < pos.length; i++) pos[i] *= scale;
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setIndex(new THREE.BufferAttribute(b64(m.idx, m.idx_type === 'u16' ? Uint16Array : Uint32Array), 1));
+  const flat = g.toNonIndexed(); flat.computeVertexNormals();  // faceted, like the CAD
+  return flat;
+}
+let SEL = null;
+function P(name, o = {}) {
+  const g = GEO[name];
+  if (!g) return new THREE.Group();
+  const hl = SEL && name === SEL.name && !o.plain;
+  const m = new THREE.Mesh(g, hl ? M.sel : (o.mat || partMat(name)));
+  m.castShadow = true; m.receiveShadow = true;
+  if (hl) {
+    EDGES[name] ||= new THREE.EdgesGeometry(g, 28);
+    m.add(new THREE.LineSegments(EDGES[name], EDGE));
+  }
+  return m;
+}
+
+// ---------- primitives (mm) ----------
+const shadowy = (m) => { m.castShadow = true; m.receiveShadow = true; return m; };
+function cyl(r, h, material, seg = 28, open = false, r2 = r) {
+  const g = new THREE.CylinderGeometry(r2, r, h, seg, 1, open); g.rotateX(Math.PI / 2); g.translate(0, 0, h / 2);
+  return shadowy(new THREE.Mesh(g, material));
+}
+const sphere = (r, material) => shadowy(new THREE.Mesh(new THREE.SphereGeometry(r, 24, 16), material));
+function box(w, d, h, material) { const g = new THREE.BoxGeometry(w, d, h); g.translate(0, 0, h / 2); return shadowy(new THREE.Mesh(g, material)); }
+function lineBetween(a, b, material) { const g = new THREE.BufferGeometry().setFromPoints([a, b]); return new THREE.Line(g, material); }
+function screw(len, material = M.screw, countersunk = false) {
+  const g = new THREE.Group();
+  g.add(cyl(1.9, len, material, 12));
+  const head = countersunk ? cyl(2.0, 2.2, material, 16, false, 4.1) : cyl(3.5, 2.8, material, 16);
+  head.position.z = countersunk ? 0 : -2.8; g.add(head);
+  return g;
+}
+function hexNut(material = M.screw) { const g = new THREE.CylinderGeometry(4.04, 4.04, 3.2, 6); g.rotateX(Math.PI / 2); g.translate(0, 0, 1.6); return shadowy(new THREE.Mesh(g, material)); }
+
+// carrier: puck + 3 steel balls + sole + bought tube + collar (+ cap, + balls inside). z = 0 at the steel balls' bottom.
+const CAR = (() => {
+  const soleZ = D.BB_PROTRUDE, bodyZ = soleZ + D.SOLE_T, tubeZ = bodyZ + D.BASE_H + D.NECK_H - D.SOCKET_DEPTH, tubeTop = tubeZ + D.TUBE_L;
+  return { soleZ, bodyZ, tubeZ, tubeTop, collarZ: tubeTop - D.COLLAR_H, capZ: tubeTop - (D.CAP_H - D.CAP_TOP_T) };
+})();
+function carrier(o = {}) {
+  const g = new THREE.Group(), parts = {};
+  parts.bb = [];
+  for (let k = 0; k < 3; k++) {
+    const a = (90 + 120 * k) * deg, b = sphere(D.BB_D / 2, M.steel);
+    b.position.set(D.BB_RING * Math.cos(a), D.BB_RING * Math.sin(a), D.BB_D / 2); g.add(b); parts.bb.push(b);
+  }
+  parts.sole = P('puck_sole'); parts.sole.position.z = CAR.soleZ; g.add(parts.sole);
+  parts.body = P('puck_body'); parts.body.position.z = CAR.bodyZ; g.add(parts.body);
+  parts.tube = cyl(D.TUBE_OD / 2, D.TUBE_L, M.glass, 40, true); parts.tube.castShadow = false; parts.tube.position.z = CAR.tubeZ; g.add(parts.tube);
+  parts.collar = P('tube_collar'); parts.collar.position.z = CAR.collarZ; g.add(parts.collar);
+  if (o.cap) { parts.cap = P('cap'); parts.cap.position.z = CAR.capZ; g.add(parts.cap); }
+  parts.fill = (o.fill || []).map((c, i) => { const b = sphere(D.BALL_D / 2, M.ball[c]); b.position.set(i % 2 ? 1.5 : -1.5, 0, CAR.tubeZ + D.BALL_D / 2 + i * D.BALL_D); g.add(b); return b; });
+  g.userData.parts = parts;
+  return g;
+}
+// two-jaw ghost gripper, centred on its jaws; set(open) in mm between the jaw faces
+function gripper(h = 30) {
+  const g = new THREE.Group();
+  const top = box(16, 50, 10, M.ghost); top.position.z = h; g.add(top);
+  const jaws = [-1, 1].map((s) => { const j = box(14, 6, h, M.ghost); g.add(j); return j; });
+  g.userData.set = (open) => { jaws[0].position.y = -(open / 2 + 3); jaws[1].position.y = open / 2 + 3; };
+  g.userData.set(30);
+  g.traverse((o) => { o.castShadow = false; });
+  return g;
+}
+
+// chute chain: modules placed head to tail; at(s) -> point on the floor top + heading
+function chain(fam, names, floorZ) {
+  const R = FAM[fam].R, g = new THREE.Group(), segs = [], joints = [];
+  let p = new V3(0, 0, 0), h = 0, s = 0, gate = null;
+  for (const nm of names) {
+    joints.push({ p: p.clone(), h, s });
+    const holder = new THREE.Group(); holder.add(P(nm)); g.add(holder);
+    if (/_C90_/.test(nm)) {
+      holder.rotation.z = h; holder.position.copy(p).add(new V3(0, R, 0).applyAxisAngle(Z, h));
+      const c = holder.position.clone(), len = R * Math.PI / 2;
+      segs.push({ arc: true, s0: s, len, c, R, a0: h - Math.PI / 2 });
+      s += len; p = c.clone().add(new V3(R, 0, 0).applyAxisAngle(Z, h)); h += Math.PI / 2;
+    } else {
+      const len = /_flare$/.test(nm) ? FAM[fam].flare : /_gate$/.test(nm) ? FAM[fam].gate : straightLen(nm);
+      holder.rotation.z = h; holder.position.copy(p);
+      segs.push({ arc: false, s0: s, len, p0: p.clone(), h });
+      if (/_gate$/.test(nm)) gate = { s0: s, holder };
+      s += len; p = p.clone().add(new V3(len, 0, 0).applyAxisAngle(Z, h));
+    }
+  }
+  joints.push({ p: p.clone(), h, s });
+  g.position.z = floorZ;
+  const top = floorZ + D.FLOOR_T;
+  function at(sq) {
+    const sg = segs.find((q) => sq <= q.s0 + q.len + 1e-6) || segs[segs.length - 1];
+    const u = clamp(sq - sg.s0, -200, sg.len + 200);
+    if (sg.arc) { const a = sg.a0 + u / sg.R; return { p: new V3(sg.c.x + sg.R * Math.cos(a), sg.c.y + sg.R * Math.sin(a), top), h: a + Math.PI / 2 }; }
+    return { p: sg.p0.clone().add(new V3(u, 0, 0).applyAxisAngle(Z, sg.h)).setZ(top), h: sg.h };
+  }
+  return { group: g, segs, joints, total: s, at, gate, floorZ, top };
+}
+// post under a saddle: foot + spacers + adjust nut + M4 rod; saddle bottom at z = top
+function post(top, o = {}) {
+  const g = new THREE.Group(), stack = [];
+  const foot = P('post_foot'); g.add(foot);
+  let z = D.FOOT_H, rest = top - D.FOOT_H;
+  for (const sp of DATA.spacers) while (rest >= sp - 1e-6) { const m = P(`post_spacer_${sp}`); m.position.z = z; g.add(m); stack.push({ m, z, h: sp }); z += sp; rest -= sp; }
+  const nut = hexNut(); nut.position.z = top - 3.2; if (rest >= 3.2) g.add(nut);
+  const rod = cyl(2, top + D.SADDLE_T + 6 - 2, M.screw, 12); rod.position.z = 2; g.add(rod);
+  if (o.saddle) { const s = P(o.saddle); s.position.z = top; g.add(s); g.userData.saddle = s; }
+  Object.assign(g.userData, { foot, stack, nut, rod, rest });
+  return g;
+}
+function chainPosts(c, fam) {
+  const g = new THREE.Group();
+  c.joints.forEach((j, i) => {
+    const name = i === 0 && c.names[0].endsWith('_flare') ? `saddle_${fam}_flat` : `saddle_${fam}`;
+    const p = post(c.floorZ - D.SADDLE_T, { saddle: GEO[name] ? name : `saddle_${fam}` });
+    p.position.set(j.p.x, j.p.y, 0); p.rotation.z = j.h; g.add(p);
+  });
+  return g;
+}
+function makeChain(fam, names, floorZ) { const c = chain(fam, names, floorZ); c.names = names; return c; }
+
+// item that travels on a chute of family ``fam``; place(s) puts it on the chain
+function item(fam, i = 0) {
+  if (fam === 'bottle') return carrier({ fill: [['red', 'green', 'blue'][i % 3], ['green', 'blue', 'red'][i % 3]] });
+  if (fam === 'cap') { const g = new THREE.Group(); g.add(P('cap', { plain: true })); return g; }
+  const g = new THREE.Group(); const b = sphere(D.BALL_D / 2, M.ball[['red', 'green', 'blue'][i % 3]]); b.position.z = D.BALL_D / 2; g.add(b); g.userData.ball = b; return g;
+}
+function place(obj, c, s, fam, lift = 0) {
+  const a = c.at(s); obj.position.copy(a.p); obj.position.z += lift; obj.rotation.set(0, 0, a.h);
+  if (fam === 'ball' && obj.userData.ball) obj.userData.ball.rotation.set(0, s / (D.BALL_D / 2), 0);
+}
+
+// ---------- SG90 + lever inside a gate holder (gate frame) ----------
+function gateMech(fam, holder) {
+  const G = GATE[fam], sg = DATA.sg90;
+  const [bl, bt] = sg.body, y1 = G.plate_y[1];
+  const bodyG = new THREE.Group();
+  const b = shadowy(new THREE.Mesh(new THREE.BoxGeometry(bl, sg.below_ears + 4.5, bt), M.servo));
+  b.position.set(0, (4.5 - sg.below_ears) / 2, 0); bodyG.add(b);
+  const ears = shadowy(new THREE.Mesh(new THREE.BoxGeometry(sg.ear_w, 2.5, bt), M.servo)); ears.position.set(0, 1.25, 0); bodyG.add(ears);
+  bodyG.position.set(G.servo_cx, y1, G.shaft_z); holder.add(bodyG);
+  const shaftLen = G.pin_y - D.LEVER_T / 2 - (y1 + 4.5);
+  const shaft = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.4, Math.max(1, shaftLen), 16), M.white));
+  shaft.position.set(G.shaft_x, y1 + 4.5 + shaftLen / 2, G.shaft_z); holder.add(shaft);
+  const outer = new THREE.Group(); outer.position.set(G.shaft_x, G.pin_y, G.shaft_z); outer.rotation.z = G.dir < 0 ? Math.PI : 0;
+  const inner = new THREE.Group(); outer.add(inner);
+  const lever = P(`gate_lever_${fam}`); lever.position.x = -3; inner.add(lever);
+  holder.add(outer);
+  return { set(u) { inner.rotation.y = u * G.release_deg * deg; } };
+}
+function irBeam(fam, holder) {
+  const G = GATE[fam], half = FAM[fam].W / 2 + D.WALL_T + 4;
+  const a = new V3(G.head_x, -half, G.beam_z), b = new V3(G.head_x, half, G.beam_z);
+  for (const p of [a, b]) { const m = box(6, 6, 10, M.dark); m.position.set(p.x, p.y, p.z - 5); holder.add(m); }
+  const line = lineBetween(a, b, BEAM_OFF); holder.add(line);
+  return { set(on) { line.material = on ? BEAM_ON : BEAM_OFF; } };
+}
+
+// ---------- scenes ----------
+// Each scene: { root, dur, steps:[[t, text]], update(t), view:{target, dist, az, el}, tags:[{text, pos}], hud(t) }
+const SCENES = {};
+
+SCENES.base = () => {
+  const root = new THREE.Group(), asm = new THREE.Group(); root.add(asm);
+  const T = D.TILE, h = T / 2, pad = D.PAD_T, tt = D.TILE_T, jt = D.JOINER_T, g = D.GRID;
+  const tiles = [[-h, -h], [h, -h], [-h, h], [h, h]].map(([x, y]) => { const m = P(tileName); m.userData.home = new V3(x, y, pad); asm.add(m); return m; });
+  const seams = [[0, -h], [0, h], [-h, 0], [h, 0]];
+  const joiners = seams.map(([x, y]) => { const m = P('tile_joiner'); m.userData.home = new V3(x, y, pad - jt); asm.add(m); return m; });
+  const screws = [];
+  for (const [x, y] of seams) for (const dx of [-g / 2, g / 2]) for (const dy of [-g / 2, g / 2]) {
+    const s = screw(10, M.screw, true); s.userData.home = new V3(x + dx, y + dy, pad - jt); asm.add(s); screws.push(s);
+  }
+  const pads = [];
+  for (const [cx, cy] of [[-h, -h], [h, -h], [-h, h], [h, h]]) for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
+    const m = P('tile_foot_pad'); m.userData.home = new V3(cx + sx * (h - 15), cy + sy * (h - 15), 0); asm.add(m); pads.push(m);
+  }
+  const flipH = pad + tt;
+  return {
+    root, dur: 13,
+    steps: [[0, '四块拼接块倒扣着摆好,底面的减重格朝上'], [2.3, '每条缝中间盖一块连接板'], [3.8, '沉头 M4 拧进两边的热熔螺母,螺丝头和板面齐平'],
+      [5.4, `四角粘 ${D.PAD_T} mm TPU 脚垫,比连接板高 ${D.PAD_T - D.JOINER_T} mm`], [7.2, '整块翻过来放到台面上'],
+      [9.4, `顶面是 ${D.GRID} mm 网格的 M4 热熔螺母;臂座、工位、相机都锁在这些孔上`]],
+    update(t) {
+      tiles.forEach((m, i) => { const u = seg(t, 0.2 + 0.3 * i, 1.2 + 0.3 * i); const hm = m.userData.home; m.position.set(hm.x * (1 + 0.5 * (1 - u)), hm.y * (1 + 0.5 * (1 - u)), hm.z); });
+      joiners.forEach((m, i) => { const u = seg(t, 2.3 + 0.25 * i, 3.1 + 0.25 * i); m.position.copy(m.userData.home); m.position.z -= 70 * (1 - u); m.visible = t > 2.2; });
+      screws.forEach((m, i) => { const u = seg(t, 3.8 + 0.06 * i, 4.4 + 0.06 * i); m.position.copy(m.userData.home); m.position.z -= 40 * (1 - u); m.visible = t > 3.7; });
+      pads.forEach((m, i) => { const u = seg(t, 5.4 + 0.07 * i, 5.9 + 0.07 * i); m.position.copy(m.userData.home); m.position.z -= 50 * (1 - u); m.visible = t > 5.3; });
+      const f = seg(t, 7.2, 9.4);
+      asm.rotation.x = Math.PI * (1 - f);
+      asm.position.z = flipH * (1 - f) + 200 * Math.sin(Math.PI * f);
+    },
+    view: { target: [0, 0, 20], dist: 900, az: -38, el: 38 },
+  };
+};
+
+SCENES.clamp = () => {
+  const root = new THREE.Group(), A = DATA.arm, pad = D.PAD_T, top = pad + D.TILE_T;
+  const tile = P(tileName, { mat: M.armTile }); tile.position.z = pad; root.add(tile);
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) { const p = P('tile_foot_pad', { plain: true }); p.position.set(sx * 65, sy * 65, 0); root.add(p); }
+  const yaw = A.yaw * deg, c = Math.cos(yaw), s = Math.sin(yaw);
+  const base = new THREE.Group(); root.add(base);
+  const [px, py] = A.pan_xy.map((v) => v * 1000);
+  base.position.set(A.xy_mm[0] - (c * px - s * py), A.xy_mm[1] - (s * px + c * py), top); base.rotation.z = yaw;
+  if (SO) for (const v of A.visuals) { const m = shadowy(new THREE.Mesh(SO[v.mesh], M.so[v.kind] || M.so.printed)); base.add(m); }
+  // base footprint in world, from the pan axis
+  const [bx0, by0, bx1, by1] = A.base_box.map((v) => v * 1000);
+  const pts = [[bx0, by0], [bx0, by1], [bx1, by0], [bx1, by1]].map(([lx, ly]) => [A.xy_mm[0] + c * lx - s * ly, A.xy_mm[1] + s * lx + c * ly]);
+  const X0 = Math.min(...pts.map((p) => p[0])), X1 = Math.max(...pts.map((p) => p[0])), Y0 = Math.min(...pts.map((p) => p[1])), Y1 = Math.max(...pts.map((p) => p[1]));
+  if (!SO) { const ph = box(X1 - X0, Y1 - Y0, 45, M.so.printed); ph.position.set((X0 + X1) / 2, (Y0 + Y1) / 2, top); root.add(ph); }
+  const h = D.TILE / 2;
+  const sides = [
+    { slack: X0 + h, n: [1, 0], e: [X0, (Y0 + Y1) / 2], len: Y1 - Y0 }, { slack: h - X1, n: [-1, 0], e: [X1, (Y0 + Y1) / 2], len: Y1 - Y0 },
+    { slack: Y0 + h, n: [0, 1], e: [(X0 + X1) / 2, Y0], len: X1 - X0 }, { slack: h - Y1, n: [0, -1], e: [(X0 + X1) / 2, Y1], len: X1 - X0 },
+  ].sort((a, b) => b.slack - a.slack).slice(0, 2);
+  const dogs = [], screws = [];
+  for (const sd of sides) {
+    const ang = Math.atan2(sd.n[1], sd.n[0]), tx = -sd.n[1], ty = sd.n[0], off = Math.min(28, sd.len / 2 - 14);
+    for (const k of [-1, 1]) {
+      const d = new THREE.Group(); d.add(P('arm_clamp_dog')); d.rotation.z = ang;
+      const home = new V3(sd.e[0] - sd.n[0] * 28 + tx * off * k, sd.e[1] - sd.n[1] * 28 + ty * off * k, top);
+      d.userData = { home, n: sd.n }; root.add(d); dogs.push(d);
+      const sc = screw(14); sc.rotation.x = Math.PI; sc.userData.home = new V3(home.x + sd.n[0] * 12, home.y + sd.n[1] * 12, top + 10); root.add(sc); screws.push(sc);
+    }
+  }
+  return {
+    root, dur: 7.5,
+    steps: [[0, 'SO-100 底座摆正放在自己那块拼接块上'], [1.5, '离块边最宽的两侧各放两个压块,唇口压住底座边缘'],
+      [3.2, 'M4 穿过长孔拧进热熔螺母;长孔能前后挪 18 mm,总能对上 20 mm 网格'], [4.8, '唇口高度按底座边缘厚度改 flange_h,装之前先量实物']],
+    update(t) {
+      base.position.z = top + 70 * (1 - seg(t, 0, 1.3));
+      dogs.forEach((d, i) => { const u = seg(t, 1.5 + 0.3 * i, 2.4 + 0.3 * i), hm = d.userData.home; d.position.set(hm.x - d.userData.n[0] * 40 * (1 - u), hm.y - d.userData.n[1] * 40 * (1 - u), hm.z); d.visible = t > 1.4; });
+      screws.forEach((sc, i) => { const u = seg(t, 3.2 + 0.2 * i, 3.8 + 0.2 * i); sc.position.copy(sc.userData.home); sc.position.z += 50 * (1 - u); sc.visible = t > 3.1; });
+    },
+    tags: sides.map((sd) => ({ text: `余量 ${sd.slack.toFixed(0)} mm`, pos: new V3(sd.e[0] - sd.n[0] * sd.slack / 2, sd.e[1] - sd.n[1] * sd.slack / 2, top + 2) })),
+    view: { target: [0, 0, 40], dist: 560, az: -50, el: 42 },
+  };
+};
+
+SCENES.carrier = () => {
+  const root = new THREE.Group(), fam = 'bottle', F = FAM.bottle;
+  const c = makeChain(fam, [straightsOf(fam)[0]], 40);
+  const tilt = new THREE.Group(); tilt.add(c.group); tilt.rotation.y = F.slope * deg; root.add(tilt);
+  for (const x of [8, c.total - 8]) { const p = cyl(3, 40 - x * Math.tan(F.slope * deg), M.post, 12); p.position.x = x; root.add(p); const f = P('post_foot', { plain: true }); f.position.x = x; f.scale.set(0.6, 0.6, 0.4); root.add(f); }
+  const car = carrier({ fill: ['red', 'green', 'blue'] }), Pp = car.userData.parts;
+  c.group.add(car);
+  const items = [
+    [Pp.bb, 0], [[Pp.sole], 18], [[Pp.body], 42], [[Pp.tube], 80], [[Pp.collar], 200], [Pp.fill, 150],
+  ];
+  for (const [objs] of items) for (const o of objs) o.userData.z0 = o.position.z;
+  const s0 = 40, s1 = c.total - 30;
+  return {
+    root, dur: 14,
+    steps: [[0, '托座分开看:3 颗 Ø8 钢珠、底片、托座、透明管、套环'], [1, `钢珠装进托座底面的盲孔,粘上底片挡住,只露出 ${D.BB_PROTRUDE.toFixed(1)} mm`],
+      [3.2, `Ø${D.TUBE_OD} × ${D.TUBE_L} 的透明管粘进托座插口`], [4.6, '管口粘一圈套环,外面是四头卡口螺纹'], [5.8, '灌装时球从管口一颗颗落进去'],
+      [7.5, `放进 ${F.slope}° 的滑道:托座靠钢珠滚着走,不是滑`]],
+    update(t) {
+      const off = { sole: 18 * (1 - seg(t, 1, 2)), body: 42 * (1 - seg(t, 2, 3)), tube: 80 * (1 - seg(t, 3.2, 4.4)), collar: 200 * (1 - seg(t, 4.6, 5.6)) };
+      Pp.sole.position.z = Pp.sole.userData.z0 + off.sole; Pp.body.position.z = Pp.body.userData.z0 + off.body;
+      Pp.tube.position.z = Pp.tube.userData.z0 + off.tube; Pp.collar.position.z = Pp.collar.userData.z0 + off.collar;
+      Pp.fill.forEach((b, i) => { const u = lin(t, 5.8 + 0.35 * i, 6.3 + 0.35 * i); b.position.z = lerp(CAR.tubeTop + 60, b.userData.z0, u * u); b.visible = t > 5.8 + 0.35 * i; });
+      const u = lin(t, 7.5, 12);
+      const s = s0 + (s1 - s0) * u * u;
+      car.position.set(s, 0, D.FLOOR_T); car.rotation.set(0, 0, 0);
+      Pp.bb.forEach((b) => b.rotation.set(0, s / (D.BB_D / 2), 0));
+    },
+    view: { target: [80, 0, 110], dist: 620, az: -62, el: 22 },
+  };
+};
+
+SCENES.cap = () => {
+  const root = new THREE.Group();
+  const car = carrier({ fill: ['red', 'green'] }); root.add(car);
+  const capG = new THREE.Group(); capG.add(P('cap')); car.add(capG);
+  const grip = gripper(18); grip.userData.set(D.CAP_OD + 1); grip.position.z = 2; capG.add(grip);
+  const enter = 30, lock = -15;  // cap angle: lugs in the gaps, lugs parked at the detents
+  let ang = enter;
+  const r = D.COLLAR_OD / 2 + 3;
+  return {
+    root, dur: 10,
+    steps: [[0, '臂夹着盖子,四个卡耳对准套环螺纹之间的四个缺口(盖子随便放的话,先最多转 90° 找缺口)'], [0.8, '直着放下去,卡耳从缺口穿过'],
+      [2.2, '顺时针转 45°,卡耳滑到螺纹段下面'], [3.8, '过卡点"咔"一下,锁住'], [6.2, '拆盖反过来:逆时针转 45° 对上缺口,再提起来']],
+    update(t) {
+      const lift = 30 * (1 - seg(t, 0.8, 2.2)) + 30 * seg(t, 7.6, 8.8);
+      ang = enter + (lock - enter) * seg(t, 2.2, 3.8) + (enter - lock) * seg(t, 6.2, 7.6);
+      const click = t > 3.8 && t < 4.1 ? -1.5 * Math.sin((t - 3.8) / 0.3 * Math.PI) : 0;
+      capG.position.z = CAR.capZ + lift; capG.rotation.z = (ang + click) * deg;
+    },
+    hud: () => `盖子已转 ${Math.round(enter - ang)}°`,
+    tags: [{ text: '缺口', pos: new V3(r * Math.cos(75 * deg), r * Math.sin(75 * deg), CAR.collarZ + D.COLLAR_H) },
+      { text: '卡点', pos: new V3(r * Math.cos(30 * deg), r * Math.sin(30 * deg), CAR.collarZ + 2) }],
+    view: { target: [0, 0, CAR.tubeTop - 4], dist: 240, az: -30, el: 30 },
+  };
+};
+
+SCENES.nest = () => {
+  const root = new THREE.Group(), top = D.PAD_T + D.TILE_T;
+  const tile = P(tileName, { plain: true }); tile.position.z = D.PAD_T; root.add(tile);
+  const nest = P('nest'); nest.position.z = top; root.add(nest);
+  for (const x of [-1, 1]) for (const y of [-1, 1]) { const s = screw(12); s.rotation.x = Math.PI; s.position.set(1.5 * D.GRID * x, 1.5 * D.GRID * y, top + 6); root.add(s); }
+  const car = carrier({ fill: ['blue', 'red'] }); root.add(car);
+  const grip = gripper(26); grip.userData.set(D.TUBE_OD); root.add(grip);
+  const seat = top + 2, off = [7, -3];
+  return {
+    root, dur: 7.5,
+    steps: [[0, '臂把瓶子放到工位上,放偏了 7 mm'], [1.6, '松开夹爪'], [2.3, '托座碰到 45° 导口,自己滑到中心落底'],
+      [4, `坑比托座大 0.8 mm;工位用 4 颗 M4 锁在网格上(±${1.5 * D.GRID} mm)`]],
+    update(t) {
+      const d = seg(t, 0, 1.5), sl = seg(t, 2.3, 3.2);
+      const lift = lerp(40, 7, d) * (1 - sl);
+      car.position.set(off[0] * (1 - sl), off[1] * (1 - sl), seat + lift);
+      grip.userData.set(D.TUBE_OD + 14 * seg(t, 1.6, 2.1));
+      const held = t < 2.1;  // the gripper follows the bottle until it lets go, then lifts away
+      grip.position.set(held ? car.position.x : off[0], held ? car.position.y : off[1], (held ? car.position.z : seat + 7) + D.GRIP_Z - 13 + 80 * seg(t, 2.6, 4));
+    },
+    view: { target: [0, 0, 55], dist: 420, az: -40, el: 26 },
+  };
+};
+
+function chuteNames(fam, sel) {
+  const ss = straightsOf(fam), main = sel && ss.includes(sel) ? sel : ss[0];
+  const curve = DATA.parts.find((p) => p.name.startsWith(`chute_${fam}_C90`));
+  if (curve) return [`chute_${fam}_flare`, main, curve.name, ss[ss.length - 1], `chute_${fam}_gate`];
+  return [`chute_${fam}_flare`, main, `chute_${fam}_gate`];
+}
+
+SCENES.chute = (sel) => {
+  const fam = sel.fam, F = FAM[fam], root = new THREE.Group();
+  const c = makeChain(fam, chuteNames(fam, sel.name), 70); root.add(c.group); root.add(chainPosts(c, fam));
+  const G = GATE[fam], sHead = c.gate.s0 + G.head_x, pitch = F.item + 0.5, sDrop = F.flare * 0.35, v = 150;
+  const n = fam === 'bottle' ? 3 : 4;
+  const items = Array.from({ length: n }, (_, i) => { const it = item(fam, i); root.add(it); return it; });
+  const t0 = (i) => 0.6 + i * 1.7;
+  const tStop = (i) => t0(i) + 0.4 + (sHead - i * pitch - sDrop) / v;
+  const dur = tStop(n - 1) + 2.5;
+  const mid = c.at(c.total / 2).p;
+  const st = fam === 'bottle'
+    ? [[0, '臂把瓶子放进喇叭口:入口比滑道宽 20 mm,放偏了也会被收进来'], [1.3, `顺着 ${F.slope}° 的坡滚下去(画面里没画坡度)`],
+      [2.6, `弯段半径 ${F.R} mm,外墙比内墙高 6 mm,托座贴着外墙转过去`], [tStop(0) - 0.2, '到闸门被挡墙挡住,后面的一个挨一个排队'],
+      [tStop(0) + 1.4, '每个接头下面一个托架 + 一根可调支柱']]
+    : [[0, `臂把${fam === 'cap' ? '瓶盖' : '球'}放进喇叭口`], [1.3, `顺着 ${F.slope}° 的坡${fam === 'cap' ? '滑' : '滚'}下去(画面里没画坡度)`],
+      [tStop(0) - 0.2, '到闸门被挡墙挡住,后面的排队'], [tStop(0) + 1.4, '每个接头下面一个托架 + 一根可调支柱']];
+  return {
+    root, dur, steps: st,
+    update(t) {
+      items.forEach((it, i) => {
+        const a = t0(i);
+        it.visible = t >= a;
+        if (t < a + 0.4) { place(it, c, sDrop, fam, 70 * (1 - lin(t, a, a + 0.4) ** 2)); return; }
+        place(it, c, Math.min(sDrop + (t - a - 0.4) * v, sHead - i * pitch), fam);
+      });
+    },
+    view: { target: [mid.x, mid.y, 60], dist: fam === 'bottle' ? 900 : 760, az: -55, el: 38 },
+  };
+};
+
+SCENES.gate = (sel) => {
+  const fam = sel.fam, F = FAM[fam], G = GATE[fam], root = new THREE.Group();
+  const c = makeChain(fam, [straightsOf(fam)[0], `chute_${fam}_gate`], 70);
+  root.add(c.group); root.add(chainPosts(c, fam));
+  const mech = gateMech(fam, c.gate.holder), beam = irBeam(fam, c.gate.holder);
+  const sHead = c.gate.s0 + G.head_x, p = F.item;
+  const items = [0, 1, 2, 3].map((i) => { const it = item(fam, i); root.add(it); return it; });
+  const grip = gripper(fam === 'bottle' ? 26 : 14); root.add(grip);
+  const gripZ = fam === 'bottle' ? D.GRIP_Z - 13 : fam === 'cap' ? 2 : 0;
+  const gripW = fam === 'bottle' ? D.TUBE_OD : F.item;
+  let pinUp = 1, beamOn = true;
+  return {
+    root, dur: 7.2,
+    steps: [[0, `头一个顶在挡墙上,光电被挡住 = 有料。两个圆挨着时侧边有一条楔形缝,挡销偏 ${G.pin_y} mm 从缝里升起,卡在第一、二个之间`],
+      [0.5, '臂取走第一个;后面的被挡销拦住,不会挤着它'], [1.6, `舵机转 ${G.release_deg}°,挡销退到底面以下`],
+      [2.2, '后面的滚到挡墙,光电又被挡住'], [3.3, '挡销升起,卡进下一条缝,等下一次取料'], [3.9, '上游的继续排进来']],
+    update(t) {
+      // item k (0..3): 0 is lifted away; 1, 2 advance one place; 3 arrives from upstream
+      const adv = seg(t, 2.2, 3.2);
+      const lift = seg(t, 0.5, 1.5);
+      place(items[0], c, sHead, fam, 220 * lift); items[0].visible = lift < 0.98;
+      place(items[1], c, sHead - p * (1 - adv), fam);
+      place(items[2], c, sHead - p * (2 - adv), fam);
+      const a4 = lin(t, 3.9, 5.6);
+      place(items[3], c, lerp(0, sHead - 2 * p, 1 - (1 - a4) * (1 - a4)), fam); items[3].visible = t >= 3.9;
+      const gpos = c.at(sHead).p;
+      const gd = seg(t, 0, 0.5);
+      grip.position.set(gpos.x, gpos.y, gpos.z + gripZ + 60 * (1 - gd) + 220 * lift); grip.rotation.z = c.at(sHead).h;
+      grip.userData.set(gripW + 10 * (1 - lin(t, 0.35, 0.5))); grip.visible = lift < 0.98;
+      pinUp = 1 - seg(t, 1.6, 2.1) + seg(t, 3.3, 3.8);
+      mech.set(1 - pinUp);
+      beamOn = !(t > 0.9 && t < 2.7);
+      beam.set(beamOn);
+    },
+    hud: () => `光电:${beamOn ? '有料' : '空'} · 挡销:${pinUp > 0.5 ? '升起' : '落下'}`,
+    view: { target: [c.at(sHead - 40).p.x, c.at(sHead - 40).p.y, fam === 'bottle' ? 95 : 70], dist: fam === 'bottle' ? 780 : 560, az: -60, el: 22 },
+  };
+};
+
+SCENES.post = (sel) => {
+  const fam = sel.fam, root = new THREE.Group();
+  const flat = /_flat$/.test(sel.name);
+  const ss = straightsOf(fam), short = ss[ss.length - 1];
+  const top = 60;
+  const pst = post(top, { saddle: flat ? `saddle_${fam}_flat` : `saddle_${fam}` }); root.add(pst);
+  const U = pst.userData;
+  const up = flat ? null : (() => { const g = new THREE.Group(); const m = P(short); m.position.x = -straightLen(short); g.add(m); root.add(g); return g; })();
+  const down = (() => { const g = new THREE.Group(); g.add(P(flat ? `chute_${fam}_flare` : short)); root.add(g); return g; })();
+  const zUp = top + D.SADDLE_T, zDown = top + D.SADDLE_T - (flat ? 0 : D.SADDLE_STEP);
+  return {
+    root, dur: 9,
+    steps: [[0, '支柱底座放在台面或拼接块上(拼接块上用 4 颗 M4 锁住)'], [0.6, 'M4 螺杆穿过底座,下端螺母藏在六角槽里'],
+      [1.4, `按 BOM 的支柱表叠垫块:${DATA.spacers.join(' / ')} mm`], [3.4, '最后几毫米用螺母调高'], [3.9, flat ? '喇叭口起点用平托架(没有侧挡)' : '接头托架坐在螺母上'],
+      [4.8, flat ? '喇叭段的定位孔套进托架的销子' : `两段滑道的定位孔套进托架的销子;下游那段低 ${D.SADDLE_STEP} mm,东西过缝不会顶住`]],
+    update(t) {
+      U.foot.position.z = 40 * (1 - seg(t, 0, 0.6));
+      U.rod.position.z = 2 + 120 * (1 - seg(t, 0.6, 1.4)); U.rod.visible = t > 0.55;
+      U.stack.forEach((q, i) => { const u = seg(t, 1.4 + 0.45 * i, 1.9 + 0.45 * i); q.m.position.z = q.z + 90 * (1 - u); q.m.visible = t > 1.35 + 0.45 * i; });
+      U.nut.position.z = top - 3.2 + 60 * (1 - seg(t, 3.4, 3.9)); U.nut.visible = t > 3.35;
+      U.saddle.position.z = top + 60 * (1 - seg(t, 3.9, 4.8)); U.saddle.visible = t > 3.85;
+      if (up) { const u = seg(t, 4.8, 5.8); up.position.set(-30 * (1 - u), 0, zUp + 50 * (1 - u)); up.visible = t > 4.75; }
+      const u2 = seg(t, 5.2, 6.2); down.position.set(30 * (1 - u2), 0, zDown + 50 * (1 - u2)); down.visible = t > 5.15;
+    },
+    tags: [{ text: `底座 ${D.FOOT_H}`, pos: new V3(34, 0, 12) }, { text: `托架底 ${top} mm`, pos: new V3(0, 40, top) }],
+    view: { target: [0, 0, 45], dist: 420, az: -58, el: 18 },
+  };
+};
+
+SCENES.cones = () => {
+  const root = new THREE.Group(), fun = DATA.funnel, hop = DATA.hopper, gap = D.BALL_D + 2, r = D.BALL_D / 2, slope = FAM.ball.slope * deg;
+  // M2 floor top at 40; hopper above its start; M1 ends 5 mm over the hopper rim; funnel over M1's start
+  const m2Top = 40, hopZ = m2Top + gap, hopTop = hopZ + 6 + hop.h, m1End = hopTop + 5;
+  const m1Name = byName.chute_ball_S75 ? 'chute_ball_S75' : straightsOf('ball')[0];
+  const dist = Math.round(Math.hypot(hop.xy[0] - fun.xy[0], hop.xy[1] - fun.xy[1]) * 1000), m1Len = straightLen(m1Name);
+  const m1Start = m1End + m1Len * Math.tan(slope), funZ = m1Start + gap, funTop = funZ + 6 + fun.h;
+  const m1 = makeChain('ball', [m1Name], 0);
+  const m1g = new THREE.Group(); m1g.add(m1.group); m1g.position.z = m1Start - D.FLOOR_T; m1g.rotation.y = slope; root.add(m1g);
+  const ss = straightsOf('ball'), m2 = makeChain('ball', [ss[ss.length - 1], 'chute_ball_gate'], m2Top - D.FLOOR_T);
+  m2.group.position.x = dist; root.add(m2.group);
+  const funnel = P('funnel'); funnel.position.set(0, 0, funZ); funnel.rotation.z = Math.PI; root.add(funnel);
+  const hopper = P('hopper'); hopper.position.set(dist, 0, hopZ); hopper.rotation.z = -Math.PI / 2; root.add(hopper);
+  for (const [x, y, zt] of [[-(fun.top_r + 14), 0, funZ + 6 + fun.h * 0.6], [dist, -(hop.top_r + 14), hopZ + 6 + hop.h * 0.6], [10, 0, m1Start - D.FLOOR_T - 4], [dist + 10, 0, m2Top - D.FLOOR_T - 4], [dist + 80, 0, m2Top - D.FLOOR_T - 4]]) {
+    const p = cyl(3.5, zt, M.post, 12); p.position.set(x, y, 0); root.add(p);
+  }
+  const mouthZ = funTop + 14;
+  const bottle = carrier({}); bottle.rotation.x = Math.PI; bottle.position.set(0, 0, mouthZ + CAR.tubeTop); root.add(bottle);
+  const grip = gripper(26); grip.userData.set(D.TUBE_OD); grip.rotation.x = Math.PI; grip.position.set(0, 0, mouthZ + CAR.tubeTop - D.GRIP_Z + 13); root.add(grip);
+  const rIn = (spec, z0, z) => spec.out_r + (spec.top_r - spec.out_r) * clamp((z - z0 - 6) / spec.h, 0, 1);
+  const colors = ['red', 'green', 'blue', 'green'];
+  const sHead2 = m2.gate.s0 + GATE.ball.head_x;
+  const balls = colors.map((cname) => { const b = sphere(r, M.ball[cname]); root.add(b); return b; });
+  // timeline per ball
+  const plan = [], vRoll = 170;
+  let lastExit = -1;
+  colors.forEach((_, i) => {
+    const t0 = 0.8 + 0.5 * i, tFun = t0 + 0.25, tSpout = tFun + 0.9, tM1 = tSpout + 0.25, tEnd1 = tM1 + m1Len / vRoll, tHop = tEnd1 + 0.3, tBottom = tHop + 0.8;
+    const tExit = Math.max(tBottom, lastExit + 0.7); lastExit = tExit;
+    const tM2 = tExit + 0.25, tStop = tM2 + (sHead2 - i * D.BALL_D) / vRoll;
+    plan.push({ t0, tFun, tSpout, tM1, tEnd1, tHop, tBottom, tExit, tM2, tStop, a0: i * 1.7 });
+  });
+  const dur = plan[plan.length - 1].tStop + 2.4;
+  const p = new V3();
+  function spiral(cx, z0, spec, zA, zB, a0, u, turns) {
+    const z = lerp(zA, zB, u), rr = Math.max(0, rIn(spec, z0, z) - r - 1) * (1 - 0.25 * u), a = a0 + turns * u;
+    return p.set(cx + rr * Math.cos(a), rr * Math.sin(a), z);
+  }
+  return {
+    root, dur,
+    steps: [[0, 'A7 把瓶子倒扣在漏斗上方'], [0.8, '球一颗颗倒出来,顺着漏斗壁转进出口'], [plan[0].tM1, `漏斗出口离球道底面 ${gap} mm,球从下面滚出去`],
+      [plan[0].tHop, '球道末端比料斗口高 5 mm,球掉进料斗'], [plan[1].tExit, '料斗出口只比球大三成,一次只放一个'], [plan[0].tStop, '球排到闸门,等 A8 取走、相机认颜色']],
+    update(t) {
+      balls.forEach((b, i) => {
+        const q = plan[i];
+        b.visible = t >= q.t0;
+        if (t < q.tFun) { const u = lin(t, q.t0, q.tFun); b.position.set(0, 0, lerp(mouthZ - r, funZ + 6 + fun.h * 0.75, u * u)); return; }
+        if (t < q.tSpout) { b.position.copy(spiral(0, funZ, fun, funZ + 6 + fun.h * 0.75, funZ + 6 + r, q.a0, lin(t, q.tFun, q.tSpout), 4)); return; }
+        if (t < q.tM1) { const u = lin(t, q.tSpout, q.tM1); b.position.set(0, 0, lerp(funZ + 6 + r, m1Start + r, u * u)); return; }
+        if (t < q.tEnd1) { const u = lin(t, q.tM1, q.tEnd1); b.position.set(u * m1Len, 0, lerp(m1Start, m1End, u) + r); return; }
+        if (t < q.tHop) { const u = lin(t, q.tEnd1, q.tHop); b.position.set(m1Len + 18 * u, 0, lerp(m1End + r, hopZ + 6 + hop.h * 0.6, u * u)); return; }
+        const queued = plan.filter((o, j) => j < i && t < o.tExit).length;
+        if (t < q.tBottom) {
+          const u = lin(t, q.tHop, q.tBottom); const s = spiral(0, hopZ, hop, hopZ + 6 + hop.h * 0.6, hopZ + 6 + r + queued * 14, Math.PI + q.a0, u, 3);
+          b.position.set(dist + s.x, s.y, s.z); return;
+        }
+        if (t < q.tExit) { b.position.set(dist, 0, hopZ + 6 + r + queued * 14); return; }
+        if (t < q.tM2) { const u = lin(t, q.tExit, q.tM2); b.position.set(dist, 0, lerp(hopZ + 6 + r, m2Top + r, u * u)); return; }
+        const s = Math.min((t - q.tM2) * vRoll, sHead2 - i * D.BALL_D);
+        const a = m2.at(s).p; b.position.set(a.x + dist, a.y, m2Top + r); b.rotation.y = s / r;
+      });
+    },
+    tags: [{ text: '漏斗', pos: new V3(0, 0, funTop + 4) }, { text: '料斗', pos: new V3(dist, 0, hopTop + 4) }],
+    view: { target: [dist / 2 + 20, 0, 130], dist: 1000, az: -62, el: 18 },
+  };
+};
+
+SCENES.camera = (sel) => {
+  const which = sel.name.match(/camera_post_(U\d)/)[1], info = DATA.cameras[which], h = info.h, root = new THREE.Group();
+  const postM = P(sel.name); root.add(postM);
+  const lx = Math.hypot(info.look_mm[0], info.look_mm[1]), pitch = Math.atan2(info.look_mm[2], lx), reach = Math.hypot(lx, info.look_mm[2]);
+  const head = new THREE.Group(); head.position.set(0, 10, h - 10); head.rotation.x = pitch; root.add(head);
+  const board = box(32, 2, 32, M.dark); board.geometry.translate(0, 0, -16); board.position.y = 1; head.add(board);
+  const lens = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(6, 6, 8, 20), M.dark)); lens.position.y = 6; head.add(lens);
+  // view frustum
+  const L = reach + 30, hw = Math.tan(30 * deg) * L, hh = Math.tan(22 * deg) * L, apex = new V3(0, 10, 0);
+  const corners = [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].map(([x, z]) => new V3(x, 10 + L, z));
+  const fg = new THREE.BufferGeometry().setFromPoints(corners.flatMap((c, i) => [apex, c, corners[(i + 1) % 4]]));
+  fg.computeVertexNormals(); head.add(new THREE.Mesh(fg, M.view));
+  for (const c of corners) head.add(lineBetween(apex, c, VIEW_LINE));
+  const target = new V3(0, 10, h - 10).add(new V3(0, Math.cos(pitch) * reach, Math.sin(pitch) * reach));
+  let hudText = '';
+  if (which === 'U3') {
+    const car = carrier({ fill: ['red', 'green', 'blue'] }); root.add(car);
+    const grip = gripper(26); grip.userData.set(D.TUBE_OD); root.add(grip);
+    const z0 = target.z - (CAR.tubeZ + 1.5 * D.BALL_D);
+    return {
+      root, dur: 7,
+      steps: [[0, `相机立柱 ${h} mm 高,镜头水平对着检查位`], [0.5, 'A4 把瓶子举到镜头前,原地转一圈'], [4.6, '读出球的颜色顺序和托座侧面的码,记一笔']],
+      update(t) {
+        const u = seg(t, 0.5, 4.5);
+        car.position.set(target.x, target.y, z0); car.rotation.z = u * 2 * Math.PI;
+        grip.position.set(target.x, target.y, z0 + D.GRIP_Z - 13); grip.rotation.z = u * 2 * Math.PI;
+        hudText = t > 4.6 ? '读到:红 · 绿 · 蓝 · 托座码 07' : t > 0.5 ? '读取中…' : '';
+      },
+      hud: () => hudText,
+      tags: [{ text: `${h} mm`, pos: new V3(-20, 0, h / 2) }],
+      view: { target: [0, 60, h * 0.7], dist: 760, az: -35, el: 20 },
+    };
+  }
+  const c = makeChain('ball', ['chute_ball_gate'], 0); root.add(c.group);
+  const G = GATE.ball, head0 = new V3(G.head_x, 0, D.FLOOR_T + D.BALL_D / 2);
+  c.group.position.set(target.x - head0.x, target.y - head0.y, target.z - head0.z); c.group.rotation.z = 0;
+  const cols = ['green', 'red', 'blue'];
+  const ball = sphere(D.BALL_D / 2, M.ball.green); root.add(ball);
+  return {
+    root, dur: 7.5,
+    steps: [[0, `相机立柱 ${h} mm 高,镜头斜向下看料斗后面的球道闸门`], [0.6, '球滚到闸门,相机认颜色'], [3.2, 'A8 取走,按颜色放进红、绿、蓝球道']],
+    update(t) {
+      const k = Math.floor(t / 2.5) % 3; ball.material = M.ball[cols[k]];
+      const u = lin(t % 2.5, 0, 0.8), lift = seg(t % 2.5, 1.9, 2.5);
+      ball.position.set(target.x - 60 * (1 - u), target.y, target.z + 120 * lift);
+      ball.visible = lift < 0.95;
+      hudText = (t % 2.5) > 0.9 && lift < 0.5 ? `颜色:${{ red: '红', green: '绿', blue: '蓝' }[cols[k]]}` : '';
+    },
+    hud: () => hudText,
+    tags: [{ text: `${h} mm`, pos: new V3(-20, 0, h / 2) }],
+    view: { target: [0, 40, h * 0.6], dist: 700, az: -35, el: 24 },
+  };
+};
+
+SCENES.coupon = () => {
+  const root = new THREE.Group();
+  const cp = P('fit_coupon'); root.add(cp);
+  const socks = [25.2, 25.4, 25.6], lips = [7.0, 7.2, 7.4], ins = [5.5, 5.6, 5.7];
+  const tubes = socks.map((d, i) => { const m = cyl(D.TUBE_OD / 2, 34, M.glass, 36, true); m.castShadow = false; m.position.set(18 + 30 * i, 20, 3); root.add(m); return m; });
+  const bbs = lips.map((d, i) => { const m = sphere(D.BB_D / 2, M.steel); m.position.set(108, 8 + 12 * i, D.BB_D / 2 - D.BB_PROTRUDE); root.add(m); return m; });
+  const inserts = ins.map((d, i) => { const m = cyl(2.9, 6, M.brass, 16); m.position.set(96, 8 + 12 * i, 5); root.add(m); return m; });
+  const tags = [
+    ...socks.map((d, i) => ({ text: `Ø${d.toFixed(1)}`, pos: new V3(18 + 30 * i, 20, 40) })),
+    ...lips.map((d, i) => ({ text: `Ø${d.toFixed(1)}`, pos: new V3(122, 8 + 12 * i, 2) })),
+    ...ins.map((d, i) => ({ text: `Ø${d.toFixed(1)}`, pos: new V3(86, 8 + 12 * i, 14) })),
+  ];
+  return {
+    root, dur: 9,
+    steps: [[0, '第一件先打这个:三档管口、三档钢珠挡圈、三档热熔孔'], [0.5, '管子插进去不晃、也不用硬压的那一档,改 layout.py 的 SOCKET_D'],
+      [3, `钢珠从底面压进去、露出约 ${D.BB_PROTRUDE.toFixed(1)} mm 又不掉的那一档,改 BB_LIP_D`], [5, '热熔螺母烫进去不歪、不松的那一档,改 cad.py 的 M4_INSERT']],
+    update(t) {
+      tubes.forEach((m, i) => { const u = seg(t, 0.5 + 0.6 * i, 1.3 + 0.6 * i); m.position.z = 3 + 60 * (1 - u); m.visible = t > 0.45 + 0.6 * i; });
+      bbs.forEach((m, i) => { const u = seg(t, 3 + 0.4 * i, 3.6 + 0.4 * i); m.position.z = D.BB_D / 2 - D.BB_PROTRUDE - 30 * (1 - u); m.visible = t > 2.95 + 0.4 * i; });
+      inserts.forEach((m, i) => { const u = seg(t, 5 + 0.4 * i, 5.8 + 0.4 * i); m.position.z = 5 + 30 * (1 - u); m.visible = t > 4.95 + 0.4 * i; });
+    },
+    tags,
+    view: { target: [60, 20, 8], dist: 300, az: -30, el: 46 },
+  };
+};
+
+// ---------- UI ----------
+const drawer = document.getElementById('drawer');
+for (const [gid, gname] of DATA.groups) {
+  const rows = DATA.parts.filter((p) => p.group === gid);
+  if (!rows.length) continue;
+  const sec = document.createElement('section');
+  sec.innerHTML = `<h3>${gname}</h3><ul>${rows.map((p) => `<li><button type="button" class="pbtn" data-name="${p.name}"><span class="nm">${title(p.name)}</span><span class="q">×${p.qty}</span></button></li>`).join('')}</ul>`;
+  drawer.appendChild(sec);
+}
+drawer.addEventListener('click', (e) => { const b = e.target.closest('.pbtn'); if (b) location.hash = hashOf(b.dataset.name); });
+
+const stepNow = document.getElementById('stepNow'), hudEl = document.getElementById('hud'), stepsEl = document.getElementById('steps');
+const tagsEl = document.getElementById('tags'), tbar = document.getElementById('tbar'), loadnote = document.getElementById('loadnote');
+const playBtn = document.getElementById('play');
+let cur = null, t = 0, playing = !REDUCED, speed = 1, tagEls = [];
+
+function setPlaying(v) { playing = v; playBtn.textContent = v ? '暂停' : '播放'; playBtn.setAttribute('aria-pressed', String(!v)); }
+playBtn.addEventListener('click', () => setPlaying(!playing));
+document.getElementById('restart').addEventListener('click', () => { t = 0; setPlaying(true); });
+for (const b of document.querySelectorAll('[data-speed]')) b.addEventListener('click', () => {
+  speed = +b.dataset.speed; for (const o of document.querySelectorAll('[data-speed]')) o.setAttribute('aria-pressed', String(o === b));
+});
+
+function sizeOf(name) {
+  const p = byName[name], bb = DATA_MESH?.meshes?.[name]?.bbox;
+  return bb ? bb[1].map((v, i) => (v - bb[0][i]).toFixed(1).replace(/\.0$/, '')).join(' × ') + ' mm' : '–';
+}
+function showInfo(p, sc) {
+  document.getElementById('pName').textContent = title(p.name) + (p.group.startsWith('chute_') ? `(${FAM_CN[p.fam]}滑道)` : '');
+  document.getElementById('pCode').textContent = `${p.name}.stl / .step`;
+  const kv = [['数量', `${p.qty} 件`], ['材料', p.mat], ['外形', sizeOf(p.name)], ['体积', p.vol ? `${p.vol} cm³(实心)` : '–'], ['说明', p.note]];
+  document.getElementById('pKv').innerHTML = kv.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
+  stepsEl.innerHTML = sc.steps.map(([, s]) => `<li>${s}</li>`).join('');
+}
+
+function select(p) {
+  SEL = p;
+  for (const b of drawer.querySelectorAll('.pbtn')) b.setAttribute('aria-current', String(b.dataset.name === p.name));
+  if (cur) scene.remove(cur.root);
+  cur = SCENES[p.scene](p);
+  scene.add(cur.root);
+  tagsEl.innerHTML = ''; tagEls = (cur.tags || []).map((g) => { const el = document.createElement('div'); el.className = 'tag'; el.textContent = g.text; tagsEl.appendChild(el); return { el, pos: g.pos }; });
+  const v = cur.view, tg = new V3(...v.target);
+  const az = v.az * deg, el = v.el * deg;
+  camera.position.set(tg.x + v.dist * Math.cos(el) * Math.sin(az), tg.y - v.dist * Math.cos(el) * Math.cos(az), tg.z + v.dist * Math.sin(el));
+  controls.target.copy(tg); controls.update();
+  t = REDUCED ? cur.dur * 0.98 : 0;
+  showInfo(p, cur);
+  document.title = `${title(p.name)} · 循环产线零件`;
+  stepIdx = -1;
+}
+let stepIdx = -1;
+function fromHash() {
+  const p = byHash[location.hash.slice(1)] || byName['chute_bottle_gate'] || DATA.parts[0];
+  select(p);
+}
+
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stage);
+
+const tmp = new V3();
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (cur) {
+    if (playing) t = (t + dt * speed) % cur.dur;
+    cur.update(t);
+    const k = cur.steps.reduce((a, [ts], i) => (t >= ts ? i : a), 0);
+    if (k !== stepIdx) {
+      stepIdx = k; stepNow.textContent = cur.steps[k][1];
+      [...stepsEl.children].forEach((li, i) => li.classList.toggle('on', i === k));
+    }
+    hudEl.textContent = cur.hud ? cur.hud(t) : '';
+    tbar.style.width = `${(t / cur.dur) * 100}%`;
+    const w = stage.clientWidth, h = stage.clientHeight;
+    for (const g of tagEls) {
+      tmp.copy(g.pos).applyMatrix4(cur.root.matrixWorld).project(camera);
+      const vis = tmp.z < 1 && Math.abs(tmp.x) < 1.05 && Math.abs(tmp.y) < 1.05;
+      g.el.style.display = vis ? '' : 'none';
+      if (vis) g.el.style.transform = `translate(${(tmp.x * 0.5 + 0.5) * w}px, ${(-tmp.y * 0.5 + 0.5) * h}px) translate(-50%, -120%)`;
+    }
+  }
+  controls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+
+let DATA_MESH = null;
+const getJSON = (u) => fetch(u).then((r) => { if (!r.ok) throw new Error(`${u}: ${r.status}`); return r.json(); });
+getJSON('parts_mesh.json').then((data) => {
+  DATA_MESH = data;
+  for (const [k, m] of Object.entries(data.meshes)) GEO[k] = decode(m);
+  loadnote.remove();
+  resize(); fromHash(); window.addEventListener('hashchange', fromHash);
+  requestAnimationFrame(frame);
+  getJSON('so100_mesh.json').then((so) => {
+    SO = {};
+    for (const v of DATA.arm.visuals) if (so.meshes[v.mesh]) SO[v.mesh] = decode(so.meshes[v.mesh], 1000);
+    if (SEL && SEL.scene === 'clamp') select(SEL);
+  }).catch(() => {});
+}).catch((e) => { loadnote.textContent = `零件模型(parts_mesh.json)加载失败:${e.message}`; stepNow.textContent = '零件模型加载失败'; });
+</script>
+</body>
+</html>

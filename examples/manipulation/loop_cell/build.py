@@ -19,6 +19,7 @@ Needs CadQuery (any recent version) for the parts; ``--no-cad`` skips them::
     cd examples/manipulation
     python -m loop_cell.build            # everything
     python -m loop_cell.build --no-cad   # BOM + page only
+    python -m loop_cell.build --place    # suggest each arm's pan axis + yaw on its tile, then stop
 """
 
 from __future__ import annotations
@@ -30,7 +31,7 @@ from collections import Counter
 from pathlib import Path
 
 from . import layout as L
-from .routes import arm_targets, arm_yaws, base_clearance, build_all, drop_s, reach_report
+from .routes import arm_yaws, base_clearance, build_all, drop_s, place_arms, reach_report
 
 HERE = Path(__file__).resolve().parent
 PLA = 1.24  # g/cm³
@@ -42,13 +43,17 @@ def _fmt(x: float) -> str:
 
 def part_list(routes) -> list[dict]:
     """Every printed part with its quantity; ``make`` builds it in CadQuery."""
-    n_tiles = sum(round((u["rect"][2] - u["rect"][0]) / 0.2) * round((u["rect"][3] - u["rect"][1]) / 0.2) for u in L.UNITS)
-    joiners = sum(2 if (u["rect"][3] - u["rect"][1]) < 0.3 else 5 for u in L.UNITS)
+    t = L.TILE / 1000
+    n_tiles = joiners = 0
+    for u in L.UNITS:
+        nx, ny = round((u["rect"][2] - u["rect"][0]) / t), round((u["rect"][3] - u["rect"][1]) / t)
+        n_tiles += nx * ny
+        joiners += (nx - 1) * ny + nx * (ny - 1)  # one under the middle of every seam
     parts = [
-        dict(name="tile_200", make=("tile",), qty=n_tiles, mat="PLA", note="底座拼接块,25 mm 网格装 M4 热熔螺母"),
-        dict(name="tile_joiner", make=("joiner",), qty=joiners, mat="PLA", note="拼接块底面跨缝连接板"),
-        dict(name="tile_foot_pad", make=("foot_pad",), qty=4 * n_tiles, mat="TPU", note="拼接块四角脚垫"),
-        dict(name="arm_clamp_dog", make=("clamp_dog",), qty=4 * len(L.ARMS), mat="PETG", note="压住 SO-100 底座;先量底座法兰厚度再改参数"),
+        dict(name=f"tile_{L.TILE:g}", make=("tile",), qty=n_tiles, mat="PLA", note=f"底座拼接块,{L.GRID:g} mm 网格装 M4 热熔螺母;其中 {len(L.ARMS)} 块是臂座"),
+        dict(name="tile_joiner", make=("joiner",), qty=joiners, mat="PLA", note="拼接块底面每条缝中间一块,沉头 M4"),
+        dict(name="tile_foot_pad", make=("foot_pad",), qty=4 * n_tiles, mat="TPU", note="拼接块四角脚垫,离两边各 15 mm"),
+        dict(name="arm_clamp_dog", make=("clamp_dog",), qty=4 * len(L.ARMS), mat="PETG", note="每台臂 4 个,压在底座离块边最宽的两侧;先量底座法兰厚度再改参数"),
         dict(name="puck_body", make=("puck_body",), qty=L.N_BOTTLES + 1, mat="PETG", note="托座;3 颗 Ø8 钢珠装进盲孔"),
         dict(name="puck_sole", make=("puck_sole",), qty=L.N_BOTTLES + 1, mat="PETG", note="粘在托座底面,挡住钢珠"),
         dict(name="tube_collar", make=("collar",), qty=L.N_BOTTLES + 1, mat="PETG", note="粘在管口,四头卡口螺纹 + 卡位凸点"),
@@ -104,7 +109,7 @@ def extra_posts(routes) -> dict:
     """Posts under the hopper and funnel tabs."""
     out = {"rows": [], "spacers": Counter()}
     for name, spec, rt, ground in (("hopper", L.HOPPER, routes["M2"], 0.0), ("funnel", L.FUNNEL, routes["M1"], L.PT)):
-        spout_bottom = rt.z(0) * 1000 + 2
+        spout_bottom = rt.z(0) * 1000 + L.SPOUT_GAP
         tab_z = spout_bottom + 6 + spec["h"] * 0.6
         post = tab_z - ground * 1000
         fill, stack = post - L.FOOT_H, []
@@ -143,7 +148,7 @@ def export_parts(parts, out: Path) -> dict[str, float]:
 
 
 def page_layout(routes) -> dict:
-    yaws = arm_yaws(arm_targets(routes))
+    yaws = arm_yaws()
     def dense(r):
         n = max(2, int(r.length / 0.004))
         return [[round(c, 5) for c in r.at(r.length * i / n)[0]] for i in range(n + 1)]
@@ -159,10 +164,10 @@ def page_layout(routes) -> dict:
         )
     mm = 1 / 1000
     return dict(
-        PT=L.PT, END_Z=L.END_Z, tile=L.TILE * mm, table=L.TABLE, units=L.UNITS, arms=[dict(a, yaw=yaws[a['id']]) for a in L.ARMS], routes=rts,
+        PT=L.PT, END_Z=L.END_Z, tile=L.TILE * mm, grid=L.GRID * mm, bottle_r=L.FAMILIES["bottle"]["R"], table=L.TABLE, units=L.UNITS, arms=[dict(a, yaw=yaws[a['id']]) for a in L.ARMS], routes=rts,
         so100=json.loads((HERE / "so100_model.json").read_text(encoding="utf-8")),
-        funnel=dict(xy=L.FUNNEL["xy"], top_r=L.FUNNEL["top_r"] * mm, out_r=L.FUNNEL["out_r"] * mm, h=L.FUNNEL["h"] * mm, z0=routes["M1"].z(0) + 0.002),
-        hopper=dict(xy=L.HOPPER["xy"], top_r=L.HOPPER["top_r"] * mm, out_r=L.HOPPER["out_r"] * mm, h=L.HOPPER["h"] * mm, z0=routes["M2"].z(0) + 0.002),
+        funnel=dict(xy=L.FUNNEL["xy"], top_r=L.FUNNEL["top_r"] * mm, out_r=L.FUNNEL["out_r"] * mm, h=L.FUNNEL["h"] * mm, z0=routes["M1"].z(0) + L.SPOUT_GAP * mm),
+        hopper=dict(xy=L.HOPPER["xy"], top_r=L.HOPPER["top_r"] * mm, out_r=L.HOPPER["out_r"] * mm, h=L.HOPPER["h"] * mm, z0=routes["M2"].z(0) + L.SPOUT_GAP * mm), pour=L.POUR_Z,
         inspect=L.INSPECT, cameras=L.CAMERAS,
         carrier=dict(puck_d=L.PUCK_D * mm, puck_top=(L.SOLE_Z + L.PUCK_TOP) * mm, base_h=(L.SOLE_Z + L.SOLE_T + L.BASE_H) * mm, neck_d=L.NECK_D * mm,
                      tube_d=L.TUBE_OD * mm, tube_bottom=L.TUBE_BOTTOM_Z * mm, tube_top=L.TUBE_TOP_Z * mm, collar_d=L.COLLAR_OD * mm,
@@ -175,8 +180,11 @@ def page_layout(routes) -> dict:
 def write_bom(parts, vols, routes, reach, out: Path) -> None:
     lines = ["# 八臂循环产线:打印零件与物料清单", "", "由 `python -m loop_cell.build` 从 `layout.py` 生成,不要手改。", ""]
     lines += ["## 关键尺寸", "", "| 项 | 值 |", "|---|---|"]
+    tw, td = L.TABLE["x"][1] - L.TABLE["x"][0], L.TABLE["y"][1] - L.TABLE["y"][0]
     lines += [
+        f"| 台面 | {tw * 100:.0f} × {td * 100:.0f} cm |",
         f"| 底座拼接块 | {L.TILE:g} × {L.TILE:g} × {L.TILE_T:g} mm,M4 热熔螺母网格 {L.GRID:g} mm,台面以上 {L.PT * 1000:g} mm(含 {L.PAD_T:g} mm TPU 脚垫) |",
+        f"| 臂座 | 每台 SO-100 单独站一块拼接块({L.ARM_PLATE:g} × {L.ARM_PLATE:g} mm),底座摆正(0/90/180/270°),块上不放别的东西 |",
         f"| 托座 | Ø{L.PUCK_D:g} mm,高 {L.PUCK_TOP:g} mm(含 {L.SOLE_T:g} mm 底片),3 颗 Ø{L.BB_D:g} 钢珠凸出 {L.BB_PROTRUDE:.2f} mm |",
         f"| 透明管 | Ø{L.TUBE_OD:g} × {L.TUBE_L:g} mm(两端开口,下端粘进托座 {L.SOCKET_DEPTH:g} mm);管口离滑道底面 {L.TUBE_TOP_Z:.1f} mm |",
         f"| 瓶口套环 / 瓶盖 | 套环 Ø{L.COLLAR_OD:g} × {L.COLLAR_H:g} mm,四头卡口(每段 {L.THREAD_SPAN:g}°,导程 {L.THREAD_LEAD:g} mm);瓶盖 Ø{L.CAP_OD:g} × {L.CAP_H:g} mm |",
@@ -203,7 +211,7 @@ def write_bom(parts, vols, routes, reach, out: Path) -> None:
         f"| SG90 舵机 | {n_gates} | 每个闸门一个 |",
         f"| 对射红外光电(5 mm) | {n_gates} 对 | 装在闸门的 Ø5.2 孔 |",
         f"| M4 热熔螺母 | 约 {4 * len(L.ARMS) + 4 * 5 + 4 * 2 + 4 * part_qty(parts, 'tile_joiner')} | 只装在用到的孔位(臂压块、工位、相机、连接板) |",
-        f"| M4 螺丝 / 螺母 | 约 {4 * part_qty(parts, 'tile_joiner') + 4 * len(L.ARMS) + 30} / {2 * n_posts} | 螺母:每根支柱上下各一 |",
+        f"| M4 螺丝 / 螺母 | 沉头约 {4 * part_qty(parts, 'tile_joiner')},普通约 {4 * len(L.ARMS) + 30} / {2 * n_posts} | 沉头的装连接板;螺母:每根支柱上下各一 |",
         f"| M4 螺杆 | {n_posts} 根 | 每个支柱一根,长度见下方支柱表 |",
         "| PTFE 胶带 | 1 卷 | 贴在盖滑道底面和弯道外墙 |",
         "| 瞬干胶 / 环氧 | – | 托座底片、管子和套环 |",
@@ -219,6 +227,17 @@ def write_bom(parts, vols, routes, reach, out: Path) -> None:
             lines.append(f"| {k} | {i} | {g} | {j['post_mm']:.0f} | {' + '.join(_fmt(s) for s in j['spacers']) or '–'} | {j['adjust_mm']:.1f} |")
     for name, post, stack, rest in extra_posts(routes)["rows"]:
         lines.append(f"| {name} | – | {'拼接块' if name == 'funnel' else '台面'} | {post:.0f} | {' + '.join(_fmt(s) for s in stack) or '–'} | {rest:.1f} |")
+    lines += ["", "## 臂座", "", "转轴位置是相对台面原点的坐标;余量是底座到拼接块四边的距离,压块放在余量 ≥ 24 mm 的两侧。", "",
+              "| 臂 | 拼接块中心 cm | 转轴 cm | 底座朝向 | 余量 西/东/南/北 mm |", "|---|---|---|---:|---|"]
+    from .routes import base_corners
+
+    h = L.ARM_PLATE / 2000
+    for a in L.ARMS:
+        cs = base_corners(a["xy"], math.radians(a["yaw"]))
+        xs, ys = [c[0] for c in cs], [c[1] for c in cs]
+        pc = a["plate"]
+        sl = [min(xs) - (pc[0] - h), pc[0] + h - max(xs), min(ys) - (pc[1] - h), pc[1] + h - max(ys)]
+        lines.append(f"| {a['id']} | ({pc[0] * 100:.0f}, {pc[1] * 100:.0f}) | ({a['xy'][0] * 100:.1f}, {a['xy'][1] * 100:.1f}) | {a['yaw']}° | {' / '.join(f'{v * 1000:.0f}' for v in sl)} |")
     lines += ["", "## 机械臂可达性", "", "用 TheRobotStudio SO-100 URDF 的真实尺寸和关节限位算的。末端朝下够不到时允许工具倾斜;倾斜越大越吃力(超过 60° 需要调布局)。", "", "| 臂 | 作业点 | 水平距离 cm | 高度 cm | 需要倾斜 |", "|---|---|---:|---:|---:|"]
     for row in reach:
         t = "够不到" if row["tilt"] is None else f"{row['tilt']:.0f}°"
@@ -236,6 +255,108 @@ def part_qty(parts, name):
     return sum(p["qty"] for p in parts if p["name"] == name)
 
 
+# ---------------- parts page ----------------
+GROUPS = [("base", "底座与臂座"), ("bottle", "瓶子"), ("chute_bottle", "瓶滑道"), ("chute_cap", "盖滑道"), ("chute_ball", "球道"),
+          ("post", "支柱"), ("balls", "倒球与料斗"), ("misc", "相机与试配")]
+
+
+def part_scene(name: str) -> tuple[str, str, str]:
+    """(scene, chute family, list group) for a part name."""
+    fam = next((f for f in L.FAMILIES if f"_{f}" in name), "bottle")
+    if name.startswith(("tile_", "arm_clamp")):
+        return ("clamp" if name.startswith("arm_clamp") else "base"), fam, "base"
+    if name.startswith("puck_"):
+        return "carrier", fam, "bottle"
+    if name in ("tube_collar", "cap"):
+        return "cap", fam, "bottle"
+    if name == "nest":
+        return "nest", fam, "bottle"
+    if name.startswith(("chute_", "gate_lever")):
+        return ("gate" if name.endswith("_gate") or name.startswith("gate_lever") else "chute"), fam, f"chute_{fam}"
+    if name.startswith(("saddle_", "post_")):
+        return "post", fam, ("post" if name.startswith("post_") else f"chute_{fam}")
+    if name in ("hopper", "funnel"):
+        return "cones", "ball", "balls"
+    if name.startswith("camera_post"):
+        return "camera", fam, "misc"
+    return "coupon", fam, "misc"
+
+
+def read_stl(path: Path):
+    """Binary STL -> (positions, indices) with shared vertices (stdlib only)."""
+    import struct
+
+    data = path.read_bytes()
+    n = struct.unpack_from("<I", data, 80)[0]
+    verts, index, out = {}, [], []
+    for i in range(n):
+        f = struct.unpack_from("<12f", data, 84 + 50 * i)
+        for k in range(3):
+            v = (round(f[3 + 3 * k], 3), round(f[4 + 3 * k], 3), round(f[5 + 3 * k], 3))
+            j = verts.get(v)
+            if j is None:
+                j = verts[v] = len(out)
+                out.append(v)
+            index.append(j)
+    return out, index
+
+
+def write_parts_mesh(parts, out: Path) -> None:
+    import array
+    import base64
+
+    meshes = {}
+    for p in parts:
+        f = out / "stl" / f"{p['name']}.stl"
+        if not f.exists():
+            continue
+        pos, idx = read_stl(f)
+        pa = array.array("f", [c for v in pos for c in v])
+        typ = "u16" if len(pos) < 65536 else "u32"
+        ia = array.array("H" if typ == "u16" else "I", idx)
+        meshes[p["name"]] = dict(pos=base64.b64encode(pa.tobytes()).decode(), idx=base64.b64encode(ia.tobytes()).decode(), idx_type=typ,
+                                 bbox=[[min(v[k] for v in pos) for k in range(3)], [max(v[k] for v in pos) for k in range(3)]])
+    (HERE / "parts_mesh.json").write_text(json.dumps(dict(units="mm", meshes=meshes), separators=(",", ":")), encoding="utf-8")
+
+
+def parts_data(parts, vols) -> dict:
+    so = json.loads((HERE / "so100_model.json").read_text(encoding="utf-8"))
+    arm = next(a for a in L.ARMS if a["id"] == "A5")
+    rows = []
+    for p in parts:
+        scene, fam, group = part_scene(p["name"])
+        rows.append(dict(name=p["name"], qty=p["qty"], mat=p["mat"], note=p["note"], vol=round(vols.get(p["name"], 0) / 1000, 1),
+                         scene=scene, fam=fam, group=group, make=list(p["make"])))
+    keys = ("TILE", "TILE_T", "PAD_T", "JOINER_T", "GRID", "PUCK_D", "SOLE_T", "BASE_H", "NECK_D", "NECK_H", "SOCKET_DEPTH", "BB_D", "BB_RING",
+            "BB_PROTRUDE", "TUBE_OD", "TUBE_L", "COLLAR_ID", "COLLAR_OD", "COLLAR_H", "THREAD_SPAN", "THREAD_LEAD", "CAP_OD", "CAP_H", "CAP_TOP_T",
+            "BALL_D", "FLOOR_T", "WALL_T", "SADDLE_L", "SADDLE_T", "SADDLE_STEP", "FOOT_H", "LEVER_R", "LEVER_T", "LEVER_H", "GRIP_Z")
+    return dict(
+        groups=GROUPS, parts=rows, dims={k: getattr(L, k) for k in keys}, families=L.FAMILIES, gates={f: L.gate_geom(f) for f in L.FAMILIES},
+        sg90=L.SG90, spacers=L.SPACERS, funnel=L.FUNNEL, hopper=L.HOPPER,
+        cameras={k: dict(h=round((v["at"][2] - L.PT) * 1000 + 10), look_mm=[round((v["look"][i] - v["at"][i]) * 1000) for i in range(3)]) for k, v in L.CAMERAS.items()},
+        arm=dict(id=arm["id"], xy_mm=[round((arm["xy"][i] - arm["plate"][i]) * 1000, 1) for i in range(2)], yaw=arm["yaw"],
+                 base_box=so["plane"]["base_box"], pan_xy=so["plane"]["pan_xy"], base_bottom=so["base_bottom"],
+                 visuals=so["visuals"]["base"], joint0=next(j for j in so["joints"] if j["name"] == "shoulder_pan")),
+        plate_margin=8,
+    )
+
+
+def parts_json_vols(out: Path) -> dict[str, float]:
+    """Volumes (mm³) from the last CAD export, kept in parts.json."""
+    f = out / "parts.json"
+    if not f.exists():
+        return {}
+    return {r["name"]: r["vol"] * 1000 for r in json.loads(f.read_text(encoding="utf-8"))["parts"] if r["vol"]}
+
+
+def inject_parts_page(data: dict) -> None:
+    tpl = (HERE / "parts_template.html").read_text(encoding="utf-8")
+    marker = "/*@PARTS@*/null"
+    if marker not in tpl:
+        raise RuntimeError("parts_template.html has no data marker")
+    (HERE / "parts.html").write_text(tpl.replace(marker, json.dumps(data, ensure_ascii=False, separators=(",", ":"))), encoding="utf-8")
+
+
 def inject_page(data: dict) -> None:
     tpl = (HERE / "page_template.html").read_text(encoding="utf-8")
     marker = "/*@LAYOUT@*/null"
@@ -248,12 +369,20 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--no-cad", action="store_true")
     ap.add_argument("--out", type=Path, default=HERE / "cad")
+    ap.add_argument("--place", action="store_true", help="print the best pan axis + yaw for each arm on its tile and stop")
     a = ap.parse_args(argv)
     routes = build_all()
+    if a.place:
+        for aid, best in place_arms(routes).items():
+            print(f"{aid}: " + ("no spot on its tile reaches every target" if best is None else f"xy={best['xy']} yaw={best['yaw']}  (tilt max {best['key'][0]:.0f}°, mean {best['key'][1]:.1f}°)"))
+        return 0
     reach = reach_report(routes)
     bad = [r for r in reach if r["tilt"] is None or r["tilt"] > 60]
     for r in bad:
         print(f"WARNING reach: {r['arm']} {r['what']} tilt={r['tilt']}")
+    hopper_rim = routes["M2"].z(0) + (L.SPOUT_GAP + 6 + L.HOPPER["h"]) / 1000
+    if routes["M1"].z_end < hopper_rim + 0.002:
+        print(f"WARNING M1 ends at {routes['M1'].z_end * 1000:.0f} mm, under the hopper rim ({hopper_rim * 1000:.0f} mm)")
     for msg in base_clearance(routes):
         print(f"WARNING base: {msg}")
     for k, r in routes.items():
@@ -263,10 +392,17 @@ def main(argv=None) -> int:
     parts = part_list(routes)
     a.out.mkdir(parents=True, exist_ok=True)
     vols = {} if a.no_cad else export_parts(parts, a.out)
-    write_bom(parts, vols, routes, reach, a.out)
+    known = parts_json_vols(a.out) if a.no_cad else vols  # --no-cad: keep the volumes of the last CAD export
+    write_bom(parts, known, routes, reach, a.out)
     data = page_layout(routes)
     (a.out / "layout.json").write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
     inject_page(data)
+    if vols:
+        write_parts_mesh(parts, a.out)
+    if (HERE / "parts_mesh.json").exists():
+        pdata = parts_data(parts, known)
+        (a.out / "parts.json").write_text(json.dumps(pdata, ensure_ascii=False, indent=1), encoding="utf-8")
+        inject_parts_page(pdata)
     print(f"parts: {len(parts)} kinds, {sum(p['qty'] for p in parts)} pieces -> {a.out}")
     return 0
 

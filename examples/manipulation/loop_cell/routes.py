@@ -135,12 +135,13 @@ def _fill(avail_mm: float) -> list[float]:
     if avail_mm < -0.5:
         raise ValueError(f"leg too short by {-avail_mm:.1f} mm")
     out: list[float] = []
-    n = int(avail_mm // 200.0)
-    out += [200.0] * n
-    rem = avail_mm - 200.0 * n
+    long, short = L.STRAIGHTS
+    n = int(avail_mm // long)
+    out += [long] * n
+    rem = avail_mm - long * n
     if rem > 0.5:
-        if abs(rem - 100.0) < 0.5:
-            out.append(100.0)
+        if abs(rem - short) < 0.5:
+            out.append(short)
         elif rem < 15.0 and out:
             out[-1] = round(out[-1] + rem, 1)
         else:
@@ -255,30 +256,22 @@ def arm_targets(routes: dict[str, Route]) -> dict[str, list[tuple[str, tuple[flo
     out["A6"] += [("盖滑道入口放盖", (x, y, z + L.CAP_H / 2000 + 0.004)), ("盖滑道入口上方", (x, y, z + L.CAP_H / 2000 + 0.05))]
     out["A4"].append(("相机前", tuple(L.INSPECT)))
     fx, fy = L.FUNNEL["xy"]
-    out["A7"] += [("漏斗上方", (fx - 0.004, fy + 0.03, 0.235)), ("倒扣位置", (fx - 0.004, fy + 0.035, 0.215))]
+    out["A7"] += [("漏斗上方", (fx - 0.004, fy + 0.03, L.POUR_Z["above"])), ("倒扣位置", (fx - 0.004, fy + 0.035, L.POUR_Z["at"]))]
     x, y, z = stop(routes["M2"])
     out["A8"] += [("料斗出口取球", (x, y, z + r)), ("料斗出口上方", (x, y, z + r + 0.05))]
     return out
 
 
-def arm_yaws(targets) -> dict[str, float]:
-    """Base yaw per arm so the middle of its work sits straight ahead of the pan zero."""
-    from . import arm_model as A
-
-    yaws = {}
-    for a in L.ARMS:
-        bx, by = a["xy"]
-        sx = sum(math.cos(math.atan2(p[1] - by, p[0] - bx)) for _, p in targets[a["id"]])
-        sy = sum(math.sin(math.atan2(p[1] - by, p[0] - bx)) for _, p in targets[a["id"]])
-        yaws[a["id"]] = math.atan2(sy, sx) - A.P["forward_yaw"]
-    return yaws
+def arm_yaws(targets=None) -> dict[str, float]:
+    """Base yaw per arm (rad). The base is squared to its tile (``yaw`` in layout, degrees)."""
+    return {a["id"]: math.radians(a["yaw"]) for a in L.ARMS}
 
 
 def reach_report(routes: dict[str, Route]) -> list[dict]:
     from . import arm_model as A
 
     targets = arm_targets(routes)
-    yaws = arm_yaws(targets)
+    yaws = arm_yaws()
     rows = []
     for a in L.ARMS:
         b = a["xy"]
@@ -287,42 +280,90 @@ def reach_report(routes: dict[str, Route]) -> list[dict]:
     return rows
 
 
-def base_clearance(routes: dict[str, Route]) -> list[str]:
-    """Things the SO-100 base footprint would sit on (chutes, nests, other bases, cones)."""
+# ---------------- arm tiles ----------------
+def obstacles(routes: dict[str, Route]) -> list[tuple[float, float, float, str]]:
+    """(x, y, radius, what) samples of everything that must stay off an arm's tile."""
+    out = []
+    for k, r in routes.items():
+        half = (r.fam["W"] / 2 + L.WALL_T) / 1000
+        n = int((r.length + r.end_ext) / 0.005) + 1
+        out += [(*r.at(i * 0.005)[0], half, f"滑道 {k}") for i in range(n)]
+        out += [(j["xy"][0], j["xy"][1], POST_R, f"{k} 支柱") for j in r.joints]
+    for u in L.UNITS:
+        if u["nest"]:
+            h = NEST / 2
+            out += [(u["nest"][0] + dx, u["nest"][1] + dy, 0.0, f"{u['id']} 工位") for dx in (-h, 0, h) for dy in (-h, 0, h)]
+    for c, cam in L.CAMERAS.items():
+        out.append((cam["at"][0], cam["at"][1], 0.025, f"{c} 相机"))
+    for nm, spec in (("漏斗", L.FUNNEL), ("料斗", L.HOPPER)):
+        out.append((spec["xy"][0] + spec["top_r"] / 1000 + 0.014, spec["xy"][1], POST_R, f"{nm}支柱"))
+    return out
+
+
+POST_R = 0.030  # post foot radius
+NEST = 0.075  # nest block edge
+
+
+def base_corners(xy, yaw) -> list[tuple[float, float]]:
     from . import arm_model as A
 
-    yaws = arm_yaws(arm_targets(routes))
     x0, y0, x1, y1 = A.P["base_box"]
+    c, s = math.cos(yaw), math.sin(yaw)
+    return [(xy[0] + c * lx - s * ly, xy[1] + s * lx + c * ly) for lx, ly in ((x0, y0), (x0, y1), (x1, y0), (x1, y1))]
+
+
+def plate_hits(pc, obs) -> set[str]:
+    h = L.ARM_PLATE / 2000
+    return {w for x, y, m, w in obs if abs(x - pc[0]) < h + m - 1e-6 and abs(y - pc[1]) < h + m - 1e-6}
+
+
+def base_clearance(routes: dict[str, Route]) -> list[str]:
+    """Each arm's tile: inside its unit, base on it, nothing else on it, no two arms on one tile."""
+    obs = obstacles(routes)
+    h = L.ARM_PLATE / 2000
     problems = []
-
-    def inside(arm, x, y, margin):
-        bx, by = arm["xy"]
-        c, s = math.cos(-yaws[arm["id"]]), math.sin(-yaws[arm["id"]])
-        lx, ly = c * (x - bx) - s * (y - by), s * (x - bx) + c * (y - by)
-        return x0 - margin <= lx <= x1 + margin and y0 - margin <= ly <= y1 + margin
-
     for a in L.ARMS:
-        for k, r in routes.items():
-            half = (r.fam["W"] / 2 + L.WALL_T) / 1000
-            n = int((r.length + r.end_ext) / 0.005) + 1
-            if any(inside(a, *r.at(i * 0.005)[0], half) for i in range(n)):
-                problems.append(f"{a['id']} 底座压到滑道 {k}")
-        for u in L.UNITS:
-            if u["nest"] and any(inside(a, u["nest"][0] + dx, u["nest"][1] + dy, 0.0) for dx in (-0.0375, 0, 0.0375) for dy in (-0.0375, 0, 0.0375)):
-                problems.append(f"{a['id']} 底座压到 {u['id']} 工位")
-        for spec, name in ((L.FUNNEL, "漏斗"), (L.HOPPER, "料斗")):
-            cx, cy = spec["xy"]
-            rr = spec["top_r"] / 1000
-            if any(inside(a, cx + rr * math.cos(t / 8 * math.pi), cy + rr * math.sin(t / 8 * math.pi), 0.0) for t in range(16)):
-                problems.append(f"{a['id']} 底座在{name}下面(漏斗/料斗架在空中,只需确认高度)")
+        pc = a["plate"]
         u = next(u for u in L.UNITS if u["id"] == a["unit"])
-        corners = []
-        c, s = math.cos(yaws[a["id"]]), math.sin(yaws[a["id"]])
-        for lx, ly in ((x0, y0), (x0, y1), (x1, y0), (x1, y1)):
-            corners.append((a["xy"][0] + c * lx - s * ly, a["xy"][1] + s * lx + c * ly))
-        if not all(u["rect"][0] - 0.005 <= x <= u["rect"][2] + 0.005 and u["rect"][1] - 0.005 <= y <= u["rect"][3] + 0.005 for x, y in corners):
-            problems.append(f"{a['id']} 底座伸出 {u['id']} 底板")
+        if not (u["rect"][0] - 1e-6 <= pc[0] - h and pc[0] + h <= u["rect"][2] + 1e-6 and u["rect"][1] - 1e-6 <= pc[1] - h and pc[1] + h <= u["rect"][3] + 1e-6):
+            problems.append(f"{a['id']} 的拼接块不在 {u['id']} 底板里")
+        if not all(abs(x - pc[0]) <= h - PLATE_MARGIN and abs(y - pc[1]) <= h - PLATE_MARGIN for x, y in base_corners(a["xy"], math.radians(a["yaw"]))):
+            problems.append(f"{a['id']} 底座伸出自己的拼接块")
+        for w in sorted(plate_hits(pc, obs)):
+            problems.append(f"{a['id']} 的拼接块上有{w}")
+        for b in L.ARMS:
+            if b["id"] > a["id"] and abs(b["plate"][0] - pc[0]) < 2 * h - 1e-6 and abs(b["plate"][1] - pc[1]) < 2 * h - 1e-6:
+                problems.append(f"{a['id']} 和 {b['id']} 的拼接块重叠")
     return problems
+
+
+PLATE_MARGIN = 0.008  # base edge to tile edge, room for the clamp dogs' lips
+
+
+def place_arms(routes: dict[str, Route]) -> dict[str, dict]:
+    """Best pan axis + squared yaw for each arm on its tile: smallest worst tool tilt, then mean."""
+    from . import arm_model as A
+
+    targets = arm_targets(routes)
+    h = L.ARM_PLATE / 2000
+    out = {}
+    steps = [k * 0.005 for k in range(-6, 7)]
+    for a in L.ARMS:
+        pc, best = a["plate"], None
+        for dx in steps:
+            for dy in steps:
+                xy = (round(pc[0] + dx, 4), round(pc[1] + dy, 4))
+                for q in range(4):
+                    if not all(abs(x - pc[0]) <= h - PLATE_MARGIN and abs(y - pc[1]) <= h - PLATE_MARGIN for x, y in base_corners(xy, q * math.pi / 2)):
+                        continue
+                    tilts = [A.tilt_needed(xy, L.PT, q * math.pi / 2, p) for _, p in targets[a["id"]]]
+                    if any(t is None for t in tilts):
+                        continue
+                    key = (max(tilts), sum(tilts) / len(tilts))
+                    if best is None or key < best["key"]:
+                        best = dict(key=key, xy=list(xy), yaw=90 * q)
+        out[a["id"]] = best
+    return out
 
 
 def drop_s(rt: Route) -> float:

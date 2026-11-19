@@ -38,35 +38,45 @@ def tile() -> cq.Workplane:
     t, skin = L.TILE_T, 4.0
     body = cq.Workplane("XY").box(L.TILE, L.TILE, t, centered=(True, True, False)).edges("|Z").fillet(3)
     depth = t - skin
-    pockets = cq.Workplane("XY").rarray(50, 50, 4, 4).rect(47, 47).extrude(depth)
+    n, g = round(L.TILE / L.GRID), L.GRID
+    pockets = cq.Workplane("XY").rarray(2 * g, 2 * g, n // 2, n // 2).rect(2 * g - 3, 2 * g - 3).extrude(depth)
     inner = cq.Workplane("XY").box(L.TILE - 8, L.TILE - 8, depth, centered=(True, True, False))
     body = body.cut(pockets.intersect(inner))
-    pts = [(-87.5 + 25 * i, -87.5 + 25 * j) for i in range(8) for j in range(8)]
+    pts = [(-L.TILE / 2 + g / 2 + g * i, -L.TILE / 2 + g / 2 + g * j) for i in range(n) for j in range(n)]
     body = body.union(cq.Workplane("XY").pushPoints(pts).circle(5).extrude(depth))
     return body.cut(cq.Workplane("XY").pushPoints(pts).circle(M4_INSERT / 2).extrude(t))
 
 
 def joiner() -> cq.Workplane:
-    """Under-tile plate across a seam (or a 4-tile corner): 4 M4 screws into the inserts."""
-    p = cq.Workplane("XY").box(50, 50, 4, centered=(True, True, False)).edges("|Z").fillet(3)
-    return p.cut(cq.Workplane("XY").pushPoints([(x, y) for x in (-12.5, 12.5) for y in (-12.5, 12.5)]).circle(M4_CLEAR / 2).extrude(4))
+    """Plate under the middle of a seam: 4 countersunk M4 into the inserts at ±GRID/2 of the seam.
+
+    Thinner than the foot pads, so the tiles still stand on their pads (z=0 faces the table)."""
+    g, t = L.GRID, L.JOINER_T
+    p = cq.Workplane("XY").box(2 * g + 10, 2 * g + 10, t, centered=(True, True, False)).edges("|Z").fillet(3)
+    pts = [(x, y) for x in (-g / 2, g / 2) for y in (-g / 2, g / 2)]
+    p = p.cut(cq.Workplane("XY").pushPoints(pts).circle(M4_CLEAR / 2).extrude(t))
+    sink = cq.Solid.makeCone(8.4 / 2, M4_CLEAR / 2, 2.0)
+    for x, y in pts:
+        p = p.cut(cq.Workplane("XY").add(sink.translate(cq.Vector(x, y, 0))))
+    return p
 
 
 def foot_pad() -> cq.Workplane:
-    """TPU pad under each tile corner (print in TPU)."""
+    """TPU pad under each tile corner, centred 15 mm in from both edges (print in TPU)."""
     return cq.Workplane("XY").box(20, 20, L.PAD_T, centered=(True, True, False)).edges("|Z").fillet(2)
 
 
 def clamp_dog(flange_h: float = 6.0) -> cq.Workplane:
-    """Holds the SO-101 base flange down onto the grid; slot for an M4 into an insert.
+    """Holds the SO-100 base flange down onto its tile; slot for an M4 into an insert.
 
-    ``flange_h``: measure your SO-101 base flange and regenerate.
+    Short enough (24 mm behind the lip) to sit between the base and the tile edge on the two
+    roomy sides of every arm tile. ``flange_h``: measure your SO-100 base flange and regenerate.
     """
     h = flange_h + 4
-    body = cq.Workplane("XY").box(32, 20, h, centered=(False, True, False))
-    lip = cq.Workplane("XY").box(8, 20, 4, centered=(False, True, False)).translate((32, 0, h - 4))
+    body = cq.Workplane("XY").box(24, 20, h, centered=(False, True, False))
+    lip = cq.Workplane("XY").box(8, 20, 4, centered=(False, True, False)).translate((24, 0, h - 4))
     body = body.union(lip)
-    slot = cq.Workplane("XY").center(14, 0).slot2D(14, M4_CLEAR).extrude(h)
+    slot = cq.Workplane("XY").center(12, 0).slot2D(L.GRID - 2, M4_CLEAR).extrude(h)
     return body.cut(slot).edges("|Z").fillet(1)
 
 
@@ -169,7 +179,8 @@ def straight(fam: str, length: float) -> cq.Workplane:
     walls = [cq.Workplane("XY").box(length, t, L.FLOOR_T + h, centered=(False, False, False)).translate((0, s * (w / 2) + (0 if s > 0 else -t), 0)) for s in (1, -1)]
     part = floor.union(walls[0]).union(walls[1])
     q = w / 4
-    return _locator_holes(part, [(8, q), (8, -q), (length - 8, q), (length - 8, -q)])
+    xs = (8, length - 8) if length >= 24 else (length / 2,)  # short trims: one pair in the middle
+    return _locator_holes(part, [(x, s * q) for x in xs for s in (1, -1)])
 
 
 def curve(fam: str) -> cq.Workplane:
@@ -207,8 +218,8 @@ def flare(fam: str) -> cq.Workplane:
 
 
 def gate(fam: str) -> cq.Workplane:
-    """Inlet stop: end wall, IR beam holes at the head item, a pin slot to hold back the second
-    item, and an SG90 cradle under the floor (pin lever: ``gate_lever``)."""
+    """Inlet stop: end wall, IR beam holes at the head item, an off-centre slot for the hold-back pin
+    and a plate under the floor for an SG90 lying on its side (pin lever: ``gate_lever``)."""
     f = _fam(fam)
     w, h, t, ln, item = f["W"], f["H"], L.WALL_T, f["gate"], f["item"]
     part = straight(fam, ln)
@@ -216,21 +227,26 @@ def gate(fam: str) -> cq.Workplane:
     head_x = ln - 4 - 1 - item / 2
     beam = cq.Workplane("XZ").center(head_x, L.FLOOR_T + f["beam_z"]).circle(2.6).extrude(w + 2 * t + 2, both=True)
     part = part.cut(beam)
-    pin_x = ln - 4 - 1 - item - 1.5
-    part = part.cut(cq.Workplane("XY").center(pin_x, 0).rect(3.2, 10).extrude(L.FLOOR_T))
-    # SG90 cradle hanging under the floor (body 22.8 x 12.6, ears 32.4 wide, holes 27.8 apart)
-    cx = pin_x - 6
-    frame = cq.Workplane("XY").box(36, 17, 16, centered=(True, True, False)).translate((cx, 0, -16))
-    frame = frame.cut(cq.Workplane("XY").box(23.2, 13.0, 16, centered=(True, True, False)).translate((cx, 0, -16)))
-    frame = frame.cut(cq.Workplane("XY").pushPoints([(cx - 13.9, 0), (cx + 13.9, 0)]).circle(1.0).extrude(-8))
-    return part.union(frame)
+    g = L.gate_geom(fam)
+    s0, s1 = g["slot"]
+    part = part.cut(cq.Workplane("XY").center((s0 + s1) / 2, g["pin_y"]).rect(s1 - s0, L.PIN_D + 0.4).extrude(L.FLOOR_T))
+    # SG90 on its side: a plate hanging under the floor with the body window and two ear screws
+    y0, y1 = g["plate_y"]
+    cx, z0 = g["servo_cx"], g["shaft_z"]
+    bw, bh = L.SG90["body"]
+    plate = cq.Workplane("XY").box(36, y1 - y0, L.FLOOR_T - (z0 - 14), centered=(True, False, False)).translate((cx, y0, z0 - 14))
+    plate = plate.cut(cq.Workplane("XZ").center(cx, z0).rect(bw + 0.4, bh + 0.6).extrude(-(y1 - y0)).translate((0, y0, 0)))
+    plate = plate.cut(cq.Workplane("XZ").pushPoints([(cx - L.SG90["hole_pitch"] / 2, z0), (cx + L.SG90["hole_pitch"] / 2, z0)]).circle(0.9).extrude(-(y1 - y0)).translate((0, y0, 0)))
+    return part.union(plate)
 
 
 def gate_lever(fam: str) -> cq.Workplane:
-    """Horn-mounted lever with the hold-back pin (trim the length to your servo horn)."""
-    arm = cq.Workplane("XY").box(24, 6, 3, centered=(False, True, False)).edges("|Z").fillet(2.5)
-    arm = arm.cut(_cyl(1.0, 3, 0, 3, 0)).cut(_cyl(1.0, 3, 0, 9, 0))
-    return arm.union(_cyl(1.4, 12 + _fam(fam)["H"] / 2, 3, 21, 0))
+    """Lever for the SG90 horn: pivot at x=3 (horn holes at x=3 and 9, along y), hold-back pin at
+    x=3+LEVER_R pointing up. Mount it so the pin sits under the gate's off-centre slot."""
+    g = L.gate_geom(fam)
+    arm = cq.Workplane("XY").box(24, L.LEVER_T, L.LEVER_H, centered=(False, True, True)).edges("|Y").fillet(2.5)
+    arm = arm.cut(cq.Workplane("XZ").pushPoints([(3, 0), (9, 0)]).circle(1.0).extrude(L.LEVER_T, both=True))
+    return arm.union(_cyl(L.PIN_D / 2, g["pin_len"], L.LEVER_H / 2, 3 + L.LEVER_R, 0))
 
 
 def saddle(fam: str, flat: bool = False) -> cq.Workplane:
@@ -253,7 +269,8 @@ def saddle(fam: str, flat: bool = False) -> cq.Workplane:
 def post_foot() -> cq.Workplane:
     disk = _cyl(30, 5).union(_cyl(8, L.FOOT_H - 5, 5))
     disk = disk.cut(_cyl(M4_CLEAR / 2, L.FOOT_H)).cut(_hex_trap(M4_NUT_AF, 3.5))
-    return disk.cut(cq.Workplane("XY").pushPoints([(-12.5, 18), (12.5, 18), (-12.5, -18), (12.5, -18)]).circle(M4_CLEAR / 2).extrude(5))
+    g = L.GRID
+    return disk.cut(cq.Workplane("XY").pushPoints([(-g / 2, g), (g / 2, g), (-g / 2, -g), (g / 2, -g)]).circle(M4_CLEAR / 2).extrude(5))
 
 
 def spacer(h: float) -> cq.Workplane:
@@ -261,14 +278,15 @@ def spacer(h: float) -> cq.Workplane:
 
 
 def nest() -> cq.Workplane:
-    """Puck seat with a 45° lead-in; bolts to the grid at (±25, ±25)."""
+    """Puck seat with a 45° lead-in; bolts to the grid at (±1.5, ±1.5) grid steps (±30 mm)."""
     t, floor, straight_h = 9.0, 2.0, 3.0
     body = cq.Workplane("XY").box(75, 75, t, centered=(True, True, False)).edges("|Z").fillet(4)
     pocket_r = L.PUCK_D / 2 + 0.4
     body = body.cut(_cyl(pocket_r, t, floor))
     cone = cq.Workplane("XY").workplane(offset=floor + straight_h).circle(pocket_r).workplane(offset=t - floor - straight_h).circle(30).loft()
     body = body.cut(cone)
-    pts = [(x, y) for x in (-25, 25) for y in (-25, 25)]
+    b = 1.5 * L.GRID
+    pts = [(x, y) for x in (-b, b) for y in (-b, b)]
     body = body.cut(cq.Workplane("XY").pushPoints(pts).circle(M4_CLEAR / 2).extrude(t))
     return body.cut(cq.Workplane("XY").workplane(offset=t - 3).pushPoints(pts).circle(4.2).extrude(3))
 
@@ -297,7 +315,7 @@ def funnel() -> cq.Workplane:
 
 def camera_post(h: float) -> cq.Workplane:
     """Upright for a small USB camera; bolts to the grid. Camera plate: 2 x M2 at 20 mm."""
-    base = cq.Workplane("XY").box(50, 30, 5, centered=(True, True, False)).cut(cq.Workplane("XY").pushPoints([(-12.5, 0), (12.5, 0)]).circle(M4_CLEAR / 2).extrude(5))
+    base = cq.Workplane("XY").box(50, 30, 5, centered=(True, True, False)).cut(cq.Workplane("XY").pushPoints([(-L.GRID, 0), (L.GRID, 0)]).circle(M4_CLEAR / 2).extrude(5))
     col = cq.Workplane("XY").box(12, 12, h, centered=(True, True, False)).translate((0, 0, 5))
     head = cq.Workplane("XY").box(30, 4, 30, centered=(True, True, False)).translate((0, 8, h - 25))
     head = head.cut(cq.Workplane("XZ").pushPoints([(-10, h - 10), (10, h - 10)]).circle(1.1).extrude(-20, both=True))
